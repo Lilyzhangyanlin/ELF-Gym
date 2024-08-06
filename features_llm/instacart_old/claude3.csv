@@ -1,0 +1,259 @@
+,feature_description,code
+0,user_total_orders - Total number of orders placed by the user,"
+# Compute the total number of orders for each user
+user_order_counts = Orders['user_id'].value_counts().reset_index()
+user_order_counts.columns = ['user_id', 'user_total_orders']
+
+# Merge the user_total_orders with the Orders DataFrame
+Orders = Orders.merge(user_order_counts, on='user_id', how='left')
+"
+1,user_order_product_count - Total number of products ordered by the user across all orders,"
+# Merge the Order_products__train and Order_products__prior dataframes
+order_products = pd.concat([Order_products__train, Order_products__prior], ignore_index=True)
+
+# Group the order_products dataframe by user_id and product_id, and count the occurrences
+user_product_counts = order_products.groupby(['order_id', 'product_id']).size().reset_index(name='user_product_count')
+
+# Sum the user_product_count for each user to get the total number of products ordered
+user_order_product_count = user_product_counts.groupby('order_id')['user_product_count'].sum().reset_index()
+
+# Merge the user_order_product_count with the Orders dataframe
+Orders = Orders.merge(user_order_product_count, on='order_id', how='left')
+"
+2,user_distinct_product_count - Number of distinct products ordered by the user across all orders,"
+import pandas as pd
+
+# Combine order_products__train and order_products__prior
+order_products = pd.concat([Order_products__train, Order_products__prior], ignore_index=True)
+
+# Count distinct products for each user
+user_distinct_product_count = order_products.groupby('order_id')['product_id'].nunique().reset_index()
+user_distinct_product_count.columns = ['order_id', 'user_distinct_product_count']
+
+# Merge the new feature with the Orders DataFrame
+Orders = Orders.merge(user_distinct_product_count, on='order_id', how='left')
+"
+3,user_reorder_ratio - Ratio of reordered products to total products ordered by the user,"
+import pandas as pd
+
+# Merge the order_products and orders tables to get user_id and reordered information
+order_products = pd.concat([Order_products__train, Order_products__prior], ignore_index=True)
+order_products = order_products.merge(Orders[['order_id', 'user_id']], on='order_id', how='left')
+
+# Calculate the total number of products ordered and reordered for each user
+user_order_stats = order_products.groupby('user_id')['reordered'].agg(['sum', 'count'])
+user_order_stats.columns = ['reordered_count', 'total_count']
+
+# Compute the user_reorder_ratio
+user_order_stats['user_reorder_ratio'] = user_order_stats['reordered_count'] / user_order_stats['total_count']
+
+# Merge the user_reorder_ratio back into the Orders DataFrame
+Orders = Orders.merge(user_order_stats['user_reorder_ratio'], left_on='user_id', right_index=True, how='left')
+"
+4,user_avg_days_since_prior - Average number of days since the user's prior order,"
+import pandas as pd
+
+# Group the Orders DataFrame by user_id and compute the mean of days_since_prior_order
+user_avg_days_since_prior = Orders.groupby('user_id')['days_since_prior_order'].mean().reset_index()
+
+# Merge the computed feature with the Orders DataFrame
+Orders = Orders.merge(user_avg_days_since_prior, on='user_id', how='left')
+
+# Rename the column
+Orders.rename(columns={'days_since_prior_order': 'user_avg_days_since_prior'}, inplace=True)
+"
+5,user_order_hour_mode - Most frequent hour of the day when the user places orders,"
+import pandas as pd
+
+# Group the Orders DataFrame by user_id and order_hour_of_day
+user_order_hours = Orders.groupby(['user_id', 'order_hour_of_day'])['order_id'].count().reset_index()
+
+# Compute the mode of order_hour_of_day for each user_id
+user_order_hour_mode = user_order_hours.groupby('user_id')['order_hour_of_day'].apply(lambda x: x.mode().iloc[0])
+
+# Convert the Series to a DataFrame
+user_order_hour_mode = user_order_hour_mode.reset_index()
+
+# Rename the column
+user_order_hour_mode.columns = ['user_id', 'user_order_hour_mode']
+
+# Merge the new feature with the Orders DataFrame
+Orders = Orders.merge(user_order_hour_mode, on='user_id', how='left')
+"
+6,user_order_dow_mode - Most frequent day of the week when the user places orders,"
+import pandas as pd
+
+# Calculate the mode of order_dow for each user_id
+user_order_dow_mode = Orders.groupby('user_id')['order_dow'].apply(lambda x: x.mode().iloc[0])
+
+# Add the new feature to the Orders DataFrame
+Orders['user_order_dow_mode'] = Orders['user_id'].map(user_order_dow_mode)
+"
+7,product_reorder_count - Number of times the product has been reordered by any user,
+8,product_reorder_ratio - Ratio of times the product has been reordered to the total number of times it has been ordered,"
+import pandas as pd
+
+# Merge Order_products__train and Order_products__prior
+order_products = pd.concat([Order_products__train, Order_products__prior], ignore_index=True)
+
+# Calculate the reorder ratio for each product
+product_reorder_ratio = (
+    order_products.groupby('product_id')['reordered']
+    .agg(['sum', 'count'])
+    .reset_index()
+    .rename(columns={'sum': 'reorders', 'count': 'total_orders'})
+)
+product_reorder_ratio['product_reorder_ratio'] = product_reorder_ratio['reorders'] / product_reorder_ratio['total_orders']
+
+# Join the Orders and Order_products tables to get product_id in Orders
+orders_with_products = Orders.merge(order_products[['order_id', 'product_id']], how='left', on='order_id')
+
+# Merge the reorder ratio with the joined Orders-Order_products table
+orders_with_products = orders_with_products.merge(product_reorder_ratio, how='left', on='product_id')
+
+# Fill NaN values with 0 for products that have never been ordered
+orders_with_products['product_reorder_ratio'] = orders_with_products['product_reorder_ratio'].fillna(0)
+
+# Drop the unnecessary columns and update the Orders table
+Orders = orders_with_products[Orders.columns.tolist() + ['product_reorder_ratio']]
+"
+9,product_order_count - Total number of times the product has been ordered by any user,"
+# Combine the order_products__train and order_products__prior DataFrames
+order_products = pd.concat([Order_products__train, Order_products__prior], ignore_index=True)
+
+# Group the order_products DataFrame by product_id and count the occurrences
+product_order_count = order_products.groupby('product_id').size().reset_index(name='product_order_count')
+
+# Merge the product_order_count DataFrame with the Products DataFrame
+Products = Products.merge(product_order_count, how='left', on='product_id')
+"
+10,product_distinct_user_count - Number of distinct users who have ordered the product,"
+# Merge Orders and Order_products__train to get user_id, product_id, and order_id together
+orders_products = Orders.merge(Order_products__train, on='order_id', how='inner')
+
+# Count the distinct users for each product
+product_distinct_user_count = orders_products.groupby('product_id')['user_id'].nunique().reset_index()
+product_distinct_user_count.columns = ['product_id', 'product_distinct_user_count']
+
+# Merge the new feature back with Orders
+Orders = Orders.merge(product_distinct_user_count, left_on='order_id', right_on='product_id', how='left')
+Orders = Orders.drop('product_id', axis=1)
+"
+11,aisle_product_count - Number of products in the aisle,"
+# Merge Order_products__train and Products tables to get aisle information for each product
+order_products = Order_products__train.merge(Products, on='product_id', how='left')
+
+# Group by aisle_id and count the number of products in each aisle
+aisle_product_count = order_products.groupby('aisle_id')['product_id'].size().reset_index()
+aisle_product_count.columns = ['aisle_id', 'aisle_product_count']
+
+# Merge order_products and aisle_product_count to get aisle_product_count for each order_id and product_id
+order_products = order_products.merge(aisle_product_count, on='aisle_id', how='left')
+
+# Group by order_id and take the maximum aisle_product_count for each order
+order_aisle_product_count = order_products.groupby('order_id')['aisle_product_count'].max().reset_index()
+
+# Merge the order_aisle_product_count with the Orders table
+Orders = Orders.merge(order_aisle_product_count, on='order_id', how='left')
+"
+12,aisle_reorder_ratio - Ratio of reordered products to total products ordered in the aisle,"
+import pandas as pd
+
+# Merge Order_products__train and Order_products__prior with Products
+merged_train = pd.merge(Order_products__train, Products[['product_id', 'aisle_id']], on='product_id', how='left')
+merged_prior = pd.merge(Order_products__prior, Products[['product_id', 'aisle_id']], on='product_id', how='left')
+merged_data = pd.concat([merged_train, merged_prior], ignore_index=True)
+
+# Group by aisle_id and reordered, and count the occurrences
+aisle_reorder_counts = merged_data.groupby(['aisle_id', 'reordered']).size().reset_index(name='count')
+
+# Pivot the data to get reordered and total counts for each aisle
+aisle_reorder_pivot = aisle_reorder_counts.pivot(index='aisle_id', columns='reordered', values='count').reset_index().fillna(0)
+aisle_reorder_pivot.columns = ['aisle_id', 'reordered_count', 'total_count']
+
+# Calculate the aisle_reorder_ratio
+aisle_reorder_pivot['aisle_reorder_ratio'] = aisle_reorder_pivot['reordered_count'] / aisle_reorder_pivot['total_count']
+
+# Merge the calculated ratios with the Orders table
+Orders = pd.merge(Orders, aisle_reorder_pivot[['aisle_id', 'aisle_reorder_ratio']], how='left', left_on='order_id', right_on='aisle_id')
+Orders.drop('aisle_id', axis=1, inplace=True)
+"
+13,department_product_count - Number of products in the department,"
+# Merge Products and Departments tables to get the department for each product
+product_department = Products.merge(Departments, left_on='department_id', right_on='department_id', how='left')
+
+# Group by department_id and count the number of products in each department
+department_product_count = product_department.groupby('department_id')['product_id'].count().reset_index()
+department_product_count.columns = ['department_id', 'department_product_count']
+
+# Merge Orders with Products to get department_id for each order
+orders_products = Orders.merge(Products[['product_id', 'department_id']], left_on='order_id', right_on='product_id', how='left')
+
+# Merge with department_product_count to add the new feature
+Orders = orders_products.merge(department_product_count, on='department_id', how='left')
+"
+14,department_reorder_ratio - Ratio of reordered products to total products ordered in the department,"
+import pandas as pd
+
+# Merge Products and Departments to get department information for each product
+products_departments = Products.merge(Departments, on='department_id', how='left')
+
+# Merge with Order_products__prior to get reorder information
+products_departments_prior = products_departments.merge(Order_products__prior, on='product_id', how='left')
+
+# Calculate department reorder ratio
+department_reorder_ratio = (
+    products_departments_prior.groupby('department_id')['reordered']
+    .agg(['sum', 'count'])
+    .reset_index()
+    .rename(columns={'sum': 'reordered_sum', 'count': 'total_count'})
+)
+department_reorder_ratio['department_reorder_ratio'] = department_reorder_ratio['reordered_sum'] / department_reorder_ratio['total_count']
+department_reorder_ratio = department_reorder_ratio[['department_id', 'department_reorder_ratio']]
+
+# Merge Orders with Products to get department_id
+orders_products = Orders.merge(Products[['product_id', 'department_id']], left_on='order_id', right_on='product_id', how='left')
+
+# Merge with department reorder ratio
+orders_products = orders_products.merge(department_reorder_ratio, on='department_id', how='left')
+
+# Update Orders with the new feature
+Orders = orders_products[Orders.columns.tolist() + ['department_reorder_ratio']]
+"
+15,order_size - Number of products in the order,"
+# Create a new column 'order_size' in the Orders DataFrame
+Orders = Orders.merge(Order_products__train.groupby('order_id').size().reset_index(name='order_size'), on='order_id', how='left')
+Orders = Orders.merge(Order_products__prior.groupby('order_id').size().reset_index(name='order_size'), on='order_id', how='left', suffixes=('_train', '_prior'))
+
+# Fill NaN values with 0 for orders without any products
+Orders['order_size'] = Orders['order_size_train'].fillna(0) + Orders['order_size_prior'].fillna(0)
+
+# Drop the temporary columns
+Orders = Orders.drop(['order_size_train', 'order_size_prior'], axis=1)
+"
+16,order_distinct_aisle_count - Number of distinct aisles represented in the order,"
+import pandas as pd
+
+# Merge Orders, Order_products__train, and Products tables
+merged_df = Orders.merge(Order_products__train, on='order_id', how='left')
+merged_df = merged_df.merge(Products[['product_id', 'aisle_id']], on='product_id', how='left')
+
+# Count distinct aisles for each order
+Orders['order_distinct_aisle_count'] = merged_df.groupby('order_id')['aisle_id'].apply(lambda x: x.nunique())
+"
+17,order_distinct_department_count - Number of distinct departments represented in the order,"
+import pandas as pd
+
+# Merge Orders with Order_products__train to get the product_ids for each order
+orders_products = pd.merge(Orders, Order_products__train, on='order_id', how='left')
+
+# Merge with Products to get the department_id for each product_id
+orders_products = pd.merge(orders_products, Products[['product_id', 'department_id']], on='product_id', how='left')
+
+# Group by order_id and count distinct department_ids
+order_distinct_department_count = orders_products.groupby('order_id')['department_id'].nunique().reset_index()
+order_distinct_department_count.columns = ['order_id', 'order_distinct_department_count']
+
+# Merge the new feature back into the Orders DataFrame
+Orders = pd.merge(Orders, order_distinct_department_count, on='order_id', how='left')
+"

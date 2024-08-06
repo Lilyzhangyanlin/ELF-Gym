@@ -1,0 +1,187 @@
+,feature_description,code
+0,ProductAisleFrequency - Frequency of the product's aisle in the user's order history,"
+# Merge Order_products__prior with Orders and Products to get user_id, product_id, and aisle_id
+prior_merged = pd.merge(Order_products__prior, Orders, on='order_id')
+prior_merged = pd.merge(prior_merged, Products, on='product_id')
+prior_merged = pd.merge(prior_merged, Aisles, on='aisle_id')
+
+# Group by user_id and aisle_id, and count the frequency of each aisle
+aisle_freq = prior_merged.groupby(['user_id', 'aisle_id']).size().reset_index(name='ProductAisleFrequency')
+
+# Merge the frequency table with Order_products__train
+Order_products__train = pd.merge(Order_products__train, Orders, on='order_id')
+Order_products__train = pd.merge(Order_products__train, Products, on='product_id')
+Order_products__train = pd.merge(Order_products__train, Aisles, on='aisle_id')
+Order_products__train = pd.merge(Order_products__train, aisle_freq, on=['user_id', 'aisle_id'], how='left')
+Order_products__train['ProductAisleFrequency'].fillna(0, inplace=True)
+"
+1,ProductDepartmentFrequency - Frequency of the product's department in the user's order history,"
+# Merge Order_products__prior with Orders and Products to get department_id
+prior_with_orders_and_products = Order_products__prior.merge(Orders, on='order_id').merge(Products, on='product_id')
+
+# Group by user_id and department_id to get frequency of each department for each user
+department_frequency = prior_with_orders_and_products.groupby(['user_id', 'department_id']).size().reset_index(name='ProductDepartmentFrequency')
+
+# Merge Order_products__train with Orders and Products to get user_id and department_id
+train_with_orders_and_products = Order_products__train.merge(Orders, on='order_id').merge(Products, on='product_id')
+
+# Merge with department_frequency to get the frequency of the product's department in the user's order history
+Order_products__train = train_with_orders_and_products.merge(department_frequency, on=['user_id', 'department_id'], how='left').fillna(0)
+"
+2,ProductOrderCount - Count of times the product was ordered by the user,"
+Order_products__train = Order_products__train.merge(Order_products__prior.groupby('product_id')['product_id'].count().reset_index(name='ProductOrderCount'), on='product_id')
+"
+3,ProductOrderRatio - Ratio of times the product was ordered to the total number of orders by the user,"
+Order_products__train = Order_products__train.merge(Orders, on='order_id')
+product_order_counts = Order_products__train.groupby(['user_id', 'product_id']).size().reset_index(name='product_orders')
+user_order_counts = Orders.groupby('user_id').size().reset_index(name='user_orders')
+product_order_counts = product_order_counts.merge(user_order_counts, on='user_id')
+Order_products__train['ProductOrderRatio'] = Order_products__train.apply(lambda row: product_order_counts[(product_order_counts['user_id'] == row['user_id']) & (product_order_counts['product_id'] == row['product_id'])]['product_orders'].values[0] / product_order_counts[(product_order_counts['user_id'] == row['user_id'])]['user_orders'].values[0], axis=1)
+"
+4,UserOrderFrequency - Frequency of the user's orders,"
+Order_products__train = Order_products__train.merge(Orders, on='order_id')
+Order_products__train = Order_products__train.merge(Orders.groupby('user_id')['order_id'].count().reset_index(name='UserOrderFrequency'), on='user_id')
+"
+5,UserOrderRecency - Time since the user's last order,"
+Order_products__train = Order_products__train.merge(Orders, on='order_id')
+Order_products__train['UserOrderRecency'] = Order_products__train.groupby('user_id')['days_since_prior_order'].transform('max') - Order_products__train['days_since_prior_order']
+"
+6,UserOrderAverageDays - Average days between the user's orders,"
+Orders['UserOrderAverageDays'] = Orders.groupby('user_id')['days_since_prior_order'].transform('mean')
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'UserOrderAverageDays']], on='order_id')
+"
+7,ProductAddToCartOrderAverage - Average add-to-cart order of the product in the user's order history,"
+Order_products__prior_avg = Order_products__prior.groupby('product_id')['add_to_cart_order'].mean().reset_index()
+Order_products__prior_avg.columns = ['product_id', 'ProductAddToCartOrderAverage']
+
+Order_products__train = pd.merge(Order_products__train, Order_products__prior_avg, on='product_id', how='left')
+Order_products__train['ProductAddToCartOrderAverage'].fillna(0, inplace=True)
+"
+8,ProductReorderedRatio - Ratio of times the product was reordered to the total number of times it was ordered by the user,"
+Order_products__prior_reordered = Order_products__prior[Order_products__prior['reordered'] == 1]
+product_reordered_count = Order_products__prior_reordered.groupby('product_id')['reordered'].count().reset_index(name='reordered_count')
+
+product_ordered_count = Order_products__prior.groupby('product_id')['product_id'].count().reset_index(name='ordered_count')
+
+product_counts = product_reordered_count.merge(product_ordered_count, on='product_id')
+product_counts['ProductReorderedRatio'] = product_counts['reordered_count'] / product_counts['ordered_count']
+
+Order_products__train = Order_products__train.merge(product_counts[['product_id', 'ProductReorderedRatio']], on='product_id')
+"
+9,OrderDowFrequency - Frequency of the day of the week the order was placed,"
+Order_products__train = Order_products__train.merge(Orders, on='order_id')
+OrderDowFrequency = Orders['order_dow'].value_counts()
+Order_products__train['OrderDowFrequency'] = Order_products__train['order_dow'].map(OrderDowFrequency)
+"
+10,OrderHourFrequency - Frequency of the hour of the day the order was placed,"
+Order_products__train = Order_products__train.merge(Orders, on='order_id')
+OrderHourFrequency = Orders['order_hour_of_day'].value_counts()
+Order_products__train['OrderHourFrequency'] = Order_products__train['order_hour_of_day'].map(OrderHourFrequency)
+"
+11,ProductAisleRank - Rank of the product's aisle by frequency in the user's order history,"
+# Merge Order_products__prior with Orders and Products to get user_id, product_id, and aisle_id
+prior_merged = pd.merge(Order_products__prior, Orders, on='order_id')
+prior_merged = pd.merge(prior_merged, Products, on='product_id')
+prior_merged = pd.merge(prior_merged, Aisles, on='aisle_id')
+
+# Group by user_id and aisle_id, and count the frequency of each aisle
+aisle_freq = prior_merged.groupby(['user_id', 'aisle_id']).size().reset_index(name='freq')
+
+# Rank the aisles by frequency for each user
+aisle_freq['ProductAisleRank'] = aisle_freq.groupby('user_id')['freq'].rank(method='dense', ascending=False)
+
+# Merge the ranked aisles back with Order_products__train
+Order_products__train = pd.merge(Order_products__train, Orders, on='order_id')
+Order_products__train = pd.merge(Order_products__train, Products, on='product_id')
+Order_products__train = pd.merge(Order_products__train, aisle_freq[['user_id', 'aisle_id', 'ProductAisleRank']], on=['user_id', 'aisle_id'])
+"
+12,ProductDepartmentRank - Rank of the product's department by frequency in the user's order history,"
+# Merge Order_products__prior with Orders and Products to get user_id, product_id, and department_id
+prior_merged = pd.merge(Order_products__prior, Orders, on='order_id')
+prior_merged = pd.merge(prior_merged, Products, on='product_id')
+prior_merged = pd.merge(prior_merged, Departments, on='department_id')
+
+# Group by user_id and department_id, and count the frequency of each department
+department_frequency = prior_merged.groupby(['user_id', 'department_id']).size().reset_index(name='frequency')
+
+# Rank the departments by frequency for each user
+department_frequency['ProductDepartmentRank'] = department_frequency.groupby('user_id')['frequency'].rank(method='dense', ascending=False)
+
+# Merge the result back with Order_products__train
+Order_products__train = pd.merge(Order_products__train, Orders, on='order_id')
+Order_products__train = pd.merge(Order_products__train, Products, on='product_id')
+Order_products__train = pd.merge(Order_products__train, Departments, on='department_id')
+Order_products__train = pd.merge(Order_products__train, department_frequency[['user_id', 'department_id', 'ProductDepartmentRank']], on=['user_id', 'department_id'])
+"
+13,UserProductOrderSequence - Sequence of the product in the user's order history,"
+Order_products__prior = Order_products__prior.merge(Orders, on='order_id')
+Order_products__prior = Order_products__prior.sort_values(['user_id', 'order_number', 'add_to_cart_order'])
+Order_products__prior['UserProductOrderSequence'] = Order_products__prior.groupby(['user_id', 'product_id']).cumcount() + 1
+Order_products__train = Order_products__train.merge(Order_products__prior[['order_id', 'product_id', 'UserProductOrderSequence']], on=['order_id', 'product_id'], how='left')
+Order_products__train['UserProductOrderSequence'].fillna(0, inplace=True)
+"
+14,ProductOrderSequenceAverage - Average sequence of the product in the user's order history,"
+# Merge Order_products__prior with Orders to get user_id
+Order_products__prior = Order_products__prior.merge(Orders, on='order_id')
+
+# Group by user_id and product_id, and calculate the average add_to_cart_order
+avg_order_seq = Order_products__prior.groupby(['user_id', 'product_id'])['add_to_cart_order'].mean().reset_index()
+
+# Merge avg_order_seq with Order_products__train
+Order_products__train = Order_products__train.merge(avg_order_seq, on='product_id', how='left')
+
+# Rename the column
+Order_products__train = Order_products__train.rename(columns={'add_to_cart_order': 'ProductOrderSequenceAverage'})
+
+# Fill NaN values with 0 (assuming products without prior orders have an average order sequence of 0)
+Order_products__train['ProductOrderSequenceAverage'].fillna(0, inplace=True)
+"
+15,ProductOrderSequenceStd - Standard deviation of the sequence of the product in the user's order history,"
+Order_products__prior = Order_products__prior.merge(Orders, on='order_id')
+Order_products__prior = Order_products__prior.merge(Products, on='product_id')
+
+product_order_sequence = Order_products__prior.groupby(['user_id', 'product_id'])['add_to_cart_order'].std().reset_index()
+product_order_sequence.columns = ['user_id', 'product_id', 'ProductOrderSequenceStd']
+
+Order_products__train = Order_products__train.merge(Orders, on='order_id')
+Order_products__train = Order_products__train.merge(product_order_sequence, on=['user_id', 'product_id'], how='left')
+Order_products__train['ProductOrderSequenceStd'].fillna(0, inplace=True)
+"
+16,UserProductOrderRatio - Ratio of times the product was ordered to the total number of products ordered by the user,"
+Order_products__train = Order_products__train.merge(Orders, on='order_id')
+user_product_counts = Order_products__train.groupby('user_id')['product_id'].count().reset_index()
+user_product_counts.columns = ['user_id', 'total_products_ordered']
+user_product_order_counts = Order_products__train.groupby(['user_id', 'product_id']).size().reset_index(name='product_order_count')
+user_product_order_counts = user_product_order_counts.merge(user_product_counts, on='user_id')
+user_product_order_counts['UserProductOrderRatio'] = user_product_order_counts['product_order_count'] / user_product_order_counts['total_products_ordered']
+Order_products__train = Order_products__train.merge(user_product_order_counts[['user_id', 'product_id', 'UserProductOrderRatio']], on=['user_id', 'product_id'])
+"
+17,ProductOrderRatioAverage - Average ratio of times the product was ordered to the total number of products ordered by the user,"
+# Merge Order_products__train with Orders on order_id
+merged = pd.merge(Order_products__train, Orders, on='order_id')
+
+# Group by user_id and product_id, count the number of orders
+product_orders = merged.groupby(['user_id', 'product_id']).size().reset_index(name='product_orders')
+
+# Group by user_id, count the total number of orders
+total_orders = merged.groupby('user_id').size().reset_index(name='total_orders')
+
+# Merge product_orders with total_orders on user_id
+merged_product_orders = pd.merge(product_orders, total_orders, on='user_id')
+
+# Calculate the ratio
+merged_product_orders['ProductOrderRatio'] = merged_product_orders['product_orders'] / merged_product_orders['total_orders']
+
+# Group by product_id, calculate the average ratio
+average_ratio = merged_product_orders.groupby('product_id')['ProductOrderRatio'].mean().reset_index(name='ProductOrderRatioAverage')
+
+# Merge Order_products__train with average_ratio on product_id
+Order_products__train = pd.merge(Order_products__train, average_ratio, on='product_id')
+"
+18,ProductOrderRatioStd - Standard deviation of the ratio of times the product was ordered to the total number of products ordered by the user,"
+Order_products__train = Order_products__train.merge(Orders, on='order_id')
+product_order_ratio = Order_products__train.groupby('user_id')['product_id'].value_counts().div(Order_products__train.groupby('user_id')['product_id'].count()).reset_index(name='ProductOrderRatio')
+product_order_ratio_std = product_order_ratio.groupby('user_id')['ProductOrderRatio'].std().reset_index(name='ProductOrderRatioStd')
+Order_products__train = Order_products__train.merge(product_order_ratio_std, on='user_id')
+Order_products__train['ProductOrderRatioStd'] = Order_products__train['ProductOrderRatioStd'].fillna(0)
+"

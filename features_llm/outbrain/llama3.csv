@@ -1,0 +1,86 @@
+,feature_description,code
+0,AdvertiserFrequency - Frequency of the advertiser_id in the Promoted table for each ad_id,"
+advertiser_frequency = Promoted.groupby('ad_id')['advertiser_id'].count().reset_index(name='AdvertiserFrequency')
+Clicks = Clicks.merge(advertiser_frequency, on='ad_id', how='left')
+"
+1,CampaignFrequency - Frequency of the campaign_id in the Promoted table for each ad_id,"
+ad_campaign_frequency = Promoted.groupby('ad_id')['campaign_id'].count().reset_index(name='CampaignFrequency')
+Clicks = Clicks.merge(ad_campaign_frequency, on='ad_id', how='left')
+"
+2,DocumentPopularity - Count of uuid in the Pageviews table for each document_id,"
+Clicks['DocumentPopularity'] = Clicks['ad_id'].map(Promoted.merge(Pageviews.groupby('document_id')['uuid'].count().reset_index(), on='document_id').set_index('ad_id')['uuid'])
+"
+3,DocumentSourceFrequency - Frequency of the source_id in the Documents_meta table for each document_id,"
+Documents_meta_source_frequency = Documents_meta.groupby('document_id')['source_id'].count().reset_index(name='DocumentSourceFrequency')
+Clicks = Clicks.merge(Promoted[['ad_id', 'document_id']], on='ad_id', how='left')
+Clicks = Clicks.merge(Documents_meta_source_frequency, on='document_id', how='left')
+"
+4,DocumentPublisherFrequency - Frequency of the publisher_id in the Documents_meta table for each document_id,"
+publisher_frequency = Documents_meta.groupby('document_id')['publisher_id'].count().reset_index(name='DocumentPublisherFrequency')
+Clicks = Clicks.merge(Promoted[['ad_id', 'document_id']], on='ad_id', how='left')
+Clicks = Clicks.merge(publisher_frequency, on='document_id', how='left')
+"
+5,DocumentTopicDiversity - Count of unique topic_id in the Documents_topics table for each document_id,"
+Clicks['DocumentTopicDiversity'] = Clicks['ad_id'].map(Promoted.merge(Documents_topics.groupby('document_id')['topic_id'].nunique().reset_index(), on='document_id').set_index('ad_id')['topic_id'])
+"
+6,DocumentEntityDiversity - Count of unique entity_id in the Documents_entities table for each document_id,"
+Clicks['DocumentEntityDiversity'] = Clicks['ad_id'].map(Promoted.merge(Documents_entities.groupby('document_id')['entity_id'].nunique().reset_index(), on='document_id').set_index('ad_id')['entity_id'])
+"
+7,DocumentCategoryDiversity - Count of unique category_id in the Documents_categories table for each document_id,"
+Clicks = Clicks.merge(Promoted, on='ad_id').merge(Documents_categories.groupby('document_id')['category_id'].nunique().reset_index(), on='document_id')
+Clicks['DocumentCategoryDiversity'] = Clicks['category_id']
+"
+8,UserPageviewFrequency - Frequency of uuid in the Pageviews table,"
+Clicks['UserPageviewFrequency'] = Clicks['display_id'].apply(lambda x: Pageviews[Pageviews['document_id'].isin(Promoted[Promoted['ad_id'] == x]['document_id'])]['uuid'].value_counts().mean())
+"
+9,UserDocumentFrequency - Frequency of document_id in the Pageviews table for each uuid,
+10,UserPlatformFrequency - Frequency of platform in the Pageviews table for each uuid,
+11,UserGeoLocationFrequency - Frequency of geo_location in the Pageviews table for each uuid,"
+Clicks = Clicks.merge(Events[['display_id', 'uuid']], on='display_id', how='left')
+Clicks['UserGeoLocationFrequency'] = Clicks.merge(Pageviews.groupby('uuid')['geo_location'].value_counts().reset_index(name='UserGeoLocationFrequency'), on='uuid', how='left')['UserGeoLocationFrequency'].fillna(0)
+"
+12,UserTrafficSourceFrequency - Frequency of traffic_source in the Pageviews table for each uuid,
+13,AdClickThroughRate - Ratio of clicked to total count of ad_id in the Clicks table,"
+ad_click_counts = Clicks.groupby('ad_id')['clicked'].sum()
+ad_total_counts = Clicks.groupby('ad_id')['clicked'].count()
+ad_click_through_rates = ad_click_counts / ad_total_counts
+Clicks['AdClickThroughRate'] = Clicks['ad_id'].map(ad_click_through_rates)
+"
+14,DisplayClickThroughRate - Ratio of clicked to total count of display_id in the Clicks table,"
+Clicks['DisplayClickThroughRate'] = Clicks['display_id'].map(Clicks.groupby('display_id')['clicked'].mean())
+"
+15,AdDocumentFrequency - Frequency of document_id in the Promoted table for each ad_id,"
+ad_document_frequency = Promoted.groupby('ad_id')['document_id'].count().reset_index(name='AdDocumentFrequency')
+Clicks = Clicks.merge(ad_document_frequency, on='ad_id', how='left')
+"
+16,AdTopicFrequency - Frequency of topic_id in the Documents_topics table for each ad_id,"
+AdTopicFrequency = Documents_topics.groupby('topic_id')['document_id'].count().reset_index()
+AdTopicFrequency.columns = ['topic_id', 'topic_frequency']
+
+AdDocumentFrequency = Documents_topics.groupby('document_id')['topic_id'].count().reset_index()
+AdDocumentFrequency.columns = ['document_id', 'document_topic_frequency']
+
+PromotedAdDocument = Promoted.merge(AdDocumentFrequency, on='document_id', how='left')
+
+AdTopicFrequencyPerAd = PromotedAdDocument.groupby('ad_id')['document_topic_frequency'].mean().reset_index()
+AdTopicFrequencyPerAd.columns = ['ad_id', 'AdTopicFrequency']
+
+Clicks = Clicks.merge(AdTopicFrequencyPerAd, on='ad_id', how='left')
+"
+17,AdEntityFrequency - Frequency of entity_id in the Documents_entities table for each ad_id,"
+entity_frequency = Documents_entities.groupby('entity_id')['document_id'].count().reset_index(name='frequency')
+ad_entity_frequency = Promoted.merge(Documents_entities, on='document_id').merge(entity_frequency, on='entity_id').groupby('ad_id')['frequency'].mean().reset_index(name='AdEntityFrequency')
+Clicks = Clicks.merge(ad_entity_frequency, on='ad_id', how='left')
+"
+18,AdCategoryFrequency - Frequency of category_id in the Documents_categories table for each ad_id,"
+ad_category_frequency = Documents_categories.groupby('category_id')['document_id'].count().reset_index()
+ad_category_frequency.columns = ['category_id', 'category_frequency']
+
+ad_document_frequency = ad_category_frequency.merge(Documents_categories, on='category_id').groupby('document_id')['category_frequency'].sum().reset_index()
+ad_document_frequency.columns = ['document_id', 'document_category_frequency']
+
+promoted_ad_frequency = Promoted.merge(ad_document_frequency, on='document_id').groupby('ad_id')['document_category_frequency'].mean().reset_index()
+promoted_ad_frequency.columns = ['ad_id', 'AdCategoryFrequency']
+
+Clicks = Clicks.merge(promoted_ad_frequency, on='ad_id')
+"

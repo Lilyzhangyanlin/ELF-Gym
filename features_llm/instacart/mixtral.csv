@@ -1,0 +1,184 @@
+,feature_description,code
+0,ProductReorder - Indicates if the product was previously ordered by the user (using the reordered column from Order_products__prior),"
+# Merge Order_products__train and Order_products__prior on product_id
+merged_df = pd.merge(Order_products__train, Order_products__prior, on='product_id', suffixes=('_train', '_prior'))
+
+# Create the new feature 'ProductReorder'
+merged_df['ProductReorder'] = merged_df['reordered']
+
+# Drop the 'reordered' column
+merged_df = merged_df.drop('reordered', axis=1)
+
+# Replace NaN values with 0
+merged_df['ProductReorder'].fillna(0, inplace=True)
+
+# Assign the result back to Order_products__train
+Order_products__train = merged_df.drop('add_to_cart_order', axis=1)
+"
+1,AddToCartOrder - Order in which the product was added to cart (using the add_to_cart_order column from Order_products__prior),"
+# Rename 'add_to_cart_order' to 'add_to_cart_order_prior' in Order_products__prior DataFrame
+Order_products__prior = Order_products__prior.rename(columns={'add_to_cart_order': 'add_to_cart_order_prior'})
+
+# Merge Order_products__train and Order_products__prior on product_id
+merged_df = pd.merge(Order_products__train, Order_products__prior, on='product_id', suffixes=('_train', '_prior'))
+
+# Create the new feature 'AddToCartOrder'
+merged_df['AddToCartOrder'] = merged_df['add_to_cart_order_prior']
+
+# Drop the unnecessary columns
+merged_df = merged_df.drop(['add_to_cart_order_prior'], axis=1)
+
+# Replace Order_products__train with the new DataFrame
+Order_products__train = merged_df
+"
+2,DaysSinceLastOrder - Days since the last order was placed by the user (using the days_since_prior_order column from Orders),"
+# Merge Order_products__train and Orders on order_id
+merged_df = pd.merge(Order_products__train, Orders[['order_id', 'days_since_prior_order']], on='order_id', how='left')
+
+# Create the new feature DaysSinceLastOrder
+merged_df['DaysSinceLastOrder'] = merged_df['days_since_prior_order'].fillna(0)
+
+# Drop the days_since_prior_order column
+merged_df = merged_df.drop('days_since_prior_order', axis=1)
+
+# Replace Order_products__train with the merged_df
+Order_products__train = merged_df
+"
+3,OrderHourOfDay - Hour of the day the order was placed (using the order_hour_of_day column from Orders),"
+# Merge Orders and Order_products__train tables on order_id
+merged_df = pd.merge(Order_products__train, Orders[['order_id', 'order_hour_of_day']], on='order_id', how='left')
+
+# Create the new feature column
+merged_df['OrderHourOfDay'] = merged_df['order_hour_of_day'].fillna(-1)  # Replace NaN with -1 or any other value that is not used in the order_hour_of_day column
+
+# Drop the order_hour_of_day column
+merged_df = merged_df.drop('order_hour_of_day', axis=1)
+
+# Replace Order_products__train with the merged_df
+Order_products__train = merged_df
+"
+4,OrderDayOfWeek - Day of the week the order was placed (using the order_dow column from Orders),"
+# Map the order_dow values to day names
+order_dow_map = {0:'Monday', 1:'Tuesday', 2:'Wednesday', 3:'Thursday', 4:'Friday', 5:'Saturday', 6:'Sunday'}
+Orders['order_dow_name'] = Orders['order_dow'].map(order_dow_map)
+
+# Merge Orders and Order_products__train on order_id
+merged = pd.merge(Order_products__train, Orders[['order_id', 'order_dow_name']], on='order_id', how='left')
+
+# Create the new feature
+merged['OrderDayOfWeek'] = merged['order_dow_name']
+
+# Fill the NaN values with the mode of the OrderDayOfWeek column
+modes = merged['OrderDayOfWeek'].mode().values
+if len(modes) > 0:
+    merged['OrderDayOfWeek'].fillna(modes[0], inplace=True)
+else:
+    merged['OrderDayOfWeek'].fillna('Unknown', inplace=True)
+
+# Add the new feature to the Order_products__train table
+Order_products__train = merged[['order_id', 'product_id', 'label', 'OrderDayOfWeek']]
+"
+5,UserOrderSequence - Order sequence number for the user (using the order_number column from Orders),"
+# Merge Order_products__train with Orders DataFrame on order_id
+merged_df = pd.merge(Order_products__train, Orders[['order_id', 'order_number']], on='order_id', how='left')
+
+# Create the new feature UserOrderSequence
+merged_df['UserOrderSequence'] = merged_df['order_number']
+
+# Replace the original Order_products__train DataFrame with the merged one
+Order_products__train = merged_df
+"
+6,AisleID - Identifier for the aisle the product belongs to (using the aisle_id column from Products),"
+# Merge Products and Order_products__train on product_id
+merged_df = pd.merge(Order_products__train, Products[['product_id', 'aisle_id']], on='product_id')
+
+# Add the new column to the Order_products__train DataFrame
+Order_products__train['AisleID'] = merged_df['aisle_id']
+"
+7,DepartmentID - Identifier for the department the product belongs to (using the department_id column from Products),"
+# Merge Products DataFrame with Order_products__train DataFrame on product_id
+Order_products__train = Order_products__train.merge(Products[['product_id', 'department_id']], on='product_id', how='left')
+
+# Fill Na values with the mean of department_id in Products DataFrame
+Order_products__train['department_id'] = Order_products__train['department_id'].fillna(Products['department_id'].mean())
+
+# Rename department_id column to DepartmentID
+Order_products__train = Order_products__train.rename(columns={'department_id': 'DepartmentID'})
+"
+8,ProductNameLength - Length of the product name (using the product_name column from Products),"
+# First, add a new column 'ProductNameLength' to the Products DataFrame
+Products['ProductNameLength'] = Products['product_name'].apply(len)
+
+# Then, merge the Products DataFrame with the Order_products__train DataFrame
+# on the 'product_id' column to add the 'ProductNameLength' column to the Order_products__train DataFrame
+Order_products__train = Order_products__train.merge(Products[['product_id', 'ProductNameLength']], on='product_id', how='left')
+"
+9,AisleName - Name of the aisle the product belongs to (using the aisle column from Aisles),"
+# Merge Aisles and Products tables to get the aisle name for each product
+Aisles_Products = pd.merge(Aisles, Products, on='aisle_id')
+
+# Merge Order_products__train table with the merged Aisles_Products table to add the aisle name
+Order_products__train[""AisleName""] = Order_products__train[""product_id""].map(Aisles_Products.set_index('product_id')['aisle'])
+"
+10,DepartmentName - Name of the department the product belongs to (using the department column from Departments),"
+# Merge Products and Departments tables to get the department name
+Products['department_name'] = Products['department_id'].map(Departments.set_index('department_id')['department'])
+
+# Merge Order_products__train table with Products table to get the department name
+Order_products__train = Order_products__train.merge(Products[['product_id', 'department_name']], on='product_id', how='left')
+"
+11,IsProductOrdered - Indicates if the product was ordered or not (using the label column from Order_products__train),
+12,PriorOrderProductCount - Count of products ordered prior to this product in the same order (using the order_id and product_id columns from Order_products__prior),"
+# First, merge the Order_products__train and Order_products__prior tables on order_id and product_id
+merged_df = pd.merge(Order_products__train, Order_products__prior, on=['order_id', 'product_id'])
+
+# Then, group by order_id and count the number of prior orders
+grouped_df = merged_df.groupby('order_id').size().reset_index(name='PriorOrderProductCount')
+
+# Finally, merge the result back to the Order_products__train table
+Order_products__train = Order_products__train.merge(grouped_df, on='order_id', how='left')
+
+# Fill the NaN values with 0
+Order_products__train['PriorOrderProductCount'].fillna(0, inplace=True)
+"
+13,PriorOrderProductUniqueCount - Count of unique products ordered prior to this product in the same order (using the order_id and product_id columns from Order_products__prior),"
+# First, merge Order_products__train and Order_products__prior on order_id and product_id
+merged_df = pd.merge(Order_products__train, Order_products__prior, on=['order_id', 'product_id'])
+
+# Then, group by order_id and count the unique product_id values for each order
+grouped_df = merged_df.groupby('order_id')['product_id'].nunique()
+
+# Reset the index to convert the result into a DataFrame
+grouped_df = grouped_df.reset_index()
+
+# Rename the columns for clarity
+grouped_df = grouped_df.rename(columns={'product_id': 'PriorOrderProductUniqueCount'})
+
+# Merge the grouped_df back with the original Order_products__train DataFrame
+Order_products__train = pd.merge(Order_products__train, grouped_df, on='order_id', how='left')
+
+# Fill the NaN values with 0, as the 'PriorOrderProductUniqueCount' for the first product in each order will be NaN
+Order_products__train['PriorOrderProductUniqueCount'] = Order_products__train['PriorOrderProductUniqueCount'].fillna(0)
+"
+14,PriorOrderProductSum - Sum of product IDs ordered prior to this product in the same order (using the product_id column from Order_products__prior),
+15,PriorOrderProductAverage - Average of product IDs ordered prior to this product in the same order (using the product_id column from Order_products__prior),"
+# Group the Order_products__prior DataFrame by order_id and calculate the mean of product_id
+grouped_prior = Order_products__prior.groupby('order_id')['product_id'].transform('mean')
+
+# Create a new column in the Order_products__train DataFrame with the grouped_prior values
+Order_products__train['PriorOrderProductAverage'] = grouped_prior
+"
+16,PriorOrderProductMax - Maximum of product IDs ordered prior to this product in the same order (using the product_id column fromOrder_products__prior),
+17,PriorOrderProductMin - Minimum of product IDs ordered prior to this product in the same order (using the product_id column from Order_products__prior),"
+# First, merge the Order_products__train and Order_products__prior tables on the order_id and product_id columns
+merged_df = pd.merge(Order_products__train, Order_products__prior, on=['order_id', 'product_id'])
+
+# Then, sort the merged table by order_id and add_to_cart_order
+merged_df = merged_df.sort_values(by=['order_id', 'add_to_cart_order'])
+
+# Now, we can compute the PriorOrderProductMin feature
+merged_df['PriorOrderProductMin'] = merged_df.groupby('order_id')['product_id'].transform('min')
+
+# Finally, merge the computed feature back into the Order_products__train table
+Order_products__train = pd.merge(Order_products__train, merged_df[['order_id', 'PriorOrderProductMin']], on='order_id')
+"

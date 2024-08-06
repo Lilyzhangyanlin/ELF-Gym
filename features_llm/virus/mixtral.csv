@@ -1,0 +1,459 @@
+,feature_description,code
+0,Weather_Tmax_Avg_Last_7_Days - Average Tmax of the last 7 days prior to the date of the WNV test,"
+# Convert the 'Date' column to datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Set the 'Date' column as the index for both DataFrames
+Virus.set_index('Date', inplace=True)
+Weather.set_index('Date', inplace=True)
+
+# Sort the index
+Virus.sort_index(inplace=True)
+Weather.sort_index(inplace=True)
+
+# Calculate the rolling average of Tmax over the last 7 days
+Weather['Weather_Tmax_Avg_Last_7_Days'] = Weather['Tmax'].rolling('7D').mean()
+
+# Merge the rolling average column back to the Virus DataFrame
+Virus = Virus.merge(Weather[['Weather_Tmax_Avg_Last_7_Days']], left_index=True, right_index=True, how='left')
+"
+1,Weather_Tmin_Avg_Last_7_Days - Average Tmin of the last 7 days prior to the date of the WNV test,"
+import numpy as np
+
+# Ensure that the dates are in the correct format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort the Weather DataFrame by date
+Weather = Weather.sort_values('Date')
+
+# Function to get the last 7 days Tmin averages
+def get_last_7_days_tmin_avg(date):
+    date_range = [date - pd.Timedelta(days=i) for i in range(7, 0, -1)]
+    tmin_values = Weather.loc[Weather['Date'].isin(date_range), 'Tmin'].values
+    if len(tmin_values) < 7:
+        return np.nan
+    else:
+        return np.mean(tmin_values)
+
+# Apply the function to each date in the Virus DataFrame
+Virus['Weather_Tmin_Avg_Last_7_Days'] = Virus['Date'].apply(get_last_7_days_tmin_avg)
+"
+2,Weather_Tavg_Avg_Last_7_Days - Average Tavg of the last 7 days prior to the date of the WNV test,"
+# Calculate the 7-day average of 'Tavg' in the Weather table
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+Weather_7day_avg = Weather.set_index('Date')['Tavg'].rolling(window=7).mean().reset_index()
+Weather_7day_avg.columns = ['Date', 'Weather_Tavg_Avg_Last_7_Days']
+
+# Merge the 7-day average with the Virus table
+Virus = Virus.merge(Weather_7day_avg, on='Date', how='left')
+"
+3,Weather_Depart_Avg_Last_7_Days - Average Depart of the last 7 days prior to the date of the WNV test,"
+# Convert the 'Date' column to datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort the Weather DataFrame by date
+Weather = Weather.sort_values('Date')
+
+# Iterate over each row in the Virus DataFrame
+for index, row in Virus.iterrows():
+    # Get the date of the WNV test
+    test_date = row['Date']
+    
+    # Calculate the start date as 7 days before the test date
+    start_date = test_date - pd.DateOffset(days=7)
+    
+    # Filter the Weather DataFrame to only include rows between start_date and test_date
+    weather_subset = Weather[(Weather['Date'] >= start_date) & (Weather['Date'] <= test_date)]
+    
+    # Calculate the average 'Depart' for the filtered Weather DataFrame
+    avg_depart = weather_subset['Depart'].mean()
+    
+    # Add the calculated average as a new column to the Virus DataFrame
+    Virus.at[index, 'Weather_Depart_Avg_Last_7_Days'] = avg_depart
+"
+4,Weather_DewPoint_Avg_Last_7_Days - Average DewPoint of the last 7 days prior to the date of the WNV test,"
+# Convert the Date column to datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort the Weather DataFrame by Date
+Weather = Weather.sort_values('Date')
+
+# Function to get the last 7 days DewPoint
+def get_last_7_days_dewpoint(date, df):
+    days = df[(df['Date'] <= date) & (df['Date'] >= date - pd.DateOffset(days=7))]['DewPoint']
+    return days.mean() if len(days) > 0 else None
+
+# Add the new feature to the Virus DataFrame
+Virus['Weather_DewPoint_Avg_Last_7_Days'] = Virus['Date'].apply(get_last_7_days_dewpoint, df=Weather)
+"
+5,Weather_WetBulb_Avg_Last_7_Days - Average WetBulb of the last 7 days prior to the date of the WNV test,"
+# Convert the Date column to datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort the Weather DataFrame by Date
+Weather = Weather.sort_values('Date')
+
+# Function to get the last 7 days WetBulb data
+def get_last_7_days_wetbulb(date, weather_df):
+    start_date = date - pd.DateOffset(days=7)
+    return weather_df[(weather_df['Date'] >= start_date) & (weather_df['Date'] <= date)]['WetBulb'].mean()
+
+# Apply the function to each row in the Virus DataFrame
+Virus['Weather_WetBulb_Avg_Last_7_Days'] = Virus['Date'].apply(get_last_7_days_wetbulb, weather_df=Weather)
+"
+6,Weather_Heat_Sum_Last_7_Days - Sum of Heat of the last 7 days prior to the date of the WNV test,
+7,Weather_Cool_Sum_Last_7_Days - Sum of Cool of the last 7 days prior to the date of the WNV test,"
+# First, let's ensure that the dates are in the correct format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Now, we can compute the sum of Cool for the last 7 days
+Virus['Weather_Cool_Sum_Last_7_Days'] = Virus['Date'].map(
+    Weather.groupby('Date')['Cool'].sum().rolling('7D').sum()
+)
+"
+8,Weather_PrecipTotal_Sum_Last_7_Days - Sum of PrecipTotal of the last 7 days prior to the date of the WNV test,"
+# First, let's ensure that the dates are in the correct format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Now, we can create a new DataFrame to store the sum of PrecipTotal for the last 7 days
+last_7_days = Weather[(Weather['Date'] <= Virus['Date']) & (Weather['Date'] >= Virus['Date'] - pd.DateOffset(days=7))]
+Virus['Weather_PrecipTotal_Sum_Last_7_Days'] = last_7_days.groupby(pd.Grouper(key='Date', freq='D'))['PrecipTotal'].transform('sum')
+"
+9,Weather_StnPressure_Avg_Last_7_Days - Average StnPressure of the last 7 days prior to the date of the WNV test,"
+# Convert the Date column to datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort the Weather DataFrame by Date
+Weather = Weather.sort_values('Date')
+
+# Function to get the last 7 days' average station pressure
+def get_avg_stn_pressure(date, df):
+    days = df[(df['Date'] >= date - pd.DateOffset(days=7)) & (df['Date'] <= date)]['StnPressure']
+    return days.mean() if len(days) > 0 else None
+
+# Add the new feature to the Virus DataFrame
+Virus['Weather_StnPressure_Avg_Last_7_Days'] = Virus['Date'].apply(get_avg_stn_pressure, df=Weather)
+"
+10,Weather_SeaLevel_Avg_Last_7_Days - Average SeaLevel of the last 7 days prior to the date of the WNV test,"
+# First, ensure that the Date column in the Weather DataFrame is in the correct format
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Then, filter the Weather DataFrame to only include the last 7 days prior to each date in the Virus DataFrame
+Weather_last_7_days = Weather[Weather['Date'].apply(lambda x: x >= Virus['Date'].min() - pd.DateOffset(days=7) and x <= Virus['Date'].min())]
+
+# Now, calculate the average SeaLevel for these last 7 days
+Weather_last_7_days['SeaLevel_Avg'] = Weather_last_7_days['SeaLevel'].rolling(window=7).mean()
+
+# Finally, merge this new DataFrame with the Virus DataFrame to add the new feature
+Virus = Virus.merge(Weather_last_7_days[['Date', 'SeaLevel_Avg']], on='Date', how='left')
+
+# Rename the new column to the desired name
+Virus.rename(columns={'SeaLevel_Avg': 'Weather_SeaLevel_Avg_Last_7_Days'}, inplace=True)
+"
+11,Weather_ResultSpeed_Avg_Last_7_Days - Average ResultSpeed of the last 7 days prior to the date of the WNV test,"
+# Ensure that the dates are in the correct order
+Virus = Virus.sort_values('Date')
+
+# Create a new column for the Weather_ResultSpeed_Avg_Last_7_Days
+Virus['Weather_ResultSpeed_Avg_Last_7_Days'] = 0
+
+# Iterate over the Virus DataFrame
+for i in range(len(Virus)):
+    # Get the current date
+    current_date = Virus.loc[i, 'Date']
+    
+    # Calculate the start date (7 days before the current date)
+    start_date = current_date - pd.DateOffset(days=7)
+    
+    # Filter the Weather DataFrame to only include rows between the start and end dates
+    relevant_weather = Weather[(Weather['Date'] >= start_date) & (Weather['Date'] <= current_date)]
+    
+    # Calculate the average ResultSpeed
+    avg_result_speed = relevant_weather['ResultSpeed'].mean()
+    
+    # Assign the average ResultSpeed to the new column in the Virus DataFrame
+    Virus.loc[i, 'Weather_ResultSpeed_Avg_Last_7_Days'] = avg_result_speed
+"
+12,Weather_AvgSpeed_Avg_Last_7_Days - Average AvgSpeed of the last 7 days prior to the date of the WNV test,"
+# Ensure the 'Date' column is in datetime format
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Create a new DataFrame with only the rows that are within the last 7 days prior to each date in the Virus DataFrame
+last_7_days = Weather.loc[Weather['Date'].apply(lambda x: x <= Virus['Date'].max() and x >= Virus['Date'].min() - pd.Timedelta(days=7))]
+
+# Group the last_7_days DataFrame by date and compute the average AvgSpeed
+avg_speeds = last_7_days.groupby('Date')['AvgSpeed'].mean()
+
+# Convert the index of avg_speeds to datetime
+avg_speeds.index = pd.to_datetime(avg_speeds.index)
+
+# Reindex avg_speeds to match the dates in the Virus DataFrame
+avg_speeds = avg_speeds.reindex(Virus['Date'], method='ffill')
+
+# Add the 'Weather_AvgSpeed_Avg_Last_7_Days' column to the Virus DataFrame
+Virus['Weather_AvgSpeed_Avg_Last_7_Days'] = avg_speeds
+"
+13,Spray_Last_Spray_Date - The date of the last spray prior to the date of the WNV test* Spray_Last_Spray_Time - The time of the last spray prior to the date of the WNV test,
+14,Spray_Frequency_Last_30_Days - The frequency of sprays in the last 30 days prior to the date of the WNV test,"
+# Convert the 'Date' column in Spray DataFrame to datetime format
+Spray['Date'] = pd.to_datetime(Spray['Date'])
+
+# Convert the 'Date' column in Virus DataFrame to datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Calculate the frequency of sprays in the last 30 days
+def spray_frequency(row):
+    start_date = row['Date'] - pd.DateOffset(days=30)
+    mask = (Spray['Date'] >= start_date) & (Spray['Date'] < row['Date'])
+    frequency = Spray[mask]['Date'].count()
+    return frequency
+
+# Apply the function to each row in the Virus DataFrame
+Virus['Spray_Frequency_Last_30_Days'] = Virus.apply(spray_frequency, axis=1)
+"
+15,NumMosquitos_Last_30_Days_Avg - The average number of mosquitoes caught in the last 30 days prior to the date of the WNV test,"
+import pandas as pd
+
+# Ensure that the dates are in the correct format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Calculate the average number of mosquitoes caught in the last 30 days
+Virus['NumMosquitos_Last_30_Days_Avg'] = Virus['NumMosquitos'].rolling(window=30).mean()
+
+# Fill the NA values with the previous non-NA value
+Virus['NumMosquitos_Last_30_Days_Avg'] = Virus['NumMosquitos_Last_30_Days_Avg'].fillna(method='bfill')
+"
+16,NumMosquitos_Last_30_Days_Sum - The sum of number of mosquitoes caught in the last 30 days prior to the date of the WNV test,"
+import pandas as pd
+
+# Ensure that the dates are in the correct format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Set the index to Date for efficient date-based operations
+Virus.set_index('Date', inplace=True)
+
+# Create a copy of the Virus DataFrame to avoid changing the original
+Virus_copy = Virus.copy()
+
+# Shift the NumMosquitos column by 30 days
+Virus_copy['NumMosquitos_Last_30_Days_Sum'] = Virus_copy['NumMosquitos'].shift(30)
+
+# Fill the NaN values with 0
+Virus_copy['NumMosquitos_Last_30_Days_Sum'].fillna(0, inplace=True)
+
+# Convert the NumMosquitos_Last_30_Days_Sum column back to int
+Virus_copy['NumMosquitos_Last_30_Days_Sum'] = Virus_copy['NumMosquitos_Last_30_Days_Sum'].astype(int)
+
+# Merge the new feature back to the original Virus DataFrame
+Virus = Virus.merge(Virus_copy[['NumMosquitos_Last_30_Days_Sum']], left_index=True, right_index=True)
+"
+17,WnvPresent_Last_30_Days_Count - The count of WNV present in the last 30 days prior to the date of the WNV test,"
+import pandas as pd
+
+# Ensure the dates are in the correct format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Convert the Date column to a format that can be subtracted
+Virus['Date'] = Virus['Date'].dt.strftime('%Y-%m-%d')
+Weather['Date'] = Weather['Date'].dt.strftime('%Y-%m-%d')
+
+# Merge the Weather and Virus tables on the Date column
+merged_df = pd.merge(Virus, Weather, on='Date', how='left')
+
+# Create a new column that is 1 if WnvPresent is 1, and 0 otherwise
+merged_df['WnvPresent_Last_30_Days'] = merged_df['WnvPresent'].shift(30)
+
+# Create a new column that counts the number of times WnvPresent_Last_30_Days is 1 in the last 30 days
+merged_df['WnvPresent_Last_30_Days_Count'] = merged_df['WnvPresent_Last_30_Days'].rolling(window=30).sum()
+
+# Drop the unnecessary columns
+merged_df = merged_df.drop(['WnvPresent_Last_30_Days'], axis=1)
+
+# Replace the NaN values with 0
+merged_df['WnvPresent_Last_30_Days_Count'] = merged_df['WnvPresent_Last_30_Days_Count'].fillna(0)
+
+# Add the new column to the Virus table
+Virus['WnvPresent_Last_30_Days_Count'] = merged_df['WnvPresent_Last_30_Days_Count']
+
+# Drop the unnecessary columns
+Virus = Virus.drop(['Date'], axis=1)
+"
+18,WnvPresent_Last_30_Days_Percentage - The percentage of WNV present in the last 30 days prior to the date of the WNV test,"
+# First, ensure that the 'Date' column in the Virus DataFrame is of datetime type
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Then, filter the Weather DataFrame to only include the rows where the date is within the last 30 days prior to each date in the Virus DataFrame
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+Weather = Weather[Weather['Date'] >= Virus['Date'].min() - pd.DateOffset(days=30)]
+
+# Next, merge the Weather DataFrame with the Virus DataFrame on the 'Date' column
+# This will give us a new DataFrame where each row corresponds to a row in the Virus DataFrame, but with additional weather data
+merged_df = pd.merge(Virus, Weather, on='Date', how='left')
+
+# Now, we can compute the percentage of WNV present in the last 30 days prior to the date of the WNV test
+# First, filter the merged DataFrame to only include the rows where WnvPresent is 1 (i.e., WNV is present)
+wnv_present_df = merged_df[merged_df['WnvPresent'] == 1]
+
+# Then, group this DataFrame by date and count the number of rows (i.e., the number of times WNV was present in the last 30 days)
+wnv_counts_df = wnv_present_df.groupby('Date').size().reset_index(name='WnvCount')
+
+# Finally, merge this DataFrame back with the original Virus DataFrame and compute the percentage
+Virus = pd.merge(Virus, wnv_counts_df, on='Date', how='left')
+Virus['WnvPresent_Last_30_Days_Percentage'] = Virus['WnvCount'] / Virus['NumMosquitos']
+"
+19,Virus_Date_Weekday - The weekday of the date of the WNV test,"
+# First, ensure that the Date column is in datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Then, add a new column 'Virus_Date_Weekday' with the weekday
+Virus['Virus_Date_Weekday'] = Virus['Date'].dt.dayofweek
+"
+20,Virus_Date_Month - The month of the date of the WNV test,"
+Virus[""Virus_Date_Month""] = Virus[""Date""].dt.month
+"
+21,Virus_Date_Quarter - The quarter of the date of the WNV test,"
+Virus[""Virus_Date_Quarter""] = pd.to_datetime(Virus[""Date""]).dt.quarter
+"
+22,Virus_Date_Year - The year of the date of the WNV test,"
+Virus[""Virus_Date_Year""] = Virus[""Date""].dt.year
+"
+23,Virus_Date_DayOfYear - The day of the year of the date of the WNV test,"
+import pandas as pd
+
+# Assuming Virus['Date'] is in datetime format
+# If not, you can convert it using pd.to_datetime(Virus['Date'])
+
+Virus['Virus_Date_DayOfYear'] = Virus['Date'].dt.dayofyear
+"
+24,Virus_Date_IsHoliday - Whether the date of the WNV test is a holiday,"
+import pandas as pd
+from holidays import US
+
+# Initialize the US holiday calendar
+us_holidays = US()
+
+# Create a function to check if a date is a holiday
+def is_holiday(date):
+    return date in us_holidays
+
+# Create a boolean series indicating if each date in the Virus DataFrame is a holiday
+Virus['Virus_Date_IsHoliday'] = Virus['Date'].apply(is_holiday)
+"
+25,Virus_Date_IsWeekend - Whether the date of the WNV test is a weekend,"
+# Convert the 'Date' column to datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Create a new column 'Virus_Date_IsWeekend'
+Virus['Virus_Date_IsWeekend'] = Virus['Date'].dt.dayofweek >= 5
+"
+26,Virus_Address_Block_Last_30_Days_Count - The count of different blocks in the last 30 days prior to the date of the WNV test,"
+import pandas as pd
+
+# Assuming the 'Date' column is of string type
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Virus = Virus.sort_values('Date')
+
+# Create a new DataFrame with the last 30 days prior to each date in the Virus DataFrame
+last_30_days = Virus.set_index('Date')['Block'].rolling('30D').apply(lambda x: x.nunique()).reset_index()
+last_30_days = last_30_days.rename(columns={'Block': 'Virus_Address_Block_Last_30_Days_Count'})
+
+# Merge the new DataFrame with the original Virus DataFrame
+Virus = pd.merge(Virus, last_30_days, on='Date', how='left')
+
+# Fill NA values with 0
+Virus['Virus_Address_Block_Last_30_Days_Count'] = Virus['Virus_Address_Block_Last_30_Days_Count'].fillna(0)
+
+# Convert the 'Virus_Address_Block_Last_30_Days_Count' column to int
+Virus['Virus_Address_Block_Last_30_Days_Count'] = Virus['Virus_Address_Block_Last_30_Days_Count'].astype(int)
+"
+27,Virus_Address_Street_Last_30_Days_Count - The count of different streets in the last 30 days prior to the date of the WNV test,
+28,Virus_Address_Block_Street_Last_30_Days_Count - The count of different block and street combinations in the last 30 days prior to the date of the WNV test,
+29,Virus_Trap_Last_30_Days_Count - The count of different traps in the last 30 days prior to the date of the WNV test,"
+import pandas as pd
+
+# First, let's ensure that the dates are in the correct format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Spray['Date'] = pd.to_datetime(Spray['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Create a new DataFrame to store the number of unique traps per day
+trap_counts = pd.DataFrame({
+    'Date': Virus['Date'],
+    'Trap_Count': Virus.groupby('Trap')['Trap'].transform('count')
+}).set_index('Date')
+
+# Resample the data to get the number of unique traps in the last 30 days
+trap_counts_30 = trap_counts.resample('D').count().rolling('30D').sum()
+
+# Merge the new DataFrame with the Virus DataFrame
+Virus = Virus.merge(trap_counts_30, left_on='Date', right_index=True, how='left')
+
+# Rename the column
+Virus.rename(columns={'Trap_Count': 'Virus_Trap_Last_30_Days_Count'}, inplace=True)
+"
+30,Virus_Species_Last_30_Days_Count - The count of different species in the last 30 days prior to the date of the WNV test,"
+import pandas as pd
+
+# First, let's ensure that the dates are in the correct format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Then, we filter the Virus table to only include the last 30 days
+last_30_days = Virus[Virus['Date'] > (Virus['Date'].max() - pd.DateOffset(days=30))]
+
+# We then group by species and count
+species_counts = last_30_days.groupby('Species')['Species'].count().reset_index(name='Virus_Species_Last_30_Days_Count')
+
+# Finally, we merge this information back to the original Virus table
+Virus = Virus.merge(species_counts, on='Species', how='left')
+
+# For rows where the species was not present in the last 30 days, the count will be NaN. We can fill these with 0.
+Virus['Virus_Species_Last_30_Days_Count'] = Virus['Virus_Species_Last_30_Days_Count'].fillna(0)
+"
+31,Virus_Species_Last_30_Days_Percentage - The percentage of different species in the last 30 days prior to the date of the WNV test,"
+import pandas as pd
+import numpy as np
+
+# First, sort the Virus DataFrame by date
+Virus = Virus.sort_values('Date')
+
+# Then, create a copy of the Virus DataFrame to calculate the species percentage
+Virus_last_30_days = Virus.copy()
+
+# Calculate the species percentage for the last 30 days
+Virus_last_30_days['Virus_Species_Last_30_Days_Percentage'] = Virus_last_30_days.groupby('Species')['Species'].transform(lambda x: x.rolling(30, min_periods=1).count() / Virus_last_30_days['NumMosquitos'].rolling(30, min_periods=1).sum())
+
+# Merge the calculated species percentage back to the original Virus DataFrame
+Virus = pd.merge(Virus, Virus_last_30_days[['Date', 'Species', 'Virus_Species_Last_30_Days_Percentage']], on=['Date', 'Species'], how='left')
+
+# Fill the NaN values with 0
+Virus['Virus_Species_Last_30_Days_Percentage'] = Virus['Virus_Species_Last_30_Days_Percentage'].fillna(0)
+"
+32,Virus_Species_Present_Last_30_Days_Count - The count of species that were present in the last 30 days prior to the date of the WNV test,"
+import pandas as pd
+
+# Assuming Virus is already sorted by Date
+Virus = Virus.sort_values('Date')
+
+# Calculate the date 30 days ago for each date in the Virus DataFrame
+Virus['Date_30days_ago'] = Virus['Date'] - pd.DateOffset(days=30)
+
+# Merge the Virus DataFrame with itself to get the count of each species in the last 30 days
+Virus_30days = pd.merge(Virus, Virus, on='Species', how='left', suffixes=('', '_30days'))
+Virus_30days = Virus_30days.loc[Virus_30days['Date_30days_ago'] <= Virus_30days['Date_30days']]
+Virus_30days = Virus_30days.groupby(['Date', 'Species']).size().reset_index(name='Virus_Species_Present_Last_30_Days_Count')
+
+# Merge the result back to the original Virus DataFrame
+Virus = pd.merge(Virus, Virus_30days, on=['Date', 'Species'], how='left')
+"
+33,Virus_Species_Present_Last_30_Days_Percentage - The percentage of species that were present in the last 30 days prior to the date of the WNV test,
+34,Virus_Species_NotPresent_Last_30_Days_Count - The count of species that were not present in the last 30 days prior to the date of the WNV test,
+35,Virus_Species_NotPresent_Last_30_Days_Percentage - The percentage of species that were not present in the last 30 days prior to the date of the WNV test,

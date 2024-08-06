@@ -1,0 +1,376 @@
+,feature_description,code
+0,`user_reordered_frequency` - How often the user reordered items,"
+# Merge Orders with Order_products__prior to get user_id for each prior order
+prior_orders = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id')
+
+# Calculate the reorder frequency for each user
+user_reorder_frequency = prior_orders.groupby('user_id')['reordered'].mean().reset_index()
+user_reorder_frequency.columns = ['user_id', 'user_reordered_frequency']
+
+# Merge the reorder frequency back to the Orders table
+orders_with_frequency = pd.merge(Orders, user_reorder_frequency, on='user_id', how='left')
+
+# Merge the Orders table with frequency back to the Order_products__train table
+Order_products__train = pd.merge(Order_products__train, orders_with_frequency[['order_id', 'user_reordered_frequency']], on='order_id', how='left')
+"
+1,`time_between_orders` - Time between orders for the user,"
+Orders['time_between_orders'] = Orders.groupby('user_id')['days_since_prior_order'].shift(-1)
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'time_between_orders']], on='order_id', how='left')
+"
+2,`user_visit_time_of_day` - Time of day the user typically visits,"
+# Ensure order_hour_of_day is numeric
+Orders['order_hour_of_day'] = pd.to_numeric(Orders['order_hour_of_day'], errors='coerce')
+
+# Calculate the typical visit time of day for each user
+user_visit_time_of_day = Orders.groupby('user_id')['order_hour_of_day'].mean().reset_index()
+user_visit_time_of_day.columns = ['user_id', 'user_visit_time_of_day']
+
+# Merge Orders with Order_products__train to get user_id in Order_products__train
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'user_id']], on='order_id', how='left')
+
+# Merge Order_products__train with user_visit_time_of_day to get the new feature
+Order_products__train = Order_products__train.merge(user_visit_time_of_day, on='user_id', how='left')
+
+# Drop the user_id column as it is no longer needed
+Order_products__train = Order_products__train.drop(columns=['user_id'])
+
+# Display the first few rows to verify
+print(Order_products__train.head())
+"
+3,`user_ordered_specialty_items` - Whether the user ordered organic gluten-free or Asian items in the past,"
+# Merge Orders with Order_products__prior to get user_id for each prior order
+order_prior_merged = pd.merge(Order_products__prior, Orders, on='order_id', how='left')
+
+# Merge the result with Products to get product details
+order_prior_merged = pd.merge(order_prior_merged, Products, on='product_id', how='left')
+
+# Define specialty items (organic, gluten-free, or Asian)
+specialty_keywords = ['organic', 'gluten-free', 'asian']
+
+# Function to check if a product name contains any of the specialty keywords
+def is_specialty_item(product_name):
+    product_name = product_name.lower()
+    return any(keyword in product_name for keyword in specialty_keywords)
+
+# Apply the function to create a new column indicating if the product is a specialty item
+order_prior_merged['is_specialty_item'] = order_prior_merged['product_name'].apply(is_specialty_item)
+
+# Group by user_id to determine if the user has ordered any specialty items in the past
+user_specialty_items = order_prior_merged.groupby('user_id')['is_specialty_item'].max().reset_index()
+user_specialty_items.rename(columns={'is_specialty_item': 'user_ordered_specialty_items'}, inplace=True)
+
+# Merge Orders with Order_products__train to get user_id for each train order
+order_train_merged = pd.merge(Order_products__train, Orders, on='order_id', how='left')
+
+# Merge the result with user_specialty_items to add the new feature
+order_train_merged = pd.merge(order_train_merged, user_specialty_items, on='user_id', how='left')
+
+# Add the new feature to the original Order_products__train table
+Order_products__train['user_ordered_specialty_items'] = order_train_merged['user_ordered_specialty_items']
+"
+4,`user_order_size_features` - Features based on the sizes of the user's orders,"
+# Merge Orders with Order_products__prior to get user_id for each order
+order_prior_merged = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id', how='left')
+
+# Calculate the size of each order
+order_sizes = order_prior_merged.groupby('order_id').size().reset_index(name='order_size')
+
+# Merge order sizes back to Orders to get user_id for each order size
+order_sizes = pd.merge(order_sizes, Orders[['order_id', 'user_id']], on='order_id', how='left')
+
+# Calculate user order size features
+user_order_size_features = order_sizes.groupby('user_id')['order_size'].agg(['mean', 'std', 'min', 'max', 'median']).reset_index()
+
+# Rename columns for clarity
+user_order_size_features.columns = ['user_id', 'user_order_size_mean', 'user_order_size_std', 'user_order_size_min', 'user_order_size_max', 'user_order_size_median']
+
+# Merge user order size features with Orders to get user_id for each order in Order_products__train
+orders_with_features = pd.merge(Orders[['order_id', 'user_id']], user_order_size_features, on='user_id', how='left')
+
+# Merge the features into Order_products__train
+Order_products__train = pd.merge(Order_products__train, orders_with_features.drop('user_id', axis=1), on='order_id', how='left')
+"
+5,`user_orders_with_no_reorders` - How many of the user’s orders contained no previously purchased items,"
+# Merge Orders with Order_products__prior to get user_id for each order
+orders_prior = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id')
+
+# Group by user_id and order_id to find orders with no reorders
+orders_with_no_reorders = orders_prior.groupby(['user_id', 'order_id'])['reordered'].sum().reset_index()
+orders_with_no_reorders['no_reorders'] = orders_with_no_reorders['reordered'] == 0
+
+# Count the number of orders with no reorders for each user
+user_orders_with_no_reorders = orders_with_no_reorders.groupby('user_id')['no_reorders'].sum().reset_index()
+user_orders_with_no_reorders.columns = ['user_id', 'user_orders_with_no_reorders']
+
+# Merge this feature back to the Orders table
+orders_with_feature = pd.merge(Orders, user_orders_with_no_reorders, on='user_id', how='left')
+
+# Merge the feature into the Order_products__train table
+Order_products__train = pd.merge(Order_products__train, orders_with_feature[['order_id', 'user_orders_with_no_reorders']], on='order_id', how='left')
+
+"
+6,`item_purchase_frequency` - How often the item is purchased,"
+item_purchase_frequency = Order_products__prior['product_id'].value_counts().reset_index()
+item_purchase_frequency.columns = ['product_id', 'item_purchase_frequency']
+
+Order_products__train = Order_products__train.merge(item_purchase_frequency, on='product_id', how='left')
+"
+7,`item_cart_position` - Average position of the item in the cart,"
+item_cart_position = Order_products__prior.groupby('product_id')['add_to_cart_order'].mean().reset_index()
+item_cart_position.columns = ['product_id', 'item_cart_position']
+
+Order_products__train = Order_products__train.merge(item_cart_position, on='product_id', how='left')
+"
+8,`item_one_shot_probability` - How many users buy the item as a one shot item,"
+# Merge Orders with Order_products__prior to get user_id for each product
+orders_prior = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id')
+
+# Calculate the number of unique users who bought each product
+product_user_counts = orders_prior.groupby('product_id')['user_id'].nunique().reset_index()
+product_user_counts.columns = ['product_id', 'unique_user_count']
+
+# Calculate the number of users who bought each product only once
+one_shot_users = orders_prior.groupby(['product_id', 'user_id']).size().reset_index(name='count')
+one_shot_users = one_shot_users[one_shot_users['count'] == 1]
+one_shot_user_counts = one_shot_users.groupby('product_id')['user_id'].count().reset_index()
+one_shot_user_counts.columns = ['product_id', 'one_shot_user_count']
+
+# Merge the counts to calculate the one shot probability
+product_counts = pd.merge(product_user_counts, one_shot_user_counts, on='product_id', how='left')
+
+product_counts['item_one_shot_probability'] = product_counts['one_shot_user_count'] / product_counts['unique_user_count']
+
+# Merge the one shot probability with Order_products__train
+Order_products__train = pd.merge(Order_products__train, product_counts[['product_id', 'item_one_shot_probability']], on='product_id', how='left')
+"
+9,`item_cooccurrence_statistics` - Stats on the number of items that co-occur with this item,"
+# Merge Orders with Order_products__prior to get user_id for each order
+orders_prior = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id', how='left')
+
+user_product_pair = orders_prior[['user_id', 'product_id']].drop_duplicates()
+product_product_pair = pd.merge(user_product_pair, user_product_pair, on='user_id')
+product_product_pair = product_product_pair[['product_id_x', 'product_id_y']].drop_duplicates()
+item_cooccurrence_statistics = product_product_pair['product_id_x'].value_counts()
+
+# Map the co-occurrence statistics to the Order_products__train table
+Order_products__train = pd.merge(Order_products__train, item_cooccurrence_statistics.rename('item_cooccurrence_statistics'), left_on='product_id', right_index=True, how='left')
+"
+10,`item_order_streak_stats` - Stats on the order streak for the item,"
+# Merge Orders with Order_products__prior to get user_id for each order
+order_prior_merged = pd.merge(Order_products__prior, Orders, on='order_id', how='left')
+
+# Sort by user_id, product_id, and order_number to calculate streaks
+order_prior_merged = order_prior_merged.sort_values(by=['user_id', 'product_id', 'order_number'])
+
+# Calculate streaks
+order_prior_merged['prev_reordered'] = order_prior_merged.groupby(['user_id', 'product_id'])['reordered'].shift(1)
+order_prior_merged['streak'] = (order_prior_merged['reordered'] == 1) & (order_prior_merged['prev_reordered'] == 1)
+order_prior_merged['streak'] = order_prior_merged.groupby(['user_id', 'product_id'])['streak'].cumsum()
+
+# Aggregate streak stats
+streak_stats = order_prior_merged.groupby('product_id')['streak'].agg(['mean', 'std', 'max', 'min']).reset_index()
+streak_stats.columns = ['product_id', 'streak_mean', 'streak_std', 'streak_max', 'streak_min']
+
+# Merge streak stats with Order_products__train
+Order_products__train = pd.merge(Order_products__train, streak_stats, on='product_id', how='left')
+
+# Fill NaN values with 0 (in case there are products in train that are not in prior)
+Order_products__train[['streak_mean', 'streak_std', 'streak_max', 'streak_min']] = Order_products__train[['streak_mean', 'streak_std', 'streak_max', 'streak_min']]
+
+# Rename columns to match the requested feature name
+Order_products__train.rename(columns={
+    'streak_mean': 'item_order_streak_mean',
+    'streak_std': 'item_order_streak_std',
+    'streak_max': 'item_order_streak_max',
+    'streak_min': 'item_order_streak_min'
+}, inplace=True)
+"
+11,`item_reorder_probability_within_N_orders` - Probability of being reordered within N orders,"
+# Merge Orders with Order_products__prior to get user_id for each order
+order_prior_merged = pd.merge(Order_products__prior, Orders[['order_id', 'user_id', 'order_number']], on='order_id')
+
+# Calculate the reorder probability within N orders for each product
+N = 5  # You can adjust N as needed
+
+# Create a function to calculate reorder probability within N orders
+def reorder_probability_within_N_orders(df, N):
+    df = df.sort_values(by=['user_id', 'order_number'])
+    df['reordered_within_N'] = df.groupby(['user_id', 'product_id'])['order_number'].diff().fillna(N+1) <= N
+    reorder_prob = df.groupby('product_id')['reordered_within_N'].mean().reset_index()
+    reorder_prob.columns = ['product_id', f'item_reorder_probability_within_{N}_orders']
+    return reorder_prob
+
+# Calculate the reorder probability
+reorder_prob = reorder_probability_within_N_orders(order_prior_merged, N)
+
+# Merge the reorder probability with Order_products__train
+Order_products__train = pd.merge(Order_products__train, reorder_prob, on='product_id', how='left')
+
+# Fill NaN values with 0 (if a product has never been reordered within N orders, its probability is 0)
+Order_products__train[f'item_reorder_probability_within_{N}_orders'] = Order_products__train[f'item_reorder_probability_within_{N}_orders']
+"
+12,`item_weekday_distribution` - Distribution of the day of week the item is ordered,
+13,`item_first_order_reorder_probability` - Probability it is reordered after the first order,"
+# Merge Orders with Order_products__prior to get user_id for each prior order
+prior_orders = pd.merge(Order_products__prior, Orders[['order_id', 'user_id', 'order_number']], on='order_id')
+
+# Find the first order for each user
+first_orders = prior_orders[prior_orders['order_number'] == 1]
+
+# Calculate the reorder probability after the first order for each product
+reorder_counts = first_orders.groupby('product_id')['reordered'].sum()
+total_counts = first_orders.groupby('product_id')['reordered'].count()
+reorder_prob = (reorder_counts / total_counts).reset_index()
+reorder_prob.columns = ['product_id', 'item_first_order_reorder_probability']
+
+# Merge the reorder probability with the Order_products__train table
+Order_products__train = pd.merge(Order_products__train, reorder_prob, on='product_id', how='left')
+
+# Fill NaN values with 0 (if a product was never ordered in the first order, its reorder probability is 0)
+Order_products__train['item_first_order_reorder_probability']
+"
+14,`item_time_between_orders_statistics` - Statistics around the time between orders for the item,"
+# Merge Orders with Order_products__prior to get user_id and days_since_prior_order for each product
+orders_prior = pd.merge(Order_products__prior, Orders[['order_id', 'user_id', 'days_since_prior_order']], on='order_id')
+
+# Sort by user_id, product_id, and order_id to calculate time between orders for each product
+orders_prior = orders_prior.sort_values(by=['user_id', 'product_id', 'order_id'])
+
+# Calculate time between orders for each product
+orders_prior['time_between_orders'] = orders_prior.groupby(['user_id', 'product_id'])['days_since_prior_order'].shift(-1)
+
+# Calculate statistics for time between orders for each product
+item_time_between_orders_statistics = orders_prior.groupby('product_id')['time_between_orders'].agg(['mean', 'std', 'min', 'max']).reset_index()
+
+# Merge the statistics back to the Order_products__train table
+Order_products__train = pd.merge(Order_products__train, item_time_between_orders_statistics, on='product_id', how='left')
+
+# Rename the columns to reflect that they are statistics of time between orders
+Order_products__train.rename(columns={
+    'mean': 'item_time_between_orders_mean',
+    'std': 'item_time_between_orders_std',
+    'min': 'item_time_between_orders_min',
+    'max': 'item_time_between_orders_max'
+}, inplace=True)
+"
+15,`user_item_purchase_count` - Number of orders in which the user purchases the item,"
+user_item_purchase_count = Order_products__prior.merge(Orders, on='order_id') \
+                                                .groupby(['user_id', 'product_id']) \
+                                                .size() \
+                                                .reset_index(name='user_item_purchase_count')
+
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'user_id']], on='order_id')
+Order_products__train = Order_products__train.merge(user_item_purchase_count, on=['user_id', 'product_id'], how='left')
+Order_products__train['user_item_purchase_count'] = Order_products__train['user_item_purchase_count']
+"
+16,`user_item_days_since_last_purchase` - Days since the user last purchased the item,"
+# Merge Orders with Order_products__prior to get user_id and order details
+order_prior_merged = pd.merge(Order_products__prior, Orders, on='order_id', how='left')
+
+# Sort by user_id, product_id, and order_number to calculate days since last purchase
+order_prior_merged = order_prior_merged.sort_values(by=['user_id', 'product_id', 'order_number'])
+
+# Calculate days since last purchase for each product by each user
+order_prior_merged['user_item_days_since_last_purchase'] = order_prior_merged.groupby(['user_id', 'product_id'])['days_since_prior_order'].cumsum().shift()
+
+# Merge the calculated feature back to the Order_products__train table
+Order_products__train = pd.merge(Order_products__train, order_prior_merged[['order_id', 'product_id', 'user_item_days_since_last_purchase']], on=['order_id', 'product_id'], how='left')
+
+# Fill NaN values with 0 (if any)
+Order_products__train['user_item_days_since_last_purchase'] = Order_products__train['user_item_days_since_last_purchase']
+"
+17,`user_item_purchase_streak` - Streak (number of consecutive orders) the user has purchased the item,"
+# Merge Orders with Order_products__prior to get user_id and order_number for each product
+order_prior_merged = pd.merge(Order_products__prior, Orders[['order_id', 'user_id', 'order_number']], on='order_id')
+
+# Sort by user_id, product_id, and order_number to calculate streaks
+order_prior_merged = order_prior_merged.sort_values(by=['user_id', 'product_id', 'order_number'])
+
+# Calculate the streaks
+order_prior_merged['prev_order_number'] = order_prior_merged.groupby(['user_id', 'product_id'])['order_number'].shift(1)
+order_prior_merged['streak'] = (order_prior_merged['order_number'] == order_prior_merged['prev_order_number'] + 1).astype(int)
+order_prior_merged['user_item_purchase_streak'] = order_prior_merged.groupby(['user_id', 'product_id'])['streak'].cumsum()
+
+# Merge the streaks back to the Order_products__train table
+order_train_merged = pd.merge(Order_products__train, Orders[['order_id', 'user_id', 'order_number']], on='order_id')
+order_train_merged = pd.merge(order_train_merged, order_prior_merged[['user_id', 'product_id', 'user_item_purchase_streak']], on=['user_id', 'product_id'], how='left')
+
+# Fill NaN values with 0 (for products that have no prior streaks)
+order_train_merged['user_item_purchase_streak'] = order_train_merged['user_item_purchase_streak']
+
+# Add the new feature to the Order_products__train table
+Order_products__train['user_item_purchase_streak'] = order_train_merged['user_item_purchase_streak']
+"
+18,`user_item_cart_position` - Average position in the cart when the user purchases the item,"
+# Merge Orders with Order_products__prior to get user_id for each order
+order_prior_merged = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id')
+
+# Calculate the average position in the cart for each user-product pair
+user_item_cart_position = order_prior_merged.groupby(['user_id', 'product_id'])['add_to_cart_order'].mean().reset_index()
+user_item_cart_position.columns = ['user_id', 'product_id', 'user_item_cart_position']
+
+# Merge Orders with Order_products__train to get user_id for each order
+order_train_merged = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id')
+
+# Merge the user_item_cart_position with the order_train_merged to add the new feature
+Order_products__train = pd.merge(order_train_merged, user_item_cart_position, on=['user_id', 'product_id'], how='left')
+
+# Drop the user_id column as it is no longer needed
+Order_products__train = Order_products__train.drop(columns=['user_id'])
+"
+19,`user_item_ordered_today` - Whether the user already ordered the item today,"
+# Merge Orders with Order_products__prior to get user_id and order_hour_of_day for each product
+orders_prior = pd.merge(Order_products__prior, Orders, on='order_id', how='left')
+
+# Create a new column to indicate if the product was ordered today
+orders_prior['ordered_today'] = orders_prior.groupby(['user_id', 'product_id', 'order_dow'])['order_id'].transform('count') > 0
+
+# Merge Orders with Order_products__train to get user_id and order_hour_of_day for each product in the training set
+orders_train = pd.merge(Order_products__train, Orders, on='order_id', how='left')
+
+# Merge the training set with the prior orders to get the 'ordered_today' feature
+orders_train = pd.merge(orders_train, orders_prior[['user_id', 'product_id', 'order_dow', 'ordered_today']], 
+                        on=['user_id', 'product_id', 'order_dow'], 
+                        how='left')
+
+# Fill NaN values with False (if there was no prior order, it means the product was not ordered today)
+orders_train['ordered_today'] = orders_train['ordered_today']
+
+# Add the new feature to the Order_products__train table
+Order_products__train['user_item_ordered_today'] = orders_train['ordered_today']
+"
+20,`user_item_cooccurrence_statistics` - Co-occurrence statistics for user and item,"
+# Merge Orders with Order_products__prior to get user_id for each order
+order_prior_merged = pd.merge(Order_products__prior, Orders, on='order_id', how='left')
+
+# Calculate user-item co-occurrence statistics
+user_item_cooccurrence = order_prior_merged.groupby(['user_id', 'product_id']).size().reset_index(name='user_item_cooccurrence_statistics')
+
+# Merge the co-occurrence statistics with Order_products__train
+Order_products__train = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id', how='left')
+Order_products__train = pd.merge(Order_products__train, user_item_cooccurrence, on=['user_id', 'product_id'], how='left')
+
+# Fill NaN values with 0 (if a user-product pair has no prior co-occurrence, it should be 0)
+Order_products__train['user_item_cooccurrence_statistics'] = Order_products__train['user_item_cooccurrence_statistics']
+"
+21,`user_item_replacement_items` - Replacement items for the user and item,
+22,`datetime_day_of_week_counts` - Counts of orders by day of week,"
+# Compute the counts of orders by day of week
+dow_counts = Orders['order_dow'].value_counts().sort_index()
+
+# Map the counts to the Orders DataFrame
+Orders['datetime_day_of_week_counts'] = Orders['order_dow'].map(dow_counts)
+
+# Merge the Orders DataFrame with the Order_products__train DataFrame to add the new feature
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'datetime_day_of_week_counts']], on='order_id', how='left')
+"
+23,`datetime_hour_of_day_counts` - Counts of orders by hour of day,"
+# Compute the counts of orders by hour of day
+hourly_order_counts = Orders['order_hour_of_day'].value_counts().sort_index()
+
+# Map the counts to the Orders DataFrame
+Orders['datetime_hour_of_day_counts'] = Orders['order_hour_of_day'].map(hourly_order_counts)
+
+# Merge the Orders DataFrame with the Order_products__train DataFrame to add the new feature
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'datetime_hour_of_day_counts']], on='order_id', how='left')
+"

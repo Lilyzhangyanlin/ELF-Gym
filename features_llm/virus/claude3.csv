@@ -1,0 +1,200 @@
+,feature_description,code
+0,"DayOfWeek - The day of the week corresponding to the Date column (e.g., Monday, Tuesday, etc.)","
+import pandas as pd
+from datetime import datetime
+
+# Convert the 'Date' column to datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Create a new column 'DayOfWeek' with the day of the week
+Virus['DayOfWeek'] = Virus['Date'].dt.day_name()
+"
+1,"MonthOfYear - The month of the year corresponding to the Date column (e.g., January, February, etc.)","
+import pandas as pd
+
+Virus['MonthOfYear'] = pd.to_datetime(Virus['Date']).dt.month_name()
+"
+2,WeekOfYear - The week number of the year corresponding to the Date column,"
+import pandas as pd
+from datetime import datetime
+
+# Assuming 'Date' column in Virus DataFrame is in a date format recognized by Pandas
+Virus['WeekOfYear'] = pd.to_datetime(Virus['Date']).dt.isocalendar().week
+"
+3,DayOfYear - The day number of the year corresponding to the Date column,"
+import pandas as pd
+
+# Assuming 'Date' column is already in datetime format
+Virus['DayOfYear'] = Virus['Date'].dt.dayofyear
+"
+4,IsWeekend - A binary flag indicating whether the Date corresponds to a weekend (Saturday or Sunday),"
+import pandas as pd
+
+Virus[""IsWeekend""] = Virus[""Date""].dt.day_name().apply(lambda x: x in [""Saturday"", ""Sunday""])
+"
+5,IsHoliday - A binary flag indicating whether the Date corresponds to a public holiday,"
+import holidays
+import pandas as pd
+
+# Load the US holidays
+us_holidays = holidays.UnitedStates()
+
+# Create a function to check if a date is a holiday
+def is_holiday(date):
+    return 1 if date in us_holidays else 0
+
+# Apply the function to the 'Date' column and create a new column 'IsHoliday'
+Virus['IsHoliday'] = Virus['Date'].apply(is_holiday)
+"
+6,TemperatureRange - The difference between Tmax and Tmin from the Weather table for the corresponding Date,"
+# Merge Virus and Weather tables on the Date column
+merged = pd.merge(Virus, Weather[['Date', 'Tmax', 'Tmin']], on='Date', how='left')
+
+# Compute the temperature range
+merged['TemperatureRange'] = merged['Tmax'] - merged['Tmin']
+
+# Update the Virus table with the new feature
+Virus['TemperatureRange'] = merged['TemperatureRange']
+"
+7,TemperatureDeparture - The Depart value from the Weather table for the corresponding Date,"
+# Merge Virus and Weather tables on the Date column
+merged = pd.merge(Virus, Weather[['Date', 'Depart']], how='left', on='Date')
+
+# Add the TemperatureDeparture column to the Virus table
+Virus['TemperatureDeparture'] = merged['Depart']
+"
+8,PrecipitationTotal - The PrecipTotal value from the Weather table for the corresponding Date,"
+# Merge Virus and Weather tables on the 'Date' column
+merged = pd.merge(Virus, Weather[['Date', 'PrecipTotal']], how='left', on='Date')
+
+# Add the 'PrecipitationTotal' column to the Virus table
+Virus['PrecipitationTotal'] = merged['PrecipTotal']
+"
+9,WindSpeed - The ResultSpeed value from the Weather table for the corresponding Date,"
+# Merge Virus and Weather tables on the 'Date' column
+merged = pd.merge(Virus, Weather[['Date', 'ResultSpeed']], how='left', on='Date')
+
+# Rename the 'ResultSpeed' column to 'WindSpeed'
+merged.rename(columns={'ResultSpeed': 'WindSpeed'}, inplace=True)
+
+# Update the Virus DataFrame with the new 'WindSpeed' column
+Virus = merged[Virus.columns.tolist() + ['WindSpeed']]
+"
+10,WindDirection - The ResultDir value from the Weather table for the corresponding Date,"
+# Merge Virus and Weather tables on the 'Date' column
+merged = pd.merge(Virus, Weather[['Date', 'ResultDir']], how='left', on='Date')
+
+# Rename the 'ResultDir' column to 'WindDirection'
+merged = merged.rename(columns={'ResultDir': 'WindDirection'})
+
+# Update the Virus DataFrame with the new 'WindDirection' column
+Virus = merged[Virus.columns.tolist() + ['WindDirection']]
+"
+11,DaysSinceLastSpray - The number of days since the last recorded spray in the Spray table for the given Latitude and Longitude,"
+import pandas as pd
+
+# Convert Date columns to datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Spray['Date'] = pd.to_datetime(Spray['Date'])
+
+# Function to calculate days since last spray for a given location
+def days_since_last_spray(row):
+    lat, lon = row['Latitude'], row['Longitude']
+    spray_dates = Spray.loc[(Spray['Latitude'] == lat) & (Spray['Longitude'] == lon), 'Date']
+    if spray_dates.empty:
+        return pd.NaT
+    else:
+        last_spray_date = spray_dates.max()
+        return (row['Date'] - last_spray_date).days
+
+# Apply the function to each row and create a new column
+Virus['DaysSinceLastSpray'] = Virus.apply(days_since_last_spray, axis=1)
+"
+12,DistanceToNearestSpray - The distance to the nearest recorded spray location in the Spray table for the given Latitude and Longitude,"
+import pandas as pd
+import math
+
+# Convert Latitude and Longitude columns to numeric
+Virus['Latitude'] = pd.to_numeric(Virus['Latitude'], errors='coerce')
+Virus['Longitude'] = pd.to_numeric(Virus['Longitude'], errors='coerce')
+Spray['Latitude'] = pd.to_numeric(Spray['Latitude'], errors='coerce')
+Spray['Longitude'] = pd.to_numeric(Spray['Longitude'], errors='coerce')
+
+# Create a new column to store the distance to the nearest spray
+Virus['DistanceToNearestSpray'] = float('inf')
+
+# Earth's radius in meters
+R = 6371000
+
+# Iterate over each row in the Virus table
+for index, row in Virus.iterrows():
+    # Check if Latitude and Longitude are valid
+    if pd.notnull(row['Latitude']) and pd.notnull(row['Longitude']):
+        virus_lat = math.radians(row['Latitude'])
+        virus_lon = math.radians(row['Longitude'])
+        
+        # Calculate the distance to each spray location
+        distances = []
+        for spray_index, spray_row in Spray.iterrows():
+            if pd.notnull(spray_row['Latitude']) and pd.notnull(spray_row['Longitude']):
+                spray_lat = math.radians(spray_row['Latitude'])
+                spray_lon = math.radians(spray_row['Longitude'])
+                
+                # Haversine formula
+                dlon = spray_lon - virus_lon
+                dlat = spray_lat - virus_lat
+                a = math.sin(dlat / 2)**2 + math.cos(virus_lat) * math.cos(spray_lat) * math.sin(dlon / 2)**2
+                c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+                distance = R * c
+                
+                distances.append(distance)
+        
+        # Find the minimum distance
+        if distances:
+            min_distance = min(distances)
+            Virus.at[index, 'DistanceToNearestSpray'] = min_distance
+"
+13,SpeciesCount - The count of mosquitoes for each unique Species value,"
+Virus[""SpeciesCount""] = Virus.groupby(""Species"")[""NumMosquitos""].transform(""sum"")
+"
+14,TrapCount - The count of mosquitoes for each unique Trap value,"
+Virus[""TrapCount""] = Virus.groupby(""Trap"")[""NumMosquitos""].transform(""sum"")
+"
+15,BlockCount - The count of mosquitoes for each unique Block value,"
+Virus[""BlockCount""] = Virus.groupby(""Block"")[""NumMosquitos""].transform(""count"")
+"
+16,StreetCount - The count of mosquitoes for each unique Street value,"
+Virus['StreetCount'] = Virus.groupby('Street')['NumMosquitos'].transform('sum')
+"
+17,AddressAccuracyBin - A binned or categorized version of the AddressAccuracy column,"
+import pandas as pd
+
+# Assuming you have already loaded the Virus DataFrame
+bins = [-1, 0.6, 0.7, 0.8, 0.9, 1.0]
+labels = ['Very Low', 'Low', 'Medium', 'High', 'Very High']
+Virus['AddressAccuracyBin'] = pd.cut(Virus['AddressAccuracy'], bins=bins, labels=labels, include_lowest=True)
+"
+18,LatitudeBin - A binned or categorized version of the Latitude column,"
+import pandas as pd
+
+# Assuming you have already loaded the Virus DataFrame
+# Virus = pd.read_csv('Virus.csv')
+
+# Define the bin edges for latitude
+latitude_bins = [-90, 40, 45, 50, 90]
+
+# Create the binned latitude column
+Virus['LatitudeBin'] = pd.cut(Virus['Latitude'], bins=latitude_bins, labels=['Low', 'Mid-Low', 'Mid-High', 'High'])
+"
+19,LongitudeBin - A binned or categorized version of the Longitude column,"
+import pandas as pd
+
+# Assuming you have already loaded the Virus DataFrame
+# Virus = pd.read_csv('Virus.csv')
+
+# Create bins for longitude values
+longitude_bins = pd.interval_range(start=Virus['Longitude'].min(), end=Virus['Longitude'].max(), freq=0.1)
+
+# Bin the longitude values and create a new column 'LongitudeBin'
+Virus['LongitudeBin'] = pd.cut(Virus['Longitude'], bins=longitude_bins)
+"

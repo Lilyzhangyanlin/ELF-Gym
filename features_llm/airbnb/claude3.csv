@@ -1,0 +1,229 @@
+,feature_description,code
+0,"age_at_account_creation - Age of the user at the time of account creation, calculated as the difference between date_account_created and the user's birth date (derived from the age column).",
+1,"days_since_account_creation - Number of days elapsed since the user created their account, calculated as the difference between the current date and date_account_created.","
+import pandas as pd
+from datetime import datetime
+
+# Assuming the current date is 2023-05-01
+current_date = datetime(2023, 5, 1)
+
+# Convert date_account_created to datetime format
+User['date_account_created'] = pd.to_datetime(User['date_account_created'])
+
+# Calculate the number of days elapsed since account creation
+User['days_since_account_creation'] = (current_date - User['date_account_created']).dt.days
+"
+2,"days_to_first_booking - Number of days between account creation and the user's first booking, calculated as the difference between date_first_booking and date_account_created.","
+import pandas as pd
+
+# Convert date columns to datetime format
+User['date_account_created'] = pd.to_datetime(User['date_account_created'])
+User['date_first_booking'] = pd.to_datetime(User['date_first_booking'])
+
+# Calculate the number of days between account creation and first booking
+User['days_to_first_booking'] = (User['date_first_booking'] - User['date_account_created']).dt.days
+"
+3,"days_to_first_activity - Number of days between account creation and the user's first activity, calculated as the difference between the timestamp of timestamp_first_active and date_account_created.","
+import pandas as pd
+
+# Convert date_account_created to datetime
+User['date_account_created'] = pd.to_datetime(User['date_account_created'])
+
+# Convert timestamp_first_active to datetime
+User['timestamp_first_active'] = pd.to_datetime(User['timestamp_first_active'])
+
+# Calculate the difference in days
+User['days_to_first_activity'] = (User['timestamp_first_active'] - User['date_account_created']).dt.days
+"
+4,"is_first_activity_before_signup - Binary flag indicating whether the user's first activity occurred before or after account creation, based on the comparison of timestamp_first_active and date_account_created.","
+import pandas as pd
+
+# Convert date_account_created and timestamp_first_active to datetime format
+User['date_account_created'] = pd.to_datetime(User['date_account_created'])
+User['timestamp_first_active'] = pd.to_datetime(User['timestamp_first_active'])
+
+# Create the new feature column
+User['is_first_activity_before_signup'] = User['timestamp_first_active'] < User['date_account_created']
+"
+5,signup_method_encoded - One-hot encoded representation of the signup_method column.,"
+import pandas as pd
+
+# Assuming User is already loaded as a pandas DataFrame
+signup_method_encoded = pd.get_dummies(User['signup_method'], prefix='signup_method')
+User = pd.concat([User, signup_method_encoded], axis=1)
+"
+6,signup_flow_encoded - One-hot encoded representation of the signup_flow column.,"
+import pandas as pd
+
+# Assuming User is already loaded as a pandas DataFrame
+signup_flow_dummies = pd.get_dummies(User['signup_flow'], prefix='signup_flow')
+User = pd.concat([User, signup_flow_dummies], axis=1)
+"
+7,language_encoded - One-hot encoded representation of the language column.,"
+import pandas as pd
+
+# Assuming 'User' is already loaded as a pandas DataFrame
+language_dummies = pd.get_dummies(User['language'], prefix='language')
+User = pd.concat([User, language_dummies], axis=1)
+"
+8,affiliate_channel_encoded - One-hot encoded representation of the affiliate_channel column.,"
+import pandas as pd
+
+# Assuming User is already loaded as a pandas DataFrame
+affiliate_channel_dummies = pd.get_dummies(User['affiliate_channel'], prefix='affiliate_channel')
+User = pd.concat([User, affiliate_channel_dummies], axis=1)
+"
+9,affiliate_provider_encoded - One-hot encoded representation of the affiliate_provider column.,"
+import pandas as pd
+
+# Assuming User is already loaded as a pandas DataFrame
+affiliate_provider_encoded = pd.get_dummies(User['affiliate_provider'], prefix='affiliate_provider')
+User = pd.concat([User, affiliate_provider_encoded], axis=1)
+"
+10,first_affiliate_tracked_encoded - One-hot encoded representation of the first_affiliate_tracked column.,"
+import pandas as pd
+
+# Assuming User is already loaded as a pandas DataFrame
+encoded_cols = pd.get_dummies(User['first_affiliate_tracked'], prefix='first_affiliate_tracked')
+User = pd.concat([User, encoded_cols], axis=1)
+"
+11,signup_app_encoded - One-hot encoded representation of the signup_app column.,"
+import pandas as pd
+
+# Assuming User is already loaded as a pandas DataFrame
+signup_app_dummies = pd.get_dummies(User['signup_app'], prefix='signup_app')
+User = pd.concat([User, signup_app_dummies], axis=1)
+"
+12,first_device_type_encoded - One-hot encoded representation of the first_device_type column.,"
+import pandas as pd
+
+# Assuming User is already loaded as a pandas DataFrame
+encoded_device_types = pd.get_dummies(User['first_device_type'], prefix='device_type')
+User = pd.concat([User, encoded_device_types], axis=1)
+"
+13,first_browser_encoded - One-hot encoded representation of the first_browser column.,"
+import pandas as pd
+
+# Assuming User is already loaded as a pandas DataFrame
+one_hot_encoded = pd.get_dummies(User['first_browser'], prefix='first_browser')
+User = pd.concat([User, one_hot_encoded], axis=1)
+"
+14,"total_sessions - Total number of sessions for the user, calculated by counting the number of rows in the Session table for each user_id.","
+# Calculate the total number of sessions for each user
+total_sessions = Session.groupby('user_id').size().reset_index()
+
+# Rename the columns for clarity
+total_sessions.columns = ['user_id', 'total_sessions']
+
+# Merge the total_sessions data with the User DataFrame
+User = User.merge(total_sessions, how='left', left_on='id', right_on='user_id')
+
+# Drop the redundant 'user_id' column
+User = User.drop('user_id', axis=1)
+"
+15,"unique_actions - Number of unique actions performed by the user, calculated by counting the distinct values in the action column of the Session table for each user_id.","
+import pandas as pd
+
+# Merge User and Session tables on 'id' and 'user_id' columns
+user_session = pd.merge(User, Session, left_on='id', right_on='user_id', how='inner')
+
+# Count the distinct actions for each user
+unique_actions = user_session.groupby('id')['action'].nunique().reset_index()
+unique_actions.columns = ['id', 'unique_actions']
+
+# Merge the unique_actions feature back into the User table
+User = pd.merge(User, unique_actions, on='id', how='left')
+"
+16,"unique_action_types - Number of unique action types performed by the user, calculated by counting the distinct values in the action_type column of the Session table for each user_id.","
+import pandas as pd
+
+# Group the Session table by user_id and count the unique action_types
+unique_action_types = Session.groupby('user_id')['action_type'].nunique().reset_index()
+unique_action_types.columns = ['id', 'unique_action_types']
+
+# Merge the unique_action_types with the User table
+User = User.merge(unique_action_types, how='left', on='id')
+"
+17,"total_session_duration - Total duration of all sessions for the user, calculated by summing the secs_elapsed column of the Session table for each user_id.","
+# Merge the User and Session tables on the 'id' and 'user_id' columns
+user_session = pd.merge(User, Session, left_on='id', right_on='user_id', how='left')
+
+# Calculate the total session duration for each user
+total_session_duration = user_session.groupby('id')['secs_elapsed'].sum().reset_index()
+
+# Rename the 'secs_elapsed' column to 'total_session_duration'
+total_session_duration.rename(columns={'secs_elapsed': 'total_session_duration'}, inplace=True)
+
+# Merge the User table with the total_session_duration data
+User = pd.merge(User, total_session_duration, on='id', how='left')
+"
+18,"avg_session_duration - Average duration of sessions for the user, calculated by dividing total_session_duration by total_sessions.","
+import pandas as pd
+
+# Compute total session duration and count of sessions for each user
+session_stats = Session.groupby('user_id')['secs_elapsed'].agg(['sum', 'count'])
+session_stats.columns = ['total_session_duration', 'total_sessions']
+
+# Calculate average session duration for each user
+session_stats['avg_session_duration'] = session_stats['total_session_duration'] / session_stats['total_sessions']
+
+# Merge the average session duration with the User DataFrame
+User = User.merge(session_stats['avg_session_duration'], left_on='id', right_index=True, how='left')
+"
+19,"device_type_distribution - Distribution of device types used by the user, calculated by counting the occurrences of each distinct value in the device_type column of the Session table for each user_id.","
+import pandas as pd
+
+# Group the Session data by user_id and device_type, and count the occurrences
+device_type_counts = Session.groupby(['user_id', 'device_type']).size().reset_index(name='count')
+
+# Pivot the data to create a wide format with device_types as columns and counts as values
+device_type_distribution = device_type_counts.pivot(index='user_id', columns='device_type', values='count').fillna(0)
+
+# Convert the device_type_distribution DataFrame to a dictionary
+device_type_distribution_dict = device_type_distribution.to_dict(orient='index')
+
+# Add the device_type_distribution feature to the User table
+User['device_type_distribution'] = User['id'].map(device_type_distribution_dict)
+"
+20,"distance_from_user_language - Levenshtein distance between the user's language and the destination_language, obtained from the Country table by joining on country_destination.","
+import pandas as pd
+from difflib import SequenceMatcher
+
+# Merge User and Country tables
+merged = pd.merge(User, Country, on='country_destination', how='left')
+
+# Function to calculate Levenshtein distance
+def levenshtein_distance(s1, s2):
+    matcher = SequenceMatcher(None, s1, s2)
+    return int(1 - matcher.ratio())
+
+# Calculate Levenshtein distance between user's language and destination language
+merged['distance_from_user_language'] = merged.apply(lambda row: levenshtein_distance(row['language'], row['destination_language']), axis=1)
+
+# Add the new feature to the User table
+User['distance_from_user_language'] = merged['distance_from_user_language']
+"
+21,"destination_area_log - Natural logarithm of the destination_km2 column from the Country table, joined on country_destination.","
+import numpy as np
+
+# Merge User and Country tables
+merged = pd.merge(User, Country[['country_destination', 'destination_km2']], how='left', on='country_destination')
+
+# Compute destination_area_log
+merged['destination_area_log'] = np.log(merged['destination_km2'])
+
+# Update the User table with the new feature
+User = merged.drop('destination_km2', axis=1)
+"
+22,"population_density - Population density of the destination country, calculated by dividing population_in_thousands from the Population table by destination_km2 from the Country table, joined on country_destination and age_bucket (assuming age_bucket is a reasonable proxy for the user's age).","
+import pandas as pd
+
+# Merge Population and Country tables to get population and area for each country and age group
+pop_country = Population.merge(Country[['country_destination', 'destination_km2']], on='country_destination', how='left')
+
+# Calculate population density
+pop_country['population_density'] = pop_country['population_in_thousands'] / pop_country['destination_km2']
+
+# Merge User and pop_country tables to add population density to User table
+User = User.merge(pop_country[['country_destination', 'age_bucket', 'population_density']], on=['country_destination', 'age_bucket'], how='left')
+"

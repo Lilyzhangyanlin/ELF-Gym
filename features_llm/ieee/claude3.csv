@@ -1,0 +1,214 @@
+,feature_description,code
+0,"TransactionAmtLog - Natural logarithm of the TransactionAmt column, as transaction amounts often follow a log-normal distribution.","
+import numpy as np
+
+Transaction[""TransactionAmtLog""] = np.log(Transaction[""TransactionAmt""])
+"
+1,"TransactionAmtBin - Binned version of the TransactionAmt column, with bins determined by quantiles or domain knowledge.",
+2,ProductCDEncoded - One-hot encoded or target encoded version of the ProductCD column.,"
+import pandas as pd
+
+# Assuming you have already loaded the data into the 'Transaction' and 'Train_identity' DataFrames
+# Transaction = pd.read_csv('Transaction.csv')
+# Train_identity = pd.read_csv('Train_identity.csv')
+
+# One-hot encode the 'ProductCD' column
+ProductCDEncoded = pd.get_dummies(Transaction['ProductCD'], prefix='ProductCD')
+
+# Add the encoded columns to the 'Transaction' DataFrame
+Transaction = pd.concat([Transaction, ProductCDEncoded], axis=1)
+"
+3,"CardEncoded - One-hot encoded or target encoded version of the concatenated card1, card2, ..., card6 columns.","
+import pandas as pd
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+
+# Concatenate the card columns
+Transaction['CardConcatenated'] = Transaction['card1'].astype(str) + '_' + \
+                                  Transaction['card2'].astype(str) + '_' + \
+                                  Transaction['card3'].astype(str) + '_' + \
+                                  Transaction['card4'].astype(str) + '_' + \
+                                  Transaction['card5'].astype(str) + '_' + \
+                                  Transaction['card6'].astype(str)
+
+# One-hot encoding
+encoder = OneHotEncoder()
+encoded = encoder.fit_transform(Transaction[['card1', 'card2', 'card3', 'card4', 'card5', 'card6']].values)
+encoded_df = pd.DataFrame(encoded.toarray(), columns=encoder.get_feature_names_out(['card1', 'card2', 'card3', 'card4', 'card5', 'card6']))
+Transaction = pd.concat([Transaction, encoded_df], axis=1)
+Transaction.drop(['card1', 'card2', 'card3', 'card4', 'card5', 'card6'], axis=1, inplace=True)
+
+# Alternatively, for target encoding
+encoder = LabelEncoder()
+Transaction['CardEncoded'] = encoder.fit_transform(Transaction['CardConcatenated'])
+Transaction.drop('CardConcatenated', axis=1, inplace=True)
+"
+4,AddrEncoded - One-hot encoded or target encoded version of the concatenated addr1 and addr2 columns.,"
+import pandas as pd
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+
+# Concatenate addr1 and addr2 columns
+Transaction['AddrCombined'] = Transaction['addr1'].astype(str) + ' ' + Transaction['addr2'].astype(str)
+
+# One-Hot Encoding
+encoder = OneHotEncoder()
+addr_encoded = encoder.fit_transform(Transaction['AddrCombined'].values.reshape(-1, 1))
+addr_encoded = pd.DataFrame(addr_encoded.toarray(), columns=encoder.get_feature_names_out(['AddrCombined']))
+Transaction = pd.concat([Transaction, addr_encoded], axis=1)
+
+# Target Encoding
+encoder = LabelEncoder()
+Transaction['AddrEncoded'] = encoder.fit_transform(Transaction['AddrCombined'])
+"
+5,EmailDomainEncoded - One-hot encoded or target encoded version of the concatenated P_emaildomain and R_emaildomain columns.,"
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+
+# Concatenate P_emaildomain and R_emaildomain columns
+Transaction['EmailDomain'] = Transaction['P_emaildomain'].astype(str) + '_' + Transaction['R_emaildomain'].astype(str)
+
+# One-hot encoding
+encoder = LabelEncoder()
+Transaction['EmailDomain'] = encoder.fit_transform(Transaction['EmailDomain'])
+one_hot_encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
+EmailDomainEncoded = one_hot_encoder.fit_transform(Transaction[['EmailDomain']])
+EmailDomainEncoded = pd.DataFrame(EmailDomainEncoded, columns=[f'EmailDomainEncoded_{i}' for i in range(EmailDomainEncoded.shape[1])])
+Transaction = pd.concat([Transaction, EmailDomainEncoded], axis=1)
+"
+6,"M_Encoded - One-hot encoded or target encoded version of the concatenated M1, M2, ..., M9 columns.",
+7,DeviceTypeEncoded - One-hot encoded or target encoded version of the DeviceType column from Train_identity.,"
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+
+# Merge the two tables on the TransactionID column
+merged_df = pd.merge(Transaction, Train_identity, on='TransactionID', how='left')
+
+# Encode the DeviceType column using LabelEncoder
+label_encoder = LabelEncoder()
+merged_df['DeviceTypeEncoded'] = label_encoder.fit_transform(merged_df['DeviceType'])
+
+# Update the Transaction table with the new feature
+Transaction = merged_df[Transaction.columns.tolist() + ['DeviceTypeEncoded']]
+"
+8,DeviceInfoEncoded - One-hot encoded or target encoded version of the DeviceInfo column from Train_identity.,"
+import pandas as pd
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+
+# Merge the two tables
+merged_df = pd.merge(Transaction, Train_identity, on='TransactionID', how='left')
+
+# One-hot encode the DeviceInfo column
+encoder = OneHotEncoder()
+device_info_encoded = encoder.fit_transform(merged_df[['DeviceInfo']]).toarray()
+device_info_encoded_df = pd.DataFrame(device_info_encoded, columns=[f'DeviceInfoEncoded_{col}' for col in range(device_info_encoded.shape[1])])
+
+# Alternatively, you can use target encoding
+# encoder = LabelEncoder()
+# merged_df['DeviceInfo'] = encoder.fit_transform(merged_df['DeviceInfo'])
+# device_info_encoded_df = merged_df[['DeviceInfo']].copy()
+# device_info_encoded_df.columns = ['DeviceInfoEncoded']
+
+# Add the encoded feature to the Transaction table
+Transaction = pd.concat([Transaction, device_info_encoded_df], axis=1)
+"
+9,"id_Encoded - One-hot encoded or target encoded version of the concatenated id_12, id_13, ..., id_38 columns from Train_identity.","
+import pandas as pd
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+
+# Concatenate the id_12, id_13, ..., id_38 columns
+Train_identity['id_concat'] = Train_identity['id_12'].astype(str) + '_' + Train_identity['id_13'].astype(str) + '_' + \
+                              Train_identity['id_14'].astype(str) + '_' + Train_identity['id_15'].astype(str) + '_' + \
+                              Train_identity['id_16'].astype(str) + '_' + Train_identity['id_17'].astype(str) + '_' + \
+                              Train_identity['id_18'].astype(str) + '_' + Train_identity['id_19'].astype(str) + '_' + \
+                              Train_identity['id_20'].astype(str) + '_' + Train_identity['id_21'].astype(str) + '_' + \
+                              Train_identity['id_22'].astype(str) + '_' + Train_identity['id_23'].astype(str) + '_' + \
+                              Train_identity['id_24'].astype(str) + '_' + Train_identity['id_25'].astype(str) + '_' + \
+                              Train_identity['id_26'].astype(str) + '_' + Train_identity['id_27'].astype(str) + '_' + \
+                              Train_identity['id_28'].astype(str) + '_' + Train_identity['id_29'].astype(str) + '_' + \
+                              Train_identity['id_30'].astype(str) + '_' + Train_identity['id_31'].astype(str) + '_' + \
+                              Train_identity['id_32'].astype(str) + '_' + Train_identity['id_33'].astype(str) + '_' + \
+                              Train_identity['id_34'].astype(str) + '_' + Train_identity['id_35'].astype(str) + '_' + \
+                              Train_identity['id_36'].astype(str) + '_' + Train_identity['id_37'].astype(str) + '_' + \
+                              Train_identity['id_38'].astype(str)
+
+# One-hot encoding
+encoder = OneHotEncoder()
+id_encoded = encoder.fit_transform(Train_identity[['id_concat']])
+id_encoded = pd.DataFrame(id_encoded.toarray(), columns=encoder.get_feature_names_out(['id_concat']))
+id_encoded = id_encoded.reset_index().rename(columns={'index': 'TransactionID'})
+
+# Merge the encoded feature with the Transaction DataFrame
+Transaction = Transaction.merge(id_encoded, how='left', on='TransactionID')
+
+# Add the id_concat column to the Transaction DataFrame
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_concat']], how='left', on='TransactionID')
+
+# Target encoding
+encoder = LabelEncoder()
+Transaction['id_Encoded'] = encoder.fit_transform(Transaction['id_concat'])
+"
+10,"C_PCA - Principal Component Analysis (PCA) on the C1, C2, ..., C14 columns to reduce dimensionality while retaining most of the variance.","
+from sklearn.decomposition import PCA
+import numpy as np
+
+# Select the relevant numerical columns
+C_cols = Transaction.filter(like='C', axis=1)._get_numeric_data().columns
+
+# Instantiate the PCA object
+pca = PCA()
+
+# Fit and transform the data
+C_pca = pca.fit_transform(Transaction[C_cols])
+
+# Add the PCA components as new columns
+for i in range(C_pca.shape[1]):
+    Transaction[f'C_PCA_{i+1}'] = C_pca[:, i]
+"
+11,"D_PCA - Principal Component Analysis (PCA) on the D1, D2, ..., D15 columns to reduce dimensionality while retaining most of the variance.","
+from sklearn.decomposition import PCA
+
+# Select the relevant columns
+D_cols = [col for col in Transaction.columns if col.startswith('D')]
+D_data = Transaction[D_cols]
+
+# Perform PCA
+pca = PCA()
+D_pca = pca.fit_transform(D_data)
+
+# Add the PCA components as new columns
+for i in range(D_pca.shape[1]):
+    Transaction[f'D_PCA_{i+1}'] = D_pca[:, i]
+"
+12,"V_PCA - Principal Component Analysis (PCA) on the V1, V2, ..., V339 columns to reduce dimensionality while retaining most of the variance.","
+from sklearn.decomposition import PCA
+
+# Select the V columns from the Transaction DataFrame
+V_cols = [col for col in Transaction.columns if col.startswith('V')]
+V_data = Transaction[V_cols]
+
+# Perform PCA on the V columns
+pca = PCA()
+V_pca = pca.fit_transform(V_data)
+
+# Add the first principal component as a new column 'V_PCA'
+Transaction['V_PCA'] = V_pca[:, 0]
+"
+13,"id_PCA - Principal Component Analysis (PCA) on the id1, id2, ..., id11 columns from Train_identity to reduce dimensionality while retaining most of the variance.","
+from sklearn.decomposition import PCA
+import numpy as np
+"
+14,"TransactionDTHour - Hour of the day extracted from the TransactionDT column, as fraud patterns may vary by time of day.","
+import pandas as pd
+
+Transaction['TransactionDTHour'] = pd.to_datetime(Transaction['TransactionDT'], unit='s').dt.hour
+"
+15,"TransactionDTWeekday - Day of the week extracted from the TransactionDT column, as fraud patterns may vary by day of the week.","
+import pandas as pd
+from datetime import datetime
+
+# Assuming the reference datetime is 2023-01-01 00:00:00
+reference_datetime = datetime(2023, 1, 1)
+
+Transaction['TransactionDT'] = pd.to_timedelta(Transaction['TransactionDT'])
+Transaction['TransactionDateTime'] = reference_datetime + Transaction['TransactionDT']
+Transaction['TransactionDTWeekday'] = Transaction['TransactionDateTime'].dt.day_name()
+"

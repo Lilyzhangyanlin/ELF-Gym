@@ -1,0 +1,238 @@
+,feature_description,code
+0,"UserSearchHistory - A feature that captures the user's search history, such as the number of searches made by the user in the past, the categories or locations they have searched for, and the frequency of their searches. This can be derived from the SearchInfo table by grouping and aggregating the data by UserID.","
+import pandas as pd
+
+# Compute the user search history features
+user_search_history = SearchInfo.groupby('UserID').agg(
+    num_searches=('SearchID', 'count'),
+    unique_categories=('SearchCategoryID', pd.Series.nunique),
+    unique_locations=('SearchLocationID', pd.Series.nunique)
+)
+
+# Merge the user search history features with the SearchStream table
+SearchStream = SearchStream.merge(user_search_history, left_on='SearchID', right_index=True, how='left')
+"
+1,"AdPopularity - A feature that measures the popularity of the ad, such as the number of times it has been shown or clicked on in the past. This can be derived from the SearchStream table by grouping and aggregating the data by AdID.","
+import pandas as pd
+
+# Count the number of times each AdID appears in the SearchStream table
+ad_counts = SearchStream['AdID'].value_counts()
+
+# Create a new column 'AdPopularity' in the SearchStream table
+SearchStream['AdPopularity'] = SearchStream['AdID'].map(ad_counts)
+"
+2,"UserAdInteractionHistory - A feature that captures the user's interaction history with the specific ad, such as the number of times the user has seen or clicked on the ad in the past. This can be derived by joining the SearchStream and VisitsStream tables on AdID and UserID, and aggregating the data.","
+import pandas as pd
+
+# Join SearchStream, SearchInfo, and VisitsStream to get user-ad interactions
+user_ad_interactions = pd.merge(SearchStream[['SearchID', 'AdID']], 
+                                SearchInfo[['SearchID', 'UserID']], 
+                                on='SearchID', 
+                                how='left')
+user_ad_interactions = pd.merge(user_ad_interactions, 
+                                VisitsStream[['UserID', 'AdID']], 
+                                on=['UserID', 'AdID'], 
+                                how='left')
+
+# Count the number of interactions for each user-ad pair
+user_ad_interaction_counts = user_ad_interactions.groupby(['UserID', 'AdID']).size().reset_index(name='UserAdInteractionHistory')
+
+# Merge the interaction counts back into the SearchStream DataFrame
+SearchStream = pd.merge(SearchStream, user_ad_interaction_counts, on=['AdID'], how='left')
+
+# Fill NaN values with 0 (for new user-ad pairs)
+SearchStream['UserAdInteractionHistory'] = SearchStream['UserAdInteractionHistory'].fillna(0)
+"
+3,"UserDeviceCategory - A categorical feature that groups user devices into broader categories (e.g., mobile, desktop, tablet) based on the UserDeviceID in the UserInfo table. This can help capture device-specific behavior patterns.","
+import pandas as pd
+
+# Define a mapping dictionary to categorize devices
+device_category_mapping = {
+    'iPhone': 'mobile',
+    'iPad': 'tablet',
+    'Samsung': 'mobile',
+    # Add more mappings as needed
+}
+
+# Create a function to map device IDs to categories
+def map_device_to_category(device_id):
+    for device_pattern, category in device_category_mapping.items():
+        if device_pattern in device_id:
+            return category
+    return 'desktop'  # Default to desktop if no match found
+
+# Apply the mapping function to the UserDeviceID column
+UserInfo['UserDeviceCategory'] = UserInfo['UserDeviceID'].apply(map_device_to_category)
+
+# Merge the UserDeviceCategory feature with the SearchStream table
+SearchStream = pd.merge(SearchStream, UserInfo[['UserID', 'UserDeviceCategory']], left_on='SearchID', right_on='UserID', how='left')
+SearchStream.drop('UserID', axis=1, inplace=True)
+"
+4,"AdTitleFeatures - Derived features from the ad's title text, such as the length of the title, the presence of specific keywords, or the sentiment of the title. These can be extracted using natural language processing techniques on the Title column in the AdsInfo table.","
+import pandas as pd
+import numpy as np
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.sentiment import SentimentIntensityAnalyzer
+
+# Merge SearchStream and AdsInfo to get the Title column
+merged_df = pd.merge(SearchStream, AdsInfo[['AdID', 'Title']], on='AdID', how='left')
+
+# Initialize sentiment analyzer
+sia = SentimentIntensityAnalyzer()
+
+# Function to extract features from title
+def extract_title_features(title):
+    if pd.isna(title):
+        return [0, 0, 0]  # Return default values for missing titles
+    
+    tokens = word_tokenize(title.lower())
+    num_words = len(tokens)
+    num_unique_words = len(set(tokens))
+    
+    # Remove stop words
+    stop_words = set(stopwords.words('english'))
+    filtered_tokens = [word for word in tokens if word not in stop_words]
+    
+    # Calculate sentiment scores
+    sentiment_scores = sia.polarity_scores(' '.join(filtered_tokens))
+    compound_score = sentiment_scores['compound']
+    
+    return [num_words, num_unique_words, compound_score]
+
+# Apply the function to the Title column and create a new column
+merged_df['AdTitleFeatures'] = merged_df['Title'].apply(extract_title_features)
+
+# Split the new column into separate columns
+merged_df[['TitleWordCount', 'TitleUniqueWordCount', 'TitleSentimentScore']] = pd.DataFrame(merged_df['AdTitleFeatures'].tolist(), index=merged_df.index)
+
+# Drop the temporary column
+merged_df = merged_df.drop('AdTitleFeatures', axis=1)
+
+# Update the SearchStream table with the new features
+SearchStream = pd.merge(SearchStream, merged_df[['SearchID', 'TitleWordCount', 'TitleUniqueWordCount', 'TitleSentimentScore']], on='SearchID', how='left')
+"
+5,"LocationHierarchy - A set of features that capture the hierarchical nature of the location data, such as the country, region, and city levels, derived from the Location table. This can help capture location-specific patterns.","
+import pandas as pd
+
+# Merge SearchStream with Location table to get location information
+merged_df = pd.merge(SearchStream, AdsInfo[['AdID', 'LocationID']], on='AdID', how='left')
+merged_df = pd.merge(merged_df, Location[['LocationID', 'Level', 'RegionID', 'CityID']], on='LocationID', how='left')
+
+# Helper function to create the location hierarchy string
+def create_location_hierarchy(row):
+    country = str(row['RegionID']) if row['Level'] == 1 else ''
+    region = str(row['RegionID']) if row['Level'] == 2 else ''
+    city = str(row['CityID']) if row['Level'] == 3 else ''
+    return '_'.join([x for x in [country, region, city] if x])
+
+# Create the LocationHierarchy feature
+merged_df['LocationHierarchy'] = merged_df.apply(lambda row: create_location_hierarchy(row), axis=1)
+
+# Update the SearchStream table with the new feature
+SearchStream['LocationHierarchy'] = merged_df['LocationHierarchy']
+"
+6,"CategoryHierarchy - A set of features that capture the hierarchical nature of the category data, such as the top-level category, subcategory, and parent category, derived from the Category table. This can help capture category-specific patterns.","
+import pandas as pd
+
+# Merge the SearchStream and AdsInfo tables to get the CategoryID
+merged_df = pd.merge(SearchStream, AdsInfo[['AdID', 'CategoryID']], on='AdID', how='left')
+
+# Merge with the Category table to get the category hierarchy
+merged_df = pd.merge(merged_df, Category[['CategoryID', 'Level', 'ParentCategoryID', 'SubcategoryID']], on='CategoryID', how='left')
+
+# Create the CategoryHierarchy feature
+merged_df['CategoryHierarchy'] = merged_df.apply(lambda row: '_'.join([
+    str(row['CategoryID']),
+    str(row['ParentCategoryID'] or ''),
+    str(row['SubcategoryID'] or '')
+]), axis=1)
+
+# Add the CategoryHierarchy feature to the SearchStream table
+SearchStream['CategoryHierarchy'] = merged_df['CategoryHierarchy']
+"
+7,"SearchQueryFeatures - Derived features from the search query text, such as the length of the query, the presence of specific keywords, or the similarity between the query and the ad's title or category. These can be extracted using natural language processing techniques on the SearchQuery column in the SearchInfo table.","
+import pandas as pd
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Merge SearchInfo and AdsInfo tables to get SearchQuery and Title columns
+merged_df = pd.merge(SearchInfo, AdsInfo[['AdID', 'Title']], left_on='SearchID', right_on='AdID', how='left')
+
+# Fill missing values in SearchQuery with an empty string
+merged_df['SearchQuery'] = merged_df['SearchQuery'].fillna('')
+
+# Compute query length
+merged_df['QueryLength'] = merged_df['SearchQuery'].apply(lambda x: len(str(x).split()))
+
+# Vectorize SearchQuery and Title columns
+tfidf = TfidfVectorizer()
+query_vectors = tfidf.fit_transform(merged_df['SearchQuery'])
+title_vectors = tfidf.transform(merged_df['Title'])
+
+# Compute cosine similarity between SearchQuery and Title
+similarity_scores = cosine_similarity(query_vectors, title_vectors)
+merged_df['QueryTitleSimilarity'] = np.diagonal(similarity_scores)
+
+# Add new features to SearchStream table
+SearchStream = pd.merge(SearchStream, merged_df[['SearchID', 'QueryLength', 'QueryTitleSimilarity']], on='SearchID', how='left')
+"
+8,"TimeFeaturesFromSearchDate - Temporal features derived from the SearchDate column in the SearchInfo table, such as the hour of the day, day of the week, or month of the year, which can capture time-based patterns in user behavior.","
+import pandas as pd
+from datetime import datetime
+
+# Merge SearchStream with SearchInfo to get SearchDate
+merged = pd.merge(SearchStream, SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+
+# Convert SearchDate to datetime
+merged['SearchDate'] = pd.to_datetime(merged['SearchDate'])
+
+# Extract temporal features
+merged['Hour'] = merged['SearchDate'].dt.hour
+merged['DayOfWeek'] = merged['SearchDate'].dt.day_of_week
+merged['Month'] = merged['SearchDate'].dt.month
+
+# Drop the original SearchDate column
+merged = merged.drop('SearchDate', axis=1)
+
+# Assign the merged DataFrame back to SearchStream
+SearchStream = merged
+"
+9,"TimeFeaturesFromViewDate - Temporal features derived from the ViewDate column in the VisitsStream table, similar to the TimeFeaturesFromSearchDate but capturing the time when the ad was viewed.","
+import pandas as pd
+
+# Merge SearchStream and VisitsStream on AdID
+merged = pd.merge(SearchStream, VisitsStream[['AdID', 'ViewDate']], on='AdID', how='left')
+
+# Extract temporal features from ViewDate
+merged['ViewDate_year'] = merged['ViewDate'].dt.year
+merged['ViewDate_month'] = merged['ViewDate'].dt.month
+merged['ViewDate_day'] = merged['ViewDate'].dt.day
+merged['ViewDate_hour'] = merged['ViewDate'].dt.hour
+merged['ViewDate_weekday'] = merged['ViewDate'].dt.weekday
+merged['ViewDate_weekend'] = merged['ViewDate'].dt.weekday.isin([5, 6]).astype(int)
+
+# Add the temporal features to the SearchStream dataframe
+SearchStream = pd.concat([SearchStream, merged[['ViewDate_year', 'ViewDate_month', 'ViewDate_day', 'ViewDate_hour', 'ViewDate_weekday', 'ViewDate_weekend']]], axis=1)
+
+# Drop the temporary merged dataframe
+del merged
+"
+10,"TimeFeaturesFromPhoneRequestDate - Temporal features derived from the PhoneRequestDate column in the PhoneRequestsStream table, capturing the time when a phone request was made for the ad.","
+import pandas as pd
+from datetime import datetime
+
+# Merge SearchStream and PhoneRequestsStream on AdID
+merged = pd.merge(SearchStream, PhoneRequestsStream[['AdID', 'PhoneRequestDate']], on='AdID', how='left')
+
+# Convert PhoneRequestDate to datetime
+merged['PhoneRequestDate'] = pd.to_datetime(merged['PhoneRequestDate'], errors='coerce')
+
+# Extract temporal features from PhoneRequestDate
+temp_features = merged['PhoneRequestDate'].apply(lambda x: pd.Series([x.hour, x.day, x.month, x.year]) if not pd.isnull(x) else pd.Series([None, None, None, None]))
+merged = pd.concat([merged, temp_features.rename(columns={0: 'Hour', 1: 'Day', 2: 'Month', 3: 'Year'})], axis=1)
+
+# Drop the original PhoneRequestDate column
+SearchStream = merged.drop(['PhoneRequestDate', 'Hour', 'Day', 'Month', 'Year'], axis=1)
+"

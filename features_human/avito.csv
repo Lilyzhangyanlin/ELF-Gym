@@ -1,0 +1,454 @@
+,feature_name,feature_description,code
+0,adid_cnt,count of the ad id in stream data,"
+ad_count = SearchStream['AdID'].value_counts()
+ad_count.name = 'AdIDCount'
+SearchStream = SearchStream.join(ad_count, on='AdID')
+"
+1,af_3h_cnt,count of records in 3 hours after the search session,"
+SearchInfo['SearchDate'] = pd.to_datetime(SearchInfo['SearchDate'])
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+
+SearchStream = SearchStream.sort_values(by='SearchDate')
+
+# Create a new column to store the count of records in 3 hours after the search session
+SearchStream['count_3h_after'] = SearchStream.apply(
+    lambda row: SearchStream[(SearchStream['SearchDate'] > row['SearchDate']) & 
+                             (SearchStream['SearchDate'] <= row['SearchDate'] + pd.Timedelta(hours=3))].shape[0], axis=1
+)
+"
+2,af_cnt,count of records after the search session,"
+# Merge SearchStream with SearchInfo to get SearchDate
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+
+# Convert SearchDate to datetime
+SearchStream['SearchDate'] = pd.to_datetime(SearchStream['SearchDate'])
+
+# Sort by SearchDate
+SearchStream = SearchStream.sort_values(by='SearchDate')
+
+# Compute the count of records after the search session
+SearchStream['CountAfterSearch'] = SearchStream.groupby('SearchID').cumcount(ascending=False)
+
+# Drop the SearchDate column as it's no longer needed
+SearchStream = SearchStream.drop(columns=['SearchDate'])
+"
+3,bf_3h_cnt,count of records in 3 hours before the search session,"
+import pandas as pd
+
+# Convert SearchDate to datetime
+SearchInfo['SearchDate'] = pd.to_datetime(SearchInfo['SearchDate'])
+
+# Merge SearchStream with SearchInfo to get SearchDate
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+
+# Sort by SearchDate
+SearchStream = SearchStream.sort_values(by='SearchDate')
+
+# Initialize the new feature column
+SearchStream['Count3HoursBefore'] = 0
+
+# Compute the count of records in 3 hours before the search session
+for idx, row in SearchStream.iterrows():
+    start_time = row['SearchDate'] - pd.Timedelta(hours=3)
+    end_time = row['SearchDate']
+    count = SearchStream[(SearchStream['SearchDate'] >= start_time) & (SearchStream['SearchDate'] < end_time)].shape[0]
+    SearchStream.at[idx, 'Count3HoursBefore'] = count
+
+# Drop the SearchDate column as it was only needed for computation
+SearchStream = SearchStream.drop(columns=['SearchDate'])
+"
+4,bf_cnt,count of records before the search session,"
+# Merge SearchStream with SearchInfo to get SearchDate
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+
+# Convert SearchDate to datetime
+SearchStream['SearchDate'] = pd.to_datetime(SearchStream['SearchDate'])
+
+# Sort by SearchDate
+SearchStream = SearchStream.sort_values(by='SearchDate')
+
+# Compute the count of records before the search session
+SearchStream['CountBeforeSearch'] = SearchStream.groupby('SearchID').cumcount()
+
+# Drop the SearchDate column as it is no longer needed
+SearchStream = SearchStream.drop(columns=['SearchDate'])
+"
+5,bf_clk_cnt,count of click records before the search session,"
+# Merge SearchStream with SearchInfo to get SearchDate
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+
+# Filter contextual ads
+contextual_ads = SearchStream[SearchStream['ObjectType'] == 3]
+
+# Sort by SearchDate
+contextual_ads = contextual_ads.sort_values(by='SearchDate')
+
+# Compute cumulative count of clicks before each search session
+contextual_ads['ClickCountBefore'] = contextual_ads.groupby('AdID')['IsClick'].cumsum().shift(fill_value=0)
+
+# Merge back to the original SearchStream
+SearchStream = SearchStream.merge(contextual_ads[['SearchID', 'AdID', 'ClickCountBefore']], on=['SearchID', 'AdID'], how='left')
+"
+6,bf_ctr,click through rate before the search session,"
+# Merge SearchStream with SearchInfo to get SearchDate
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+
+# Filter contextual ads (ObjectType == 3)
+contextual_ads = SearchStream[SearchStream['ObjectType'] == 3]
+
+# Calculate cumulative clicks and impressions for each AdID before each search session
+contextual_ads = contextual_ads.sort_values(by='SearchDate')
+contextual_ads['CumulativeClicks'] = contextual_ads.groupby('AdID')['IsClick'].cumsum().shift(1)
+contextual_ads['CumulativeImpressions'] = contextual_ads.groupby('AdID').cumcount()
+
+# Calculate CTR before the search session
+contextual_ads['CTRBeforeSearch'] = contextual_ads['CumulativeClicks'] / contextual_ads['CumulativeImpressions']
+contextual_ads['CTRBeforeSearch'] = contextual_ads['CTRBeforeSearch']
+
+# Merge the CTRBeforeSearch back to the original SearchStream
+SearchStream = SearchStream.merge(contextual_ads[['SearchID', 'AdID', 'CTRBeforeSearch']], on=['SearchID', 'AdID'], how='left')
+
+# Fill NaN values with 0 for non-contextual ads
+SearchStream['CTRBeforeSearch'] = SearchStream['CTRBeforeSearch']
+"
+7,ca_match,matched category id,"
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchCategoryID']], on='SearchID', how='left')
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'CategoryID']], on='AdID', how='left')
+SearchStream['MatchedCategoryID'] = (SearchStream['SearchCategoryID'] == SearchStream['CategoryID']).astype(int)
+"
+8,ca_pid_match,matched parent category id,"
+# Merge SearchStream with AdsInfo to get CategoryID
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'CategoryID']], on='AdID', how='left')
+
+# Merge the result with Category to get ParentCategoryID
+SearchStream = SearchStream.merge(Category[['CategoryID', 'ParentCategoryID']], on='CategoryID', how='left')
+
+# Rename the column to matched_parent_category_id
+SearchStream.rename(columns={'ParentCategoryID': 'matched_parent_category_id'}, inplace=True)
+"
+9,clk_cnt,historic click count of user on some ad,"
+# Merge SearchStream with SearchInfo to get UserID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+
+# Calculate historic click count of user on some ad
+historic_clicks = SearchStream.groupby(['UserID', 'AdID'])['IsClick'].sum().reset_index()
+historic_clicks.columns = ['UserID', 'AdID', 'HistoricClickCount']
+
+# Merge the historic click count back to the SearchStream
+SearchStream = SearchStream.merge(historic_clicks, on=['UserID', 'AdID'], how='left')
+
+# Fill NaN values with 0 (for cases where there are no historic clicks)
+SearchStream['HistoricClickCount'] = SearchStream['HistoricClickCount']
+"
+10,hl_lcnt,count of highlighted ads below the position in search session,"
+SearchStream['HighlightedAdsBelow'] = SearchStream.groupby('SearchID').apply(
+    lambda x: x[::-1].cumsum()['ObjectType'].shift(-1)
+).reset_index(level=0, drop=True)
+SearchStream['HighlightedAdsBelow'] = SearchStream['HighlightedAdsBelow'].where(SearchStream['ObjectType'] == 2, 0)
+"
+11,hl_ucnt,count of highlighted ads above the position in search session,"
+SearchStream = SearchStream.sort_values(by=['SearchID', 'Position'])
+SearchStream['HighlightedAdsAbove'] = SearchStream.groupby('SearchID').apply(
+    lambda x: x['ObjectType'].eq(2).cumsum().shift(fill_value=0)
+).reset_index(level=0, drop=True)
+"
+12,ot*_cnt,count of different object type in search session,"
+# Merge SearchStream with SearchInfo to get SearchID and SearchDate
+merged_df = pd.merge(SearchStream, SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+
+# Count different object types in each search session
+object_type_counts = merged_df.groupby('SearchID')['ObjectType'].nunique().reset_index()
+object_type_counts.columns = ['SearchID', 'ObjectTypeCount']
+
+# Merge the counts back to the original SearchStream table
+SearchStream = pd.merge(SearchStream, object_type_counts, on='SearchID', how='left')
+
+# Rename the new column to match the requested feature name
+SearchStream.rename(columns={'ObjectTypeCount': 'CountOfDifferentObjectTypeInSearchSession'}, inplace=True)
+"
+13,pos_ot_type,hash value of object type tuple in search session,"
+import hashlib
+
+# Merge SearchStream with SearchInfo to get SearchID and ObjectType together
+merged_df = pd.merge(SearchStream, SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+
+# Group by SearchID and create a tuple of ObjectType for each search session
+object_type_tuples = merged_df.groupby('SearchID')['ObjectType'].apply(tuple).reset_index()
+
+# Compute the hash value for each tuple
+object_type_tuples['ObjectTypeHash'] = object_type_tuples['ObjectType'].apply(lambda x: hashlib.md5(str(x).encode()).hexdigest())
+
+# Merge the hash values back to the original SearchStream dataframe
+SearchStream = pd.merge(SearchStream, object_type_tuples[['SearchID', 'ObjectTypeHash']], on='SearchID', how='left')
+"
+14,pos_type,hash value of position tuple in search session,"
+import hashlib
+
+# Merge SearchStream with SearchInfo to get SearchID and Position together
+merged_df = SearchStream.merge(SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+
+# Create a tuple of positions for each search session
+position_tuples = merged_df.groupby('SearchID')['Position'].apply(tuple)
+
+# Compute hash value for each position tuple
+position_hashes = position_tuples.apply(lambda x: hashlib.md5(str(x).encode()).hexdigest())
+
+# Map the hash values back to the SearchStream table
+SearchStream['PositionTupleHash'] = SearchStream['SearchID'].map(position_hashes)
+"
+15,price_pos,rank by price in search session,"
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'Price']], on='AdID', how='left')
+SearchStream['RankByPrice'] = SearchStream.groupby('SearchID')['Price'].rank(method='min')
+"
+16,price_ratio,divide price by average price in search session,"
+# Merge SearchStream with AdsInfo to get the Price column
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'Price']], on='AdID', how='left')
+
+# Merge SearchStream with SearchInfo to get the SearchID and group by SearchID to calculate average price per search session
+SearchStream = SearchStream.merge(SearchInfo[['SearchID']], on='SearchID', how='left')
+average_price_per_search = SearchStream.groupby('SearchID')['Price'].mean().reset_index()
+average_price_per_search.columns = ['SearchID', 'AvgPrice']
+
+# Merge the average price back to the SearchStream
+SearchStream = SearchStream.merge(average_price_per_search, on='SearchID', how='left')
+
+# Calculate the new feature
+SearchStream['PriceByAvgPriceInSession'] = SearchStream['Price'] / SearchStream['AvgPrice']
+
+# Drop the intermediate columns
+SearchStream.drop(columns=['Price', 'AvgPrice'], inplace=True)
+"
+17,qe_ng_cnt,count of matched 2-ngram words between query and title,"
+from sklearn.feature_extraction.text import CountVectorizer
+import numpy as np
+
+# Merge SearchStream with SearchInfo to get SearchQuery
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchQuery']], on='SearchID', how='left')
+
+# Merge SearchStream with AdsInfo to get Title
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'Title']], on='AdID', how='left')
+
+# Function to count matched 2-gram words between query and title
+def count_2gram_matches(query, title):
+    if pd.isnull(query) or pd.isnull(title) or query is None or title is None:
+        return 0
+    vectorizer = CountVectorizer(ngram_range=(2, 2))
+    try:
+        query_ngrams = vectorizer.fit_transform([query]).toarray()
+    except:
+        return 0
+    title_ngrams = vectorizer.transform([title]).toarray()
+    return np.sum(np.minimum(query_ngrams, title_ngrams))
+
+# Apply the function to each row
+SearchStream['2gram_match_count'] = SearchStream.apply(lambda row: count_2gram_matches(row['SearchQuery'], row['Title']), axis=1)
+"
+18,qe_ng_min_pos,earliest position of matched 2-ngram words between query and title,"
+import pandas as pd
+import numpy as np
+from nltk import ngrams
+
+# Assuming the dataframes are already loaded as follows:
+# SearchStream, AdsInfo, SearchInfo
+
+# Merge SearchStream with AdsInfo to get the titles
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'Title']], on='AdID', how='left')
+
+# Merge SearchStream with SearchInfo to get the search queries
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchQuery']], on='SearchID', how='left')
+
+# Function to find earliest position of matched 2-ngram words between query and title
+def earliest_ngram_position(query, title):
+    if pd.isnull(query) or pd.isnull(title):
+        return np.nan
+    query_ngrams = list(ngrams(query.split(), 2))
+    title_words = title.split()
+    for i in range(len(title_words) - 1):
+        if (title_words[i], title_words[i+1]) in query_ngrams:
+            return i
+    return np.nan
+
+# Apply the function to each row
+SearchStream['Earliest2NgramPosition'] = SearchStream.apply(
+    lambda row: earliest_ngram_position(row['SearchQuery'], row['Title']), axis=1
+)
+
+# Drop the merged columns to clean up
+SearchStream.drop(columns=['Title', 'SearchQuery'], inplace=True)
+"
+19,qe_ng_ratio,ratio of matched words 2-ngram between query and title,"
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Merge SearchStream with SearchInfo to get SearchQuery
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchQuery']], on='SearchID', how='left')
+
+# Merge SearchStream with AdsInfo to get Title
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'Title']], on='AdID', how='left')
+
+# Function to compute 2-gram ratio
+def compute_ngram_ratio(query, title):
+    if pd.isnull(query) or pd.isnull(title):
+        return 0
+    vectorizer = CountVectorizer(ngram_range=(2, 2))
+    try:
+        ngrams = vectorizer.fit_transform([query, title])
+    except:
+        return 0
+    similarity = cosine_similarity(ngrams[0:1], ngrams[1:2])
+    return similarity[0][0]
+
+# Apply the function to each row
+SearchStream['NgramRatio'] = SearchStream.apply(lambda row: compute_ngram_ratio(row['SearchQuery'], row['Title']), axis=1)
+"
+20,qe_w_cnt,count of matched words between query and title,"
+import numpy as np
+
+# Merge SearchStream with SearchInfo to get SearchQuery
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchQuery']], on='SearchID', how='left')
+
+# Merge SearchStream with AdsInfo to get Title
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'Title']], on='AdID', how='left')
+
+# Function to count matched words between query and title
+def count_matched_words(row):
+    if pd.isnull(row['SearchQuery']) or pd.isnull(row['Title']):
+        return 0
+    query_words = set(row['SearchQuery'].lower().split())
+    title_words = set(row['Title'].lower().split())
+    return len(query_words & title_words)
+
+# Apply the function to each row
+SearchStream['CountMatchedWords'] = SearchStream.apply(count_matched_words, axis=1)
+"
+21,qe_w_pos,earliest position of matched words between query and title,"
+import numpy as np
+
+# Merge SearchStream with SearchInfo to get SearchQuery
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchQuery']], on='SearchID', how='left')
+
+# Merge SearchStream with AdsInfo to get Title
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'Title']], on='AdID', how='left')
+
+# Function to find the earliest position of matched words between query and title
+def earliest_position(query, title):
+    if pd.isnull(query) or pd.isnull(title):
+        return np.nan
+    query_words = query.split()
+    title_words = title.split()
+    positions = [title_words.index(word) for word in query_words if word in title_words]
+    return min(positions) if positions else np.nan
+
+# Apply the function to create the new feature
+SearchStream['EarliestPosition'] = SearchStream.apply(lambda row: earliest_position(row['SearchQuery'], row['Title']), axis=1)
+"
+22,qe_w_ratio,ratio of matched words between query and title,"
+import pandas as pd
+
+# Assuming the dataframes are already loaded as follows:
+# SearchStream, AdsInfo, SearchInfo
+
+# Merge SearchStream with AdsInfo to get the ad titles
+merged_df = SearchStream.merge(AdsInfo[['AdID', 'Title']], on='AdID', how='left')
+
+# Merge the result with SearchInfo to get the search queries
+merged_df = merged_df.merge(SearchInfo[['SearchID', 'SearchQuery']], on='SearchID', how='left')
+
+# Function to compute the ratio of matched words between query and title
+def compute_ratio(query, title):
+    if pd.isnull(query) or pd.isnull(title):
+        return 0
+    query_words = set(query.lower().split())
+    title_words = set(title.lower().split())
+    if not query_words or not title_words:
+        return 0
+    matched_words = query_words.intersection(title_words)
+    return len(matched_words) / len(query_words)
+
+# Apply the function to compute the new feature
+merged_df['RatioMatchedWords'] = merged_df.apply(lambda row: compute_ratio(row['SearchQuery'], row['Title']), axis=1)
+
+# Add the new feature to the original SearchStream table
+SearchStream['RatioMatchedWords'] = merged_df['RatioMatchedWords']
+
+# Now SearchStream has the new feature
+"
+23,record_cnt,count of records in search session,"
+# Merge SearchStream with SearchInfo to get SearchID and SearchDate
+merged_df = pd.merge(SearchStream, SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+
+# Count the number of records in each search session
+session_counts = merged_df.groupby('SearchID').size().reset_index(name='SessionCount')
+
+# Merge the session counts back to the original SearchStream table
+SearchStream = pd.merge(SearchStream, session_counts, on='SearchID', how='left')
+"
+24,show_cnt,historic impression count of user on some ad,"
+# Merge SearchStream with SearchInfo to get UserID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+
+# Calculate historic impression count of user on some ad
+SearchStream['HistoricImpressionCount'] = SearchStream.groupby(['UserID', 'AdID']).cumcount()
+
+# Drop the UserID column as it was only needed for the calculation
+SearchStream = SearchStream.drop(columns=['UserID'])
+"
+25,t_cnt,total search count of user,"
+total_search_count = SearchInfo.groupby('UserID')['SearchID'].count().reset_index()
+total_search_count.columns = ['UserID', 'TotalSearchCount']
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+SearchStream = SearchStream.merge(total_search_count, on='UserID', how='left')
+SearchStream.drop(columns=['UserID'], inplace=True)
+"
+26,t_match,check if query is in the title,"
+# Merge SearchStream with SearchInfo to get SearchQuery
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchQuery']], on='SearchID', how='left')
+
+# Merge SearchStream with AdsInfo to get Title
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'Title']], on='AdID', how='left')
+
+# Define a function to check if query is in the title
+def query_in_title(row):
+    if pd.isnull(row['SearchQuery']) or pd.isnull(row['Title']):
+        return 0
+    return int(row['SearchQuery'].lower() in row['Title'].lower())
+
+# Apply the function to create the new feature
+SearchStream['QueryInTitle'] = SearchStream.apply(query_in_title, axis=1)
+"
+27,t_show_cnt,total impression count of user on some ad,"
+# Merge SearchStream with SearchInfo to get UserID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+
+# Group by UserID and AdID to count total impressions
+impression_counts = SearchStream.groupby(['UserID', 'AdID']).size().reset_index(name='TotalImpressionCount')
+
+# Merge the impression counts back to the SearchStream
+SearchStream = SearchStream.merge(impression_counts, on=['UserID', 'AdID'], how='left')
+"
+28,title_len,the length of title,"
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'Title']], on='AdID', how='left')
+SearchStream['TitleLength'] = SearchStream['Title'].apply(lambda x: len(str(x)) if pd.notnull(x) else 0)
+SearchStream.drop(columns=['Title'], inplace=True)
+"
+29,u_aid_ctr,historic click through rate of user on some ad,"
+# Merge SearchStream with SearchInfo to get UserID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+
+# Filter only contextual ads (ObjectType == 3)
+contextual_ads = SearchStream[SearchStream['ObjectType'] == 3]
+
+# Calculate historic click through rate of user on some ad
+user_ad_clicks = contextual_ads.groupby(['UserID', 'AdID'])['IsClick'].sum().reset_index(name='UserAdClicks')
+user_ad_impressions = contextual_ads.groupby(['UserID', 'AdID'])['IsClick'].count().reset_index(name='UserAdImpressions')
+
+# Merge clicks and impressions to calculate CTR
+user_ad_ctr = user_ad_clicks.merge(user_ad_impressions, on=['UserID', 'AdID'])
+user_ad_ctr['UserAdCTR'] = user_ad_ctr['UserAdClicks'] / user_ad_ctr['UserAdImpressions']
+
+# Merge the calculated CTR back to the original SearchStream
+SearchStream = SearchStream.merge(user_ad_ctr[['UserID', 'AdID', 'UserAdCTR']], on=['UserID', 'AdID'], how='left')
+
+# Fill NaN values with 0 (assuming no history means 0 CTR)
+SearchStream['UserAdCTR'] = SearchStream['UserAdCTR']
+"

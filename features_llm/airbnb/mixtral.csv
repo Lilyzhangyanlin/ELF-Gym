@@ -1,0 +1,269 @@
+,feature_description,code
+0,"AgeGroup - Age of the user categorized into groups (e.g., 0-18, 19-30, 31-45, 46-60, 61+)","
+User['age'] = pd.to_numeric(User['age'], errors='coerce')
+User[""AgeGroup""] = pd.cut(User['age'], bins=[0, 18, 30, 45, 60, 100], labels=['0-18', '19-30', '31-45', '46-60', '61+'])
+"
+1,"GenderGroup - Gender of the user categorized into groups (e.g., Male, Female, Other)","
+# Define the gender groups
+gender_groups = {'Male': 'Male', 'Female': 'Female', 'Other': 'Other'}
+
+# Create a new column 'GenderGroup' in the User DataFrame
+User['GenderGroup'] = User['gender'].map(gender_groups)
+"
+2,"SignupMethodCategory - Signup method categorized into groups (e.g., Social Media, Email, Other)","
+# Define the categories
+categories = {
+    'facebook': 'Social Media',
+    'google': 'Social Media',
+    'twitter': 'Social Media',
+    'email': 'Email',
+    'other': 'Other'
+}
+
+# Create a new column in the User DataFrame
+User['SignupMethodCategory'] = User['signup_method'].map(categories)
+"
+3,"SignupFlowCategory - Signup flow categorized into groups (e.g., Direct, Referral, Other)","
+User[""SignupFlowCategory""] = User[""signup_flow""].apply(lambda x: 'Direct' if 'direct' in x.lower() else ('Referral' if 'referral' in x.lower() else 'Other'))
+"
+4,"LanguageGroup - Language preference categorized into groups (e.g., English, Spanish, Other)",
+5,"AffiliateChannelCategory - Affiliate channel categorized into groups (e.g., Google, Craigslist, Other)","
+# Define a dictionary for channel categories
+channel_categories = {
+    'google': 'Google',
+    'craigslist': 'Craigslist',
+    'other': 'Other'
+}
+
+# Create a new column in the User table with categorized affiliate channels
+User['AffiliateChannelCategory'] = User['affiliate_channel'].map(channel_categories)
+"
+6,"AffiliateProviderGroup - Affiliate provider categorized into groups (e.g., Google, Craigslist, Other)","
+# Define the groups
+group_dict = {'google': 'Google', 'craigslist': 'Craigslist', 'other': 'Other'}
+
+# Create a new column 'AffiliateProviderGroup'
+User['AffiliateProviderGroup'] = User['affiliate_provider'].map(group_dict)
+
+# Fill NA values with 'Other'
+User['AffiliateProviderGroup'] = User['AffiliateProviderGroup'].fillna('Other')
+"
+7,"FirstAffiliateTrackedCategory - First affiliate tracked categorized into groups (e.g., Google, Craigslist, Other)","
+# Define a function to categorize the first_affiliate_tracked
+def categorize_affiliate(x):
+    if x == 'google':
+        return 'Google'
+    elif x == 'craigslist':
+        return 'Craigslist'
+    else:
+        return 'Other'
+
+# Apply the function to the first_affiliate_tracked column
+User['FirstAffiliateTrackedCategory'] = User['first_affiliate_tracked'].apply(categorize_affiliate)
+"
+8,"SignupAppCategory - Signup app categorized into groups (e.g., Android, iOS, Other)","
+# Define a dictionary for app categories
+app_categories = {
+    'android': 'Android',
+    'ios': 'iOS',
+    'other': 'Other'
+}
+
+# Create a new column 'SignupAppCategory' in the User DataFrame
+User['SignupAppCategory'] = User['signup_app'].map(app_categories)
+
+# Fill NA/NaN values with 'Other'
+User['SignupAppCategory'] = User['SignupAppCategory'].fillna('Other')
+"
+9,"FirstDeviceTypeCategory - First device type categorized into groups (e.g., Mobile, Desktop, Other)","
+# Define a dictionary for device type categorization
+device_categories = {
+    'mobile': ['mobile', 'smartphone', 'tablet'],
+    'desktop': ['desktop', 'laptop'],
+    'other': ['tv', 'gaming console', 'other']
+}
+
+# Create a function to categorize device types
+def categorize_device(device):
+    for category, devices in device_categories.items():
+        if device in devices:
+            return category
+    return 'other'
+
+# Apply the function to the 'first_device_type' column and create a new column 'FirstDeviceTypeCategory'
+User['FirstDeviceTypeCategory'] = User['first_device_type'].apply(categorize_device)
+"
+10,"FirstBrowserCategory - First browser used categorized into groups (e.g., Chrome, Firefox, Other)","
+# Define the categories
+browser_categories = {'Chrome': ['Chrome', 'Chromium'],
+                      'Firefox': ['Firefox'],
+                      'Other': ['Safari', 'Edge', 'Opera', 'Internet Explorer', 'Unknown']}
+
+# Create a function to categorize the browsers
+def categorize_browser(browser):
+    for category, browsers in browser_categories.items():
+        if browser in browsers:
+            return category
+    return 'Other'
+
+# Apply the function to the 'first_browser' column and create a new column 'FirstBrowserCategory'
+User['FirstBrowserCategory'] = User['first_browser'].apply(categorize_browser)
+"
+11,DaysSinceAccountCreation - The number of days since the account was created,
+12,DaysSinceFirstActive - The number of days since the first activity,"
+import pandas as pd
+
+# Assuming that timestamp_first_active is in datetime format
+User['timestamp_first_active'] = pd.to_datetime(User['timestamp_first_active'])
+
+# Convert the date_account_created column to datetime format
+User['date_account_created'] = pd.to_datetime(User['date_account_created'])
+
+# Calculate the difference between the two dates in days
+User['DaysSinceFirstActive'] = (User['timestamp_first_active'] - User['date_account_created']).dt.days
+"
+13,DaysSinceFirstBooking - The number of days since the first booking,"
+User['DaysSinceFirstBooking'] = (User['date_first_booking'] - User['date_account_created']).dt.days
+"
+14,UserActivityDuration - The duration from the first activity to the last activity,"
+# First, merge the User and Session tables on id and user_id
+UserSession = pd.merge(User, Session, left_on='id', right_on='user_id')
+
+# Then, sort the merged table by id and timestamp_first_active
+UserSession = UserSession.sort_values(['id', 'timestamp_first_active'])
+
+# Compute the difference between the maximum and minimum timestamp for each user
+UserSession['UserActivityDuration'] = UserSession.groupby('id')['timestamp_first_active'].transform(lambda x: x.max() - x.min())
+
+# Finally, drop the extra columns and keep only the User table with the new feature
+User = UserSession.drop(['action', 'action_type', 'action_detail', 'device_type', 'secs_elapsed'], axis=1)
+"
+15,UserCountryDestinationFrequency - The frequency of the user's country destination,"
+# First, merge the User and Session DataFrames on the 'user_id' column
+UserSession = pd.merge(User, Session, left_on='id', right_on='user_id', how='left')
+
+# Then, group the merged DataFrame by 'id' and 'country_destination' and count the number of occurrences
+UserSessionGrouped = UserSession.groupby(['id', 'country_destination']).size().reset_index(name='UserCountryDestinationFrequency')
+
+# Finally, merge the result back to the original User DataFrame
+User = User.merge(UserSessionGrouped, on='id', how='left')
+"
+16,UserCountryDestinationProportion - The proportion of the user's country destination out of all destinations,"
+# Join Session and User DataFrames on user_id
+UserSession = pd.merge(User, Session, left_on='id', right_on='user_id')
+
+# Join UserSession and Country DataFrames on country_destination
+UserCountry = pd.merge(UserSession, Country, on='country_destination')
+
+# Group by user_id and country_destination, then count the number of each group
+grouped = UserCountry.groupby(['id', 'country_destination']).size().reset_index(name='count')
+
+# Pivot to create a DataFrame where each row represents a user and each column represents a country_destination
+pivot = grouped.pivot(index='id', columns='country_destination', values='count')
+
+# Calculate the sum of each row
+row_sums = pivot.sum(axis=1)
+
+# Add the sum as a new column to the User DataFrame
+User['UserCountryDestinationCount'] = row_sums
+
+# Calculate the proportion of the user's country destination out of all destinations
+User['UserCountryDestinationProportion'] = User['UserCountryDestinationCount'] / User['UserCountryDestinationCount'].sum()
+"
+17,UserCountryDestinationRank - The rank of the user's country destination based on frequency,
+18,UserDestinationDistance - The average distance to the user's country destination,"
+# Merge User and Country tables on country_destination
+UserCountry = pd.merge(User, Country, on='country_destination', how='left')
+
+# Calculate the average distance to the user's country destination
+UserCountry['UserDestinationDistance'] = UserCountry['distance_km'].mean()
+
+# Add the new column to the User table
+User = User.join(UserCountry['UserDestinationDistance'], how='inner')
+"
+19,UserDestinationArea - The average area of the user's country destination,"
+# Merge User and Country tables on the country_destination column
+UserCountry = pd.merge(User, Country, on='country_destination', how='left')
+
+# Calculate the average area of the user's country destination
+UserCountry['UserDestinationArea'] = UserCountry['destination_km2'].mean()
+
+# Add the new column to the User table
+User = UserCountry[['id', 'date_account_created', 'timestamp_first_active', 'date_first_booking', 'gender', 'age', 'signup_method', 'signup_flow', 'language', 'affiliate_channel', 'affiliate_provider', 'first_affiliate_tracked', 'signup_app', 'first_device_type', 'first_browser', 'country_destination', 'UserDestinationArea']]
+"
+20,"UserDestinationLanguageSimilarity - The Levenshtein distance between the user's language and the destination language, normalized to the range [0, 1]",
+21,PopulationInThousandsAtDestination - The population of the user's country destination in thousands,"
+# Merge User and Population tables on country_destination
+User_Population = pd.merge(User, Population, on=['country_destination'])
+
+# Compute PopulationInThousandsAtDestination
+User_Population['PopulationInThousandsAtDestination'] = User_Population['population_in_thousands'] / 1000
+
+# Drop population_in_thousands column
+User_Population = User_Population.drop('population_in_thousands', axis=1)
+
+# Merge User_Population and Country tables on country_destination
+User_Population_Country = pd.merge(User_Population, Country, on=['country_destination'])
+
+# Drop country_destination column as it is redundant
+User_Population_Country = User_Population_Country.drop('country_destination', axis=1)
+
+# Rename the columns for better understanding
+User_Population_Country = User_Population_Country.rename(columns={'lat_destination': 'Latitude', 'lng_destination': 'Longitude', 'distance_km': 'DistanceKm', 'destination_km2': 'DestinationKm2', 'destination_language': 'DestinationLanguage', 'language_levenshtein_distance': 'LanguageLevenshteinDistance'})
+
+# Now User_Population_Country is the User table with the new feature and other necessary features
+"
+22,"PopulationInThousandsAtDestinationGenderGroup - The population of the user's country destination in thousands, categorized by gender",
+23,"PopulationInThousandsAtDestinationAgeGroup - The population of the user's country destination in thousands, categorized by age group",
+24,"PopulationInThousandsAtDestinationYear - The population of the user's country destination in thousands, categorized by year","
+# Check if 'user_id' column exists in both User and Session tables
+if 'user_id' in User.columns and 'user_id' in Session.columns:
+    UserSession = pd.merge(User, Session, on='user_id')
+
+    # Check if 'country_destination' column exists in UserSession table
+    if 'country_destination' in UserSession.columns:
+        UserSessionCountry = UserSession
+
+        # Check if 'country_destination' and 'year' columns exist in Population table
+        if 'country_destination' in Population.columns and 'year' in Population.columns:
+            UserSessionPopulation = pd.merge(UserSessionCountry, Population, left_on=['country_destination', UserSessionCountry['timestamp_first_active'].dt.year], right_on=['country_destination', 'year'])
+
+            # Create the new feature 'PopulationInThousandsAtDestinationYear'
+            UserSessionPopulation['PopulationInThousandsAtDestinationYear'] = UserSessionPopulation['population_in_thousands'] / 1000
+
+            # Drop unnecessary columns
+            UserSessionPopulation = UserSessionPopulation.drop(['id_x', 'date_account_created', 'timestamp_first_active', 'date_first_booking', 'gender', 'age', 'signup_method', 'signup_flow', 'language', 'affiliate_channel', 'affiliate_provider', 'first_affiliate_tracked', 'signup_app', 'first_device_type', 'first_browser', 'country_destination_x', 'lat_destination', 'lng_destination', 'distance_km', 'destination_km2', 'destination_language', 'language_levenshtein_distance', 'age_bucket', 'country_destination_y', 'gender_y', 'population_in_thousands', 'year_y'], axis=1)
+
+            # Rename the columns
+            UserSessionPopulation = UserSessionPopulation.rename(columns={'id_y': 'id', 'action': 'user_action', 'action_type': 'user_action_type', 'action_detail': 'user_action_detail', 'device_type': 'user_device_type', 'secs_elapsed': 'user_secs_elapsed'})
+
+            # Now, the UserSessionPopulation DataFrame contains the new feature 'PopulationInThousandsAtDestinationYear'
+            print(UserSessionPopulation.head())
+
+        else:
+            print(""Error: 'country_destination' or 'year' column not found in Population table."")
+
+    else:
+        print(""Error: 'country_destination' column not found in UserSession table."")
+
+else:
+    print(""Error: 'user_id' column not found in User or Session table."")
+"
+25,"PopulationInThousandsAtDestinationYearGenderGroup - The population of the user's country destination in thousands, categorized by year and gender","
+# Create a temporary DataFrame with 'year' column
+temp = User.merge(Population[['country_destination', 'year']], on='country_destination', how='left')
+
+# Group Population DataFrame and calculate sum of population_in_thousands
+population_groups = Population.groupby(['country_destination', 'year', 'gender'])['population_in_thousands'].sum().reset_index()
+
+# Merge with the temporary DataFrame to create new feature
+temp = temp.merge(population_groups, on=['country_destination', 'year', 'gender'], how='left')
+
+# Rename the new column
+temp.rename(columns={'population_in_thousands': 'PopulationInThousandsAtDestinationYearGenderGroup'}, inplace=True)
+
+# Merge the temporary DataFrame back with the User DataFrame
+User = User.merge(temp, on=['id', 'date_account_created', 'date_first_booking', 'gender', 'age', 'signup_method', 'signup_flow', 'language', 'affiliate_channel', 'affiliate_provider', 'first_affiliate_tracked', 'signup_app', 'first_device_type', 'first_browser'], how='left')
+"
+26,"PopulationInThousandsAtDestinationYearAgeGroup - The population of the user's country destination in thousands, categorized by year and age group",
+27,"PopulationInThousandsAtDestinationYearAgeGroupGenderGroup - The population of the user's country destination in thousands, categorized by year, age group, and gender",

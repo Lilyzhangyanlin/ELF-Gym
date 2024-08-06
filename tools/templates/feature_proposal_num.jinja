@@ -1,0 +1,16 @@
+{% include 'header.jinja' %}
+
+Can you propose the additional features that makes the most sense to be added to the {{target_table}} table as input to a tabular machine learning model?
+
+Please write down the description of the additional features line-by-line, prepended by an asterisk.
+{% if num_features is none %}
+Please write down as many features as possible, and write the feature descriptions as precisely as possible, as someone needs to implement it.
+{% else %}
+Please write down at least {{num_features}} features. And write the feature descriptions as precisely as possible, as someone needs to implement it.
+{% endif %}
+
+Here is an example response. Please follow the format in the example and do not auto-number. Note that the actual answer in this particular example may not make sense.
+
+* FooCount - Count of Foo
+* BarAverage - Average of Bar
+* BletchSum - Sum of Bletch

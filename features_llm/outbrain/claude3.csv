@@ -1,0 +1,233 @@
+,feature_description,code
+0,"user_document_view_count - Count of page views for the given user and document combination, derived from the Pageviews table.",
+1,"user_platform_view_count - Count of page views for the given user and platform combination, derived from the Pageviews table.","
+# Check if 'uuid' and 'platform' columns exist in Clicks
+if 'uuid' in Clicks.columns and 'platform' in Clicks.columns:
+    # Compute the user_platform_view_count feature
+    user_platform_view_count = Pageviews.groupby(['uuid', 'platform'])['document_id'].size().reset_index(name='user_platform_view_count')
+
+    # Merge the feature with the Clicks DataFrame
+    Clicks = Clicks.merge(user_platform_view_count, how='left', on=['uuid', 'platform'])
+else:
+    print(""The 'uuid' and 'platform' columns are not present in the Clicks DataFrame."")
+"
+2,"user_geo_view_count - Count of page views for the given user and geo_location combination, derived from the Pageviews table.","
+import pandas as pd
+
+# Create a temporary DataFrame with 'uuid', 'geo_location', and 'display_id' columns
+temp_df = Pageviews[['uuid', 'geo_location']].drop_duplicates().reset_index(drop=True)
+temp_df = temp_df.merge(Events[['display_id', 'uuid', 'geo_location']], how='left', on=['uuid', 'geo_location'])
+
+# Group the temporary DataFrame by 'uuid' and 'geo_location' and count the occurrences
+user_geo_view_count = temp_df.groupby(['uuid', 'geo_location']).size().reset_index(name='user_geo_view_count')
+
+# Merge the 'user_geo_view_count' feature with the 'Clicks' DataFrame
+Clicks = Clicks.merge(user_geo_view_count, how='left', left_on='display_id', right_on='uuid')
+
+# Drop the temporary 'uuid' and 'geo_location' columns
+Clicks = Clicks.drop(['uuid', 'geo_location'], axis=1)
+"
+3,"user_traffic_source_view_count - Count of page views for the given user and traffic_source combination, derived from the Pageviews table.","
+# Compute the user_traffic_source_view_count feature
+user_traffic_source_view_count = Pageviews.groupby(['uuid', 'traffic_source'])['document_id'].count().reset_index()
+user_traffic_source_view_count.columns = ['uuid', 'traffic_source', 'user_traffic_source_view_count']
+
+# Check if Clicks has the required columns
+if 'uuid' in Clicks.columns and 'traffic_source' in Clicks.columns:
+    # Merge the feature with the Clicks DataFrame
+    Clicks = Clicks.merge(user_traffic_source_view_count, how='left', on=['uuid', 'traffic_source'])
+else:
+    # Create a new column in Clicks with a default value
+    Clicks['user_traffic_source_view_count'] = 0
+"
+4,"document_view_count - Count of page views for the given document, derived from the Pageviews table.","
+# Merge Clicks with Promoted to get document_id
+Clicks_with_doc = Clicks.merge(Promoted[['ad_id', 'document_id']], on='ad_id', how='left')
+
+# Compute the document view count from the Pageviews table
+document_view_count = Pageviews['document_id'].value_counts().reset_index()
+document_view_count.columns = ['document_id', 'document_view_count']
+
+# Merge the document view count with the Clicks_with_doc table
+Clicks_with_doc = Clicks_with_doc.merge(document_view_count, on='document_id', how='left')
+"
+5,"document_platform_view_count - Count of page views for the given document and platform combination, derived from the Pageviews table.","
+# Check if 'document_id' and 'platform' columns exist in Clicks
+if 'document_id' in Clicks.columns and 'platform' in Clicks.columns:
+    # Group Pageviews by document_id and platform, and count the occurrences
+    document_platform_view_count = Pageviews.groupby(['document_id', 'platform'])['uuid'].count().reset_index()
+    document_platform_view_count.columns = ['document_id', 'platform', 'document_platform_view_count']
+
+    # Merge the new feature with the Clicks DataFrame
+    Clicks = Clicks.merge(document_platform_view_count, how='left', on=['document_id', 'platform'])
+else:
+    print(""The 'document_id' and 'platform' columns are not present in the Clicks DataFrame."")
+"
+6,"document_geo_view_count - Count of page views for the given document and geo_location combination, derived from the Pageviews table.","
+import pandas as pd
+
+# Group the Pageviews DataFrame by document_id and geo_location, and count the occurrences
+document_geo_view_counts = Pageviews.groupby(['document_id', 'geo_location']).size().reset_index(name='document_geo_view_count')
+
+# Check if the 'document_id' and 'geo_location' columns exist in the Clicks DataFrame
+if 'document_id' in Clicks.columns and 'geo_location' in Clicks.columns:
+    # Merge the document_geo_view_counts DataFrame with the Clicks DataFrame on 'document_id' and 'geo_location'
+    Clicks = Clicks.merge(document_geo_view_counts, how='left', on=['document_id', 'geo_location'])
+elif 'document_id' in Clicks.columns:
+    # If 'geo_location' is not present, merge on 'document_id' only
+    Clicks = Clicks.merge(document_geo_view_counts.drop('geo_location', axis=1), how='left', on='document_id')
+elif 'geo_location' in Clicks.columns:
+    # If 'document_id' is not present, merge on 'geo_location' only
+    Clicks = Clicks.merge(document_geo_view_counts.drop('document_id', axis=1), how='left', on='geo_location')
+else:
+    # If neither 'document_id' nor 'geo_location' is present, add a constant value
+    Clicks['document_geo_view_count'] = document_geo_view_counts['document_geo_view_count'].mean()
+"
+7,"document_traffic_source_view_count - Count of page views for the given document and traffic_source combination, derived from the Pageviews table.","
+# Compute the document_traffic_source_view_count
+document_traffic_source_view_count = Pageviews.groupby(['document_id', 'traffic_source'])['uuid'].count().reset_index()
+document_traffic_source_view_count.columns = ['document_id', 'traffic_source', 'document_traffic_source_view_count']
+
+# Merge the Clicks DataFrame with the Events DataFrame to get document_id
+Clicks = Clicks.merge(Events[['display_id', 'document_id']], how='left', on='display_id')
+
+# Merge the document_traffic_source_view_count with the Clicks DataFrame
+Clicks = Clicks.merge(document_traffic_source_view_count, how='left', on='document_id')
+"
+8,"document_topic_confidence_sum - Sum of confidence levels for the topics associated with the document, derived from the Documents_topics table.","
+import pandas as pd
+
+# Merge Clicks and Promoted to get document_id for each ad_id
+clicks_promoted = pd.merge(Clicks, Promoted, on='ad_id', how='left')
+
+# Merge with Documents_topics to get topic confidence levels for each document_id
+clicks_topics = pd.merge(clicks_promoted, Documents_topics, on='document_id', how='left')
+
+# Group by display_id and ad_id, and sum the confidence_level for each group
+topic_confidence_sum = clicks_topics.groupby(['display_id', 'ad_id'])['confidence_level'].sum().reset_index()
+
+# Rename the summed column
+topic_confidence_sum = topic_confidence_sum.rename(columns={'confidence_level': 'document_topic_confidence_sum'})
+
+# Merge the summed confidence levels back into the original Clicks DataFrame
+Clicks = pd.merge(Clicks, topic_confidence_sum, on=['display_id', 'ad_id'], how='left')
+"
+9,"document_entity_confidence_sum - Sum of confidence levels for the entities associated with the document, derived from the Documents_entities table.","
+import pandas as pd
+
+# Merge Clicks and Promoted tables to get document_id for each ad_id
+clicks_promoted = pd.merge(Clicks, Promoted, on='ad_id', how='left')
+
+# Merge with Documents_entities to get confidence_level for each document_id and entity_id
+clicks_entities = pd.merge(clicks_promoted, Documents_entities, on='document_id', how='left')
+
+# Group by ad_id and sum the confidence_level to get document_entity_confidence_sum
+document_entity_confidence_sum = clicks_entities.groupby('ad_id')['confidence_level'].sum().reset_index()
+
+# Add the new feature to the Clicks table
+Clicks = pd.merge(Clicks, document_entity_confidence_sum, on='ad_id', how='left')
+Clicks.rename(columns={'confidence_level': 'document_entity_confidence_sum'}, inplace=True)
+"
+10,"document_category_confidence_sum - Sum of confidence levels for the categories associated with the document, derived from the Documents_categories table.","
+import pandas as pd
+
+# Merge Clicks with Promoted to get document_id
+clicks_promoted = pd.merge(Clicks, Promoted, on='ad_id', how='left')
+
+# Merge with Documents_categories to get category_id and confidence_level
+clicks_categories = pd.merge(clicks_promoted, Documents_categories, left_on='document_id', right_on='document_id', how='left')
+
+# Group by display_id and sum the confidence_level for each document
+document_category_confidence_sum = clicks_categories.groupby(['display_id', 'document_id'])['confidence_level'].sum().reset_index()
+
+# Add the computed feature to the Clicks DataFrame
+Clicks = Clicks.merge(document_category_confidence_sum, on='display_id', how='left')
+"
+11,"document_age - Age of the document in days, calculated from the publish_time in the Documents_meta table.","
+import pandas as pd
+from datetime import datetime
+
+# Convert publish_time to datetime format
+Documents_meta['publish_time'] = pd.to_datetime(Documents_meta['publish_time'])
+
+# Check if document_id is present in Clicks
+if 'document_id' in Clicks.columns:
+    # Merge Clicks and Documents_meta on document_id
+    merged = pd.merge(Clicks, Documents_meta[['document_id', 'publish_time']], on='document_id', how='left')
+else:
+    # Merge Clicks and Promoted on ad_id, then merge with Documents_meta on document_id
+    merged = pd.merge(Clicks, Promoted[['ad_id', 'document_id']], on='ad_id', how='left')
+    merged = pd.merge(merged, Documents_meta[['document_id', 'publish_time']], on='document_id', how='left')
+
+# Calculate document age in days
+merged['document_age'] = (datetime.now() - merged['publish_time']).dt.days
+
+# Update the Clicks DataFrame with the new feature
+Clicks = merged[['display_id', 'ad_id', 'clicked', 'document_age']]
+"
+12,"publisher_document_count - Count of documents for the given publisher, derived from the Documents_meta table.","
+# Merge Clicks and Events tables to get document_id
+Clicks = Clicks.merge(Events[['display_id', 'document_id']], how='left', on='display_id')
+
+# Compute the publisher_document_count
+publisher_document_count = Documents_meta.groupby('publisher_id')['document_id'].count().reset_index()
+publisher_document_count.columns = ['publisher_id', 'publisher_document_count']
+
+# Convert data types to ensure compatibility
+Clicks['document_id'] = Clicks['document_id'].astype(str)
+publisher_document_count['publisher_id'] = publisher_document_count['publisher_id'].astype(str)
+
+# Merge the publisher_document_count with the Clicks table
+Clicks = Clicks.merge(publisher_document_count, how='left', left_on='document_id', right_on='publisher_id')
+
+# Drop the document_id column if not needed
+Clicks = Clicks.drop('document_id', axis=1)
+"
+13,"source_document_count - Count of documents for the given source, derived from the Documents_meta table.","
+# Convert data types
+Events['document_id'] = Events['document_id'].astype(str)
+Documents_meta['document_id'] = Documents_meta['document_id'].astype(str)
+
+# Compute the source_document_count
+source_document_count = Documents_meta.groupby('source_id')['document_id'].count().reset_index()
+source_document_count.columns = ['source_id', 'source_document_count']
+
+# Merge the source_document_count with the Events table
+Events = Events.merge(source_document_count, left_on='document_id', right_on='source_id', how='left')
+
+# Merge the Events table with the Clicks table
+Clicks = Clicks.merge(Events[['display_id', 'source_document_count']], on='display_id', how='left')
+"
+14,"advertiser_ad_count - Count of ads for the given advertiser, derived from the Promoted table.","
+# Compute the advertiser_ad_count feature
+advertiser_ad_count = Promoted.groupby('advertiser_id')['ad_id'].nunique().reset_index()
+advertiser_ad_count.columns = ['advertiser_id', 'advertiser_ad_count']
+
+# Merge the feature with the Promoted DataFrame
+Promoted = Promoted.merge(advertiser_ad_count, how='left', on='advertiser_id')
+
+# Join the Clicks and Promoted DataFrames
+Clicks = Clicks.merge(Promoted[['ad_id', 'advertiser_ad_count']], how='left', on='ad_id')
+"
+15,"campaign_ad_count - Count of ads for the given campaign, derived from the Promoted table.","
+# Convert data types to a common type
+Clicks['ad_id'] = Clicks['ad_id'].astype(str)
+Promoted['campaign_id'] = Promoted['campaign_id'].astype(str)
+
+# Count the number of ads for each campaign
+campaign_ad_count = Promoted.groupby('campaign_id')['ad_id'].count().reset_index()
+campaign_ad_count.columns = ['campaign_id', 'campaign_ad_count']
+
+# Merge the campaign_ad_count with the Clicks DataFrame
+Clicks = Clicks.merge(campaign_ad_count, how='left', left_on='ad_id', right_on='campaign_id')
+"
+16,"user_event_count - Count of events for the given user, derived from the Events table.","
+# Compute the user_event_count feature
+user_event_count = Events.groupby(['display_id', 'uuid']).size().reset_index(name='user_event_count')
+
+# Merge the user_event_count feature with the Clicks DataFrame
+Clicks = Clicks.merge(user_event_count, how='left', on='display_id')
+"
+17,"user_document_event_count - Count of events for the given user and document combination, derived from the Events table.",
+18,"user_platform_event_count - Count of events for the given user and platform combination, derived from the Events table.",
+19,"user_geo_event_count - Count of events for the given user and geo_location combination, derived from the Events table.",

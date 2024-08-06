@@ -1,0 +1,12 @@
+import pandas as pd
+
+def func(dataframes):
+{% for table_name in table_names %}
+    {{ table_name }} = dataframes['{{ table_name }}'].copy()
+{% endfor %}
+    _num_rows_dataframe_ = {{ target_table_name }}.shape[0]
+{% filter indent(width=4) %}
+    {{ code_block }}
+{% endfilter %}
+    assert _num_rows_dataframe_ == {{ target_table_name }}.shape[0]
+    return {{ target_table_name }}

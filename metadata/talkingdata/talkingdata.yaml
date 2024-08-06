@@ -1,0 +1,1094 @@
+human_feature_desc:
+  distinct_days: Count of distinct days on which events associated with a device_id
+    occurred
+  event_count: Count of events associated with a device_id
+  maximum_date: Latest date on which an event associated with a device_id occurred
+  maximum_hour: Latest hour (of the day) at which an event associated with a device_id
+    occurred
+  mean_appevent_count: Calculate the count of app events for each event_id then get
+    the mean of these counts across different event_ids for each device_id
+  mean_appevent_labelcount: Calculate the mean count of label_ids for app events within
+    each event_id then get the mean of these counts across different event_ids for
+    each device_id
+  mean_appevent_maxappactive: Find the maximum is_active status of apps within app
+    events for each event_id then calculate the mean of these maximum values across
+    different event_ids for each device_id
+  mean_appevent_maxlabel: Identify the maximum label_id for app events within each
+    event_id then calculate the mean of these maximum values across different event_ids
+    for each device_id
+  mean_appevent_meanactive: Calculate the mean is_active value of app events for each
+    event_id then get the mean of these values across different event_ids for each
+    device_id
+  mean_appevent_meanappactive: Calculate the mean is_active status of apps within
+    app events for each event_id then get the mean of these values across different
+    event_ids for each device_id
+  mean_appevent_rangeappactive: Calculate the range of is_active status values for
+    apps within app events for each event_id then get the mean of these ranges across
+    different event_ids for each device_id
+  mean_appid_proportion: Calculate the proportion of distinct app_ids to the total
+    app events for each event_id then get the mean proportion across different event_ids
+    for each device_id
+  min_appevent_count: Find the minimum count of app events for each event_id then
+    identify the minimum of these counts across different event_ids for each device_id
+  min_appevent_labelcount: Calculate the minimum mean count of label_ids for app events
+    within each event_id then identify the minimum of these counts across different
+    event_ids for each device_id
+  min_appevent_maxappactive: Identify the minimum maximum is_active status for apps
+    within app events for each event_id then find the minimum of these maximums across
+    different event_ids for each device_id
+  min_appevent_maxlabel: Find the minimum maximum label_id value for app events within
+    each event_id then determine the minimum of these maximum values across different
+    event_ids for each device_id
+  min_appevent_meanactive: Identify the minimum mean is_active value for app events
+    within each event_id then find the minimum of these values across different event_ids
+    for each device_id
+  min_appevent_meanappactive: Determine the minimum mean is_active status for apps
+    within app events for each event_id then find the minimum of these means across
+    different event_ids for each device_id
+  min_appevent_rangeappactive: Calculate the minimum range of is_active status for
+    apps within app events for each event_id then determine the minimum of these ranges
+    across different event_ids for each device_id
+  min_appid_proportion: Determine the minimum proportion of distinct app_ids to total
+    app events for each event_id then find the minimum of these proportions across
+    different event_ids for each device_id
+  minimum_date: Earliest date on which an event associated with a device_id occurred
+  minimum_hour: Earliest hour (of the day) at which an event associated with a device_id
+    occurred
+  range_appevent_count: Determine the range of app event counts for each event_id
+    then calculate the range of these counts across different event_ids for each device_id
+  range_appevent_labelcount: Determine the range of mean counts of label_ids for app
+    events within each event_id then find the range of these counts across different
+    event_ids for each device_id
+  range_appevent_maxappactive: Identify the range of maximum is_active statuses for
+    apps within app events for each event_id then find the range of these maximums
+    across different event_ids for each device_id
+  range_appevent_maxlabel: Find the range of maximum label_id values for app events
+    within each event_id then determine the range of these maximum values across different
+    event_ids for each device_id
+  range_appevent_meanactive: Calculate the range of mean is_active values for app
+    events within each event_id then get the range of these values across different
+    event_ids for each device_id
+  range_appevent_meanappactive: Calculate the range of mean is_active statuses of
+    apps within app events for each event_id then get the range of these means across
+    different event_ids for each device_id
+  range_appevent_rangeappactive: Determine the range of is_active status ranges for
+    apps within app events for each event_id then calculate the range of these ranges
+    across different event_ids for each device_id
+  range_appid_proportion: Identify the range of distinct app_id proportions to total
+    app events for each event_id then find the range of these proportions across different
+    event_ids for each device_id
+  range_date: Range of dates on which events associated with a device_id occurred
+human_feature_impl:
+  distinct_days: '
+
+    Events[''date''] = pd.to_datetime(Events[''timestamp'']).dt.date
+
+    distinct_days = Events.groupby(''device_id'')[''date''].nunique().reset_index()
+
+    distinct_days.columns = [''device_id'', ''distinct_days'']
+
+    Gender_age = Gender_age.merge(distinct_days, on=''device_id'', how=''left'')
+
+    Gender_age[''distinct_days''] = Gender_age[''distinct_days'']
+
+    '
+  event_count: '
+
+    event_count = Events.groupby(''device_id'').size().reset_index(name=''event_count'')
+
+    Gender_age = Gender_age.merge(event_count, on=''device_id'', how=''left'')
+
+    '
+  maximum_date: '
+
+    Events[''timestamp''] = pd.to_datetime(Events[''timestamp''])
+
+    max_dates = Events.groupby(''device_id'')[''timestamp''].max().reset_index()
+
+    max_dates.columns = [''device_id'', ''maximum_date'']
+
+    Gender_age = Gender_age.merge(max_dates, on=''device_id'', how=''left'')
+
+    '
+  maximum_hour: '
+
+    Events[''timestamp''] = pd.to_datetime(Events[''timestamp''])
+
+    Events[''hour''] = Events[''timestamp''].dt.hour
+
+    max_hour = Events.groupby(''device_id'')[''hour''].max().reset_index()
+
+    max_hour.columns = [''device_id'', ''maximum_hour'']
+
+    Gender_age = Gender_age.merge(max_hour, on=''device_id'', how=''left'')
+
+    '
+  mean_appevent_count: '
+
+    # Merge Events with App_events to get event counts per device_id
+
+    events_app_events = pd.merge(Events, App_events, on=''event_id'')
+
+
+    # Count app events per event_id
+
+    event_app_counts = events_app_events.groupby(''event_id'').size().reset_index(name=''app_event_count'')
+
+
+    # Merge back to get app event counts per device_id
+
+    events_app_counts = pd.merge(events_app_events, event_app_counts, on=''event_id'')
+
+
+    # Calculate mean app event count per device_id
+
+    mean_appevent_count = events_app_counts.groupby(''device_id'')[''app_event_count''].mean().reset_index()
+
+
+    # Merge with Gender_age to add the new feature
+
+    Gender_age = pd.merge(Gender_age, mean_appevent_count, on=''device_id'', how=''left'')
+
+
+    # Rename the column to match the required feature name
+
+    Gender_age.rename(columns={''app_event_count'': ''mean_appevent_count''}, inplace=True)
+
+    '
+  mean_appevent_labelcount: '
+
+    # Merge App_labels with App_events to get label counts per event
+
+    app_event_labels = App_events.merge(App_labels, on=''app_id'')
+
+
+    # Count the number of labels per event
+
+    label_counts_per_event = app_event_labels.groupby(''event_id'')[''label_id''].count().reset_index(name=''label_count'')
+
+
+    # Merge label counts with Events to associate them with device_id
+
+    event_label_counts = Events.merge(label_counts_per_event, on=''event_id'')
+
+
+    # Calculate the mean label count per event for each device_id
+
+    mean_label_count_per_device = event_label_counts.groupby(''device_id'')[''label_count''].mean().reset_index(name=''mean_appevent_labelcount'')
+
+
+    # Merge the mean label count with Gender_age table
+
+    Gender_age = Gender_age.merge(mean_label_count_per_device, on=''device_id'', how=''left'')
+
+
+    # Fill NaN values with 0 (if any device_id in Gender_age has no corresponding
+    events)
+
+    Gender_age[''mean_appevent_labelcount'']
+
+    '
+  mean_appevent_maxappactive: '
+
+    # Compute the maximum is_active status for each event_id
+
+    max_is_active_per_event = App_events.groupby(''event_id'')[''is_active''].max().reset_index()
+
+
+    # Merge with Events to get device_id
+
+    events_with_max_is_active = pd.merge(Events[[''event_id'', ''device_id'']], max_is_active_per_event,
+    on=''event_id'')
+
+
+    # Compute the mean of these maximum values across different event_ids for each
+    device_id
+
+    mean_max_is_active_per_device = events_with_max_is_active.groupby(''device_id'')[''is_active''].mean().reset_index()
+
+
+    # Rename the column to mean_appevent_maxappactive
+
+    mean_max_is_active_per_device.rename(columns={''is_active'': ''mean_appevent_maxappactive''},
+    inplace=True)
+
+
+    # Merge with Gender_age to add the new feature
+
+    Gender_age = pd.merge(Gender_age, mean_max_is_active_per_device, on=''device_id'',
+    how=''left'')
+
+
+    # Fill NaN values with 0 (if any device_id in Gender_age does not have corresponding
+    events)
+
+    Gender_age[''mean_appevent_maxappactive'']
+
+    '
+  mean_appevent_maxlabel: '
+
+    # Merge App_events with App_labels to get label_id for each event
+
+    app_events_labels = pd.merge(App_events, App_labels, on=''app_id'', how=''left'')
+
+
+    # Identify the maximum label_id for app events within each event_id
+
+    max_label_per_event = app_events_labels.groupby(''event_id'')[''label_id''].max().reset_index()
+
+
+    # Merge max_label_per_event with Events to get device_id for each event
+
+    events_max_label = pd.merge(Events, max_label_per_event, on=''event_id'', how=''left'')
+
+
+    # Calculate the mean of these maximum values across different event_ids for each
+    device_id
+
+    mean_max_label_per_device = events_max_label.groupby(''device_id'')[''label_id''].mean().reset_index()
+
+    mean_max_label_per_device.columns = [''device_id'', ''mean_appevent_maxlabel'']
+
+
+    # Merge the mean_max_label_per_device with Gender_age to add the new feature
+
+    Gender_age = pd.merge(Gender_age, mean_max_label_per_device, on=''device_id'',
+    how=''left'')
+
+
+    # Fill NaN values with 0 (if any device_id in Gender_age does not have corresponding
+    events)
+
+    Gender_age[''mean_appevent_maxlabel'']
+
+    '
+  mean_appevent_meanactive: '
+
+    # Merge Events with App_events to get device_id in App_events
+
+    events_app_events = pd.merge(Events[[''event_id'', ''device_id'']], App_events,
+    on=''event_id'')
+
+
+    # Calculate mean is_active value for each event_id
+
+    event_mean_active = events_app_events.groupby(''event_id'')[''is_active''].mean().reset_index()
+
+
+    # Merge back to get device_id
+
+    event_mean_active_device = pd.merge(event_mean_active, Events[[''event_id'', ''device_id'']],
+    on=''event_id'')
+
+
+    # Calculate mean of these values across different event_ids for each device_id
+
+    device_mean_active = event_mean_active_device.groupby(''device_id'')[''is_active''].mean().reset_index()
+
+
+    # Rename columns for clarity
+
+    device_mean_active.columns = [''device_id'', ''mean_appevent_meanactive'']
+
+
+    # Merge with Gender_age to add the new feature
+
+    Gender_age = pd.merge(Gender_age, device_mean_active, on=''device_id'', how=''left'')
+
+
+    # Fill NaN values with 0 (if any device_id in Gender_age does not have corresponding
+    events)
+
+    Gender_age[''mean_appevent_meanactive'']
+
+    '
+  mean_appevent_meanappactive: '
+
+    # Merge App_events with Events to get device_id
+
+    app_events_with_device = App_events.merge(Events[[''event_id'', ''device_id'']],
+    on=''event_id'')
+
+
+    # Calculate mean is_active status of apps within app events for each event_id
+
+    mean_is_active_per_event = app_events_with_device.groupby(''event_id'')[''is_active''].mean().reset_index()
+
+
+    # Merge the mean_is_active_per_event back with app_events_with_device to get device_id
+
+    mean_is_active_per_event_with_device = mean_is_active_per_event.merge(app_events_with_device[[''event_id'',
+    ''device_id'']], on=''event_id'')
+
+
+    # Calculate the mean of these values across different event_ids for each device_id
+
+    mean_appevent_meanappactive = mean_is_active_per_event_with_device.groupby(''device_id'')[''is_active''].mean().reset_index()
+
+
+    # Merge this feature back to the Gender_age table
+
+    Gender_age = Gender_age.merge(mean_appevent_meanappactive, on=''device_id'', how=''left'')
+
+
+    # Rename the new column to mean_appevent_meanappactive
+
+    Gender_age.rename(columns={''is_active'': ''mean_appevent_meanappactive''}, inplace=True)
+
+    '
+  mean_appevent_rangeappactive: '
+
+    # Merge Events with App_events to get device_id in App_events
+
+    app_events_merged = App_events.merge(Events[[''event_id'', ''device_id'']], on=''event_id'',
+    how=''left'')
+
+
+    # Calculate the range of is_active status values for apps within app events for
+    each event_id
+
+    app_events_merged[''is_active_range''] = app_events_merged.groupby(''event_id'')[''is_active''].transform(lambda
+    x: x.max() - x.min())
+
+
+    # Get the mean of these ranges across different event_ids for each device_id
+
+    mean_appevent_rangeappactive = app_events_merged.groupby(''device_id'')[''is_active_range''].mean().reset_index()
+
+
+    # Merge the calculated feature back to the Gender_age table
+
+    Gender_age = Gender_age.merge(mean_appevent_rangeappactive, on=''device_id'',
+    how=''left'')
+
+
+    # Rename the column to match the desired feature name
+
+    Gender_age.rename(columns={''is_active_range'': ''mean_appevent_rangeappactive''},
+    inplace=True)
+
+    '
+  mean_appid_proportion: '
+
+    # Merge Events with App_events to get app_id for each event
+
+    events_app_events = pd.merge(Events, App_events, on=''event_id'')
+
+
+    # Calculate the proportion of distinct app_ids to the total app events for each
+    event_id
+
+    events_app_events[''app_id_count''] = events_app_events.groupby(''event_id'')[''app_id''].transform(''nunique'')
+
+    events_app_events[''total_app_events''] = events_app_events.groupby(''event_id'')[''app_id''].transform(''count'')
+
+    events_app_events[''app_id_proportion''] = events_app_events[''app_id_count'']
+    / events_app_events[''total_app_events'']
+
+
+    # Get the mean proportion across different event_ids for each device_id
+
+    mean_appid_proportion = events_app_events.groupby(''device_id'')[''app_id_proportion''].mean().reset_index()
+
+
+    # Merge the mean_appid_proportion with Gender_age
+
+    Gender_age = pd.merge(Gender_age, mean_appid_proportion, on=''device_id'', how=''left'')
+
+
+    # Rename the column to mean_appid_proportion
+
+    Gender_age.rename(columns={''app_id_proportion'': ''mean_appid_proportion''},
+    inplace=True)
+
+    '
+  min_appevent_count: '
+
+    # Merge Events with App_events to get the count of app events per event_id
+
+    event_app_counts = App_events.groupby(''event_id'').size().reset_index(name=''app_event_count'')
+
+
+    # Merge the event_app_counts with Events to associate device_id with app_event_count
+
+    events_with_counts = pd.merge(Events, event_app_counts, on=''event_id'', how=''left'')
+
+
+    # Find the minimum app_event_count for each device_id
+
+    min_app_event_count_per_device = events_with_counts.groupby(''device_id'')[''app_event_count''].min().reset_index()
+
+
+    # Rename the column to min_appevent_count
+
+    min_app_event_count_per_device.rename(columns={''app_event_count'': ''min_appevent_count''},
+    inplace=True)
+
+
+    # Merge the min_app_event_count_per_device with Gender_age to add the new feature
+
+    Gender_age = pd.merge(Gender_age, min_app_event_count_per_device, on=''device_id'',
+    how=''left'')
+
+
+    # Fill NaN values with 0 (if there are devices with no events)
+
+    Gender_age[''min_appevent_count'']
+
+    '
+  min_appevent_labelcount: '
+
+    # Merge Events with App_events to get event_id and device_id together
+
+    events_app_events = pd.merge(Events[[''event_id'', ''device_id'']], App_events,
+    on=''event_id'')
+
+
+    # Merge the result with App_labels to get label_id
+
+    events_app_events_labels = pd.merge(events_app_events, App_labels, on=''app_id'')
+
+
+    # Calculate the mean count of label_ids for app events within each event_id
+
+    label_counts_per_event = events_app_events_labels.groupby(''event_id'')[''label_id''].count().groupby(level=0).mean()
+
+
+    # Merge the mean counts back to events to associate with device_id
+
+    events_with_label_counts = pd.merge(Events[[''event_id'', ''device_id'']], label_counts_per_event,
+    on=''event_id'', how=''left'')
+
+
+    # Calculate the minimum of these counts across different event_ids for each device_id
+
+    min_label_counts_per_device = events_with_label_counts.groupby(''device_id'')[''label_id''].min().reset_index()
+
+
+    # Merge the result with Gender_age to add the new feature
+
+    Gender_age = pd.merge(Gender_age, min_label_counts_per_device, on=''device_id'',
+    how=''left'')
+
+
+    # Rename the column to the desired feature name
+
+    Gender_age.rename(columns={''label_id'': ''min_appevent_labelcount''}, inplace=True)
+
+    '
+  min_appevent_maxappactive: '
+
+    # Merge Events with App_events to get device_id in App_events
+
+    events_app_events = pd.merge(Events[[''event_id'', ''device_id'']], App_events,
+    on=''event_id'')
+
+
+    # Group by event_id and find the maximum is_active status for each event_id
+
+    max_is_active_per_event = events_app_events.groupby(''event_id'')[''is_active''].max().reset_index()
+
+
+    # Merge back to get device_id
+
+    max_is_active_per_event = pd.merge(max_is_active_per_event, Events[[''event_id'',
+    ''device_id'']], on=''event_id'')
+
+
+    # Group by device_id and find the minimum of these maximums across different event_ids
+    for each device_id
+
+    min_max_is_active_per_device = max_is_active_per_event.groupby(''device_id'')[''is_active''].min().reset_index()
+
+
+    # Merge with Gender_age to add the new feature
+
+    Gender_age = pd.merge(Gender_age, min_max_is_active_per_device, on=''device_id'',
+    how=''left'')
+
+
+    # Rename the new column
+
+    Gender_age.rename(columns={''is_active'': ''min_appevent_maxappactive''}, inplace=True)
+
+    '
+  min_appevent_maxlabel: '
+
+    # Merge App_events with App_labels to get label_id for each event
+
+    app_event_labels = pd.merge(App_events, App_labels, on=''app_id'')
+
+
+    # Find the maximum label_id for each event_id
+
+    max_label_per_event = app_event_labels.groupby(''event_id'')[''label_id''].max().reset_index()
+
+
+    # Merge max_label_per_event with Events to get device_id for each event
+
+    event_max_label = pd.merge(Events[[''event_id'', ''device_id'']], max_label_per_event,
+    on=''event_id'')
+
+
+    # Find the minimum of these maximum values across different event_ids for each
+    device_id
+
+    min_max_label_per_device = event_max_label.groupby(''device_id'')[''label_id''].min().reset_index()
+
+
+    # Rename the column to min_appevent_maxlabel
+
+    min_max_label_per_device.rename(columns={''label_id'': ''min_appevent_maxlabel''},
+    inplace=True)
+
+
+    # Merge this feature with the Gender_age table
+
+    Gender_age = pd.merge(Gender_age, min_max_label_per_device, on=''device_id'',
+    how=''left'')
+
+
+    # Fill NaN values with a default value (e.g., -1) if necessary
+
+    Gender_age[''min_appevent_maxlabel'']
+
+    '
+  min_appevent_meanactive: '
+
+    # Merge Events with App_events to get device_id in App_events
+
+    events_app_events = pd.merge(Events[[''event_id'', ''device_id'']], App_events,
+    on=''event_id'')
+
+
+    # Calculate mean is_active for each event_id
+
+    event_mean_active = events_app_events.groupby(''event_id'')[''is_active''].mean().reset_index()
+
+
+    # Merge back to get device_id
+
+    event_mean_active_device = pd.merge(event_mean_active, Events[[''event_id'', ''device_id'']],
+    on=''event_id'')
+
+
+    # Find the minimum mean is_active value for each device_id
+
+    min_mean_active_per_device = event_mean_active_device.groupby(''device_id'')[''is_active''].min().reset_index()
+
+
+    # Rename columns for clarity
+
+    min_mean_active_per_device.columns = [''device_id'', ''min_appevent_meanactive'']
+
+
+    # Merge with Gender_age to add the new feature
+
+    Gender_age = pd.merge(Gender_age, min_mean_active_per_device, on=''device_id'',
+    how=''left'')
+
+
+    # Fill NaN values with a default value (e.g., 0) if necessary
+
+    Gender_age[''min_appevent_meanactive'']
+
+    '
+  min_appevent_meanappactive: '
+
+    # Merge Events with App_events to get device_id in App_events
+
+    events_app_events = pd.merge(Events[[''event_id'', ''device_id'']], App_events,
+    on=''event_id'')
+
+
+    # Calculate mean is_active for each app_id within each event_id
+
+    mean_is_active_per_event = events_app_events.groupby([''event_id'', ''app_id''])[''is_active''].mean().reset_index()
+
+
+    # Calculate the minimum mean is_active for each event_id
+
+    min_mean_is_active_per_event = mean_is_active_per_event.groupby(''event_id'')[''is_active''].min().reset_index()
+
+
+    # Merge back to get device_id
+
+    min_mean_is_active_per_event_device = pd.merge(min_mean_is_active_per_event, Events[[''event_id'',
+    ''device_id'']], on=''event_id'')
+
+
+    # Calculate the minimum of these means across different event_ids for each device_id
+
+    min_appevent_meanappactive = min_mean_is_active_per_event_device.groupby(''device_id'')[''is_active''].min().reset_index()
+
+
+    # Merge with Gender_age to add the new feature
+
+    Gender_age = pd.merge(Gender_age, min_appevent_meanappactive, on=''device_id'',
+    how=''left'')
+
+
+    # Rename the new column
+
+    Gender_age.rename(columns={''is_active'': ''min_appevent_meanappactive''}, inplace=True)
+
+    '
+  min_appevent_rangeappactive: '
+
+    # Merge Events with App_events to get device_id in App_events
+
+    events_app_events = pd.merge(Events[[''event_id'', ''device_id'']], App_events,
+    on=''event_id'')
+
+
+    # Calculate the range of is_active status for each event_id
+
+    events_app_events[''is_active_range''] = events_app_events.groupby(''event_id'')[''is_active''].transform(lambda
+    x: x.max() - x.min())
+
+
+    # Determine the minimum of these ranges across different event_ids for each device_id
+
+    min_appevent_rangeappactive = events_app_events.groupby(''device_id'')[''is_active_range''].min().reset_index()
+
+
+    # Merge the calculated feature with Gender_age table
+
+    Gender_age = pd.merge(Gender_age, min_appevent_rangeappactive, on=''device_id'',
+    how=''left'')
+
+
+    # Rename the new column
+
+    Gender_age.rename(columns={''is_active_range'': ''min_appevent_rangeappactive''},
+    inplace=True)
+
+    '
+  min_appid_proportion: "\n# Merge Events with App_events to get app_id for each event\n\
+    events_app_events = pd.merge(Events, App_events, on='event_id')\n\n# Calculate\
+    \ the proportion of distinct app_ids to total app events for each event_id\nevent_app_proportion\
+    \ = events_app_events.groupby('event_id').apply(\n    lambda x: x['app_id'].nunique()\
+    \ / len(x)\n).reset_index(name='app_id_proportion')\n\n# Find the minimum of these\
+    \ proportions across different event_ids for each device_id\ndevice_min_appid_proportion\
+    \ = events_app_events.merge(event_app_proportion, on='event_id').groupby('device_id')['app_id_proportion'].min().reset_index()\n\
+    \n# Merge the result with Gender_age table\nGender_age = pd.merge(Gender_age,\
+    \ device_min_appid_proportion, on='device_id', how='left')\n\n# Rename the column\
+    \ to match the required feature name\nGender_age.rename(columns={'app_id_proportion':\
+    \ 'min_appid_proportion'}, inplace=True)\n"
+  minimum_date: '
+
+    Events[''timestamp''] = pd.to_datetime(Events[''timestamp''])
+
+    min_dates = Events.groupby(''device_id'')[''timestamp''].min().reset_index()
+
+    min_dates.columns = [''device_id'', ''minimum_date'']
+
+    Gender_age = Gender_age.merge(min_dates, on=''device_id'', how=''left'')
+
+    '
+  minimum_hour: '
+
+    Events[''hour''] = pd.to_datetime(Events[''timestamp'']).dt.hour
+
+    minimum_hour = Events.groupby(''device_id'')[''hour''].min().reset_index()
+
+    minimum_hour.columns = [''device_id'', ''minimum_hour'']
+
+    Gender_age = Gender_age.merge(minimum_hour, on=''device_id'', how=''left'')
+
+    '
+  range_appevent_count: '
+
+    # Merge Events with App_events to get the count of app events per event_id
+
+    event_app_counts = App_events.groupby(''event_id'').size().reset_index(name=''app_event_count'')
+
+
+    # Merge the event_app_counts with Events to get the device_id associated with
+    each event_id
+
+    event_app_counts = event_app_counts.merge(Events[[''event_id'', ''device_id'']],
+    on=''event_id'', how=''left'')
+
+
+    # Calculate the range of app event counts for each device_id
+
+    range_appevent_count = event_app_counts.groupby(''device_id'')[''app_event_count''].agg(lambda
+    x: x.max() - x.min()).reset_index(name=''range_appevent_count'')
+
+
+    # Merge the range_appevent_count with Gender_age
+
+    Gender_age = Gender_age.merge(range_appevent_count, on=''device_id'', how=''left'')
+
+
+    # Fill NaN values with 0 (if any device_id in Gender_age does not have corresponding
+    events)
+
+    Gender_age[''range_appevent_count'']
+
+    '
+  range_appevent_labelcount: '
+
+    # Merge Events with App_events to get event_id and device_id together
+
+    events_app_events = pd.merge(Events[[''event_id'', ''device_id'']], App_events[[''event_id'',
+    ''app_id'']], on=''event_id'')
+
+
+    # Merge the result with App_labels to get label_id
+
+    events_app_events_labels = pd.merge(events_app_events, App_labels[[''app_id'',
+    ''label_id'']], on=''app_id'')
+
+
+    # Group by event_id and count unique label_ids
+
+    event_label_counts = events_app_events_labels.groupby(''event_id'')[''label_id''].nunique().reset_index(name=''label_count'')
+
+
+    # Merge the label counts back with events to get device_id
+
+    event_label_counts_device = pd.merge(event_label_counts, Events[[''event_id'',
+    ''device_id'']], on=''event_id'')
+
+
+    # Group by device_id and calculate the mean label count per event
+
+    device_label_mean_counts = event_label_counts_device.groupby(''device_id'')[''label_count''].mean().reset_index(name=''mean_label_count'')
+
+
+    # Calculate the range of mean label counts for each device_id
+
+    range_label_counts = device_label_mean_counts.groupby(''device_id'')[''mean_label_count''].agg(lambda
+    x: x.max() - x.min()).reset_index(name=''range_appevent_labelcount'')
+
+
+    # Merge the range of label counts with Gender_age table
+
+    Gender_age = pd.merge(Gender_age, range_label_counts, on=''device_id'', how=''left'')
+
+
+    # Fill NaN values with 0 (if any device_id in Gender_age does not have corresponding
+    events)
+
+    Gender_age[''range_appevent_labelcount'']
+
+    '
+  range_appevent_maxappactive: '
+
+    # Merge Events with App_events to get is_active status for each event
+
+    events_app_events = pd.merge(Events, App_events, on=''event_id'')
+
+
+    # Group by event_id and find the maximum is_active status for each event
+
+    max_is_active_per_event = events_app_events.groupby(''event_id'')[''is_active''].max().reset_index()
+
+
+    # Merge back to get device_id for each event
+
+    max_is_active_per_event = pd.merge(max_is_active_per_event, Events[[''event_id'',
+    ''device_id'']], on=''event_id'')
+
+
+    # Group by device_id and find the range of maximum is_active statuses across different
+    event_ids
+
+    range_max_is_active_per_device = max_is_active_per_event.groupby(''device_id'')[''is_active''].agg(lambda
+    x: x.max() - x.min()).reset_index()
+
+    range_max_is_active_per_device.columns = [''device_id'', ''range_appevent_maxappactive'']
+
+
+    # Merge the new feature into the Gender_age table
+
+    Gender_age = pd.merge(Gender_age, range_max_is_active_per_device, on=''device_id'',
+    how=''left'')
+
+
+    # Fill NaN values with 0 (if any device_id in Gender_age does not have corresponding
+    events)
+
+    Gender_age[''range_appevent_maxappactive'']
+
+    '
+  range_appevent_maxlabel: '
+
+    # Merge Events with App_events to get event_id and device_id together
+
+    events_app_events = pd.merge(Events[[''event_id'', ''device_id'']], App_events[[''event_id'',
+    ''app_id'']], on=''event_id'')
+
+
+    # Merge with App_labels to get label_id
+
+    events_app_labels = pd.merge(events_app_events, App_labels[[''app_id'', ''label_id'']],
+    on=''app_id'')
+
+
+    # Find the maximum label_id for each event_id
+
+    max_label_per_event = events_app_labels.groupby(''event_id'')[''label_id''].max().reset_index()
+
+
+    # Merge back with Events to get device_id
+
+    max_label_per_event_device = pd.merge(max_label_per_event, Events[[''event_id'',
+    ''device_id'']], on=''event_id'')
+
+
+    # Find the range of maximum label_id values for each device_id
+
+    range_max_label_per_device = max_label_per_event_device.groupby(''device_id'')[''label_id''].agg(lambda
+    x: x.max() - x.min()).reset_index()
+
+
+    # Rename columns for clarity
+
+    range_max_label_per_device.columns = [''device_id'', ''range_appevent_maxlabel'']
+
+
+    # Merge with Gender_age to add the new feature
+
+    Gender_age = pd.merge(Gender_age, range_max_label_per_device, on=''device_id'',
+    how=''left'')
+
+
+    # Fill NaN values with 0 (if any device_id in Gender_age does not have corresponding
+    events)
+
+    Gender_age[''range_appevent_maxlabel'']
+
+    '
+  range_appevent_meanactive: '
+
+    # Merge Events with App_events to get device_id in App_events
+
+    events_app_events = pd.merge(Events[[''event_id'', ''device_id'']], App_events,
+    on=''event_id'')
+
+
+    # Calculate mean is_active for each event_id
+
+    event_mean_active = events_app_events.groupby(''event_id'')[''is_active''].mean().reset_index()
+
+
+    # Merge back to get device_id
+
+    event_mean_active = pd.merge(event_mean_active, Events[[''event_id'', ''device_id'']],
+    on=''event_id'')
+
+
+    # Calculate the range of mean is_active values for each device_id
+
+    device_range_mean_active = event_mean_active.groupby(''device_id'')[''is_active''].agg(lambda
+    x: x.max() - x.min()).reset_index()
+
+    device_range_mean_active.columns = [''device_id'', ''range_appevent_meanactive'']
+
+
+    # Merge with Gender_age to add the new feature
+
+    Gender_age = pd.merge(Gender_age, device_range_mean_active, on=''device_id'',
+    how=''left'')
+
+
+    # Fill NaN values with 0 (if any device_id in Gender_age does not have corresponding
+    events)
+
+    Gender_age[''range_appevent_meanactive'']
+
+    '
+  range_appevent_meanappactive: '
+
+    # Merge Events with App_events to get is_active status for each event
+
+    events_app_events = pd.merge(Events, App_events, on=''event_id'')
+
+
+    # Calculate mean is_active status for each app within each event
+
+    mean_is_active_per_event = events_app_events.groupby([''event_id'', ''app_id''])[''is_active''].mean().reset_index()
+
+
+    # Calculate the range of mean is_active statuses for each event
+
+    range_mean_is_active_per_event = mean_is_active_per_event.groupby(''event_id'')[''is_active''].agg(lambda
+    x: x.max() - x.min()).reset_index()
+
+
+    # Merge the range of mean is_active statuses back to the events to get device_id
+
+    range_mean_is_active_per_event = pd.merge(range_mean_is_active_per_event, Events[[''event_id'',
+    ''device_id'']], on=''event_id'')
+
+
+    # Calculate the range of these means across different event_ids for each device_id
+
+    range_mean_is_active_per_device = range_mean_is_active_per_event.groupby(''device_id'')[''is_active''].agg(lambda
+    x: x.max() - x.min()).reset_index()
+
+
+    # Merge the calculated feature back to the Gender_age table
+
+    Gender_age = pd.merge(Gender_age, range_mean_is_active_per_device, on=''device_id'',
+    how=''left'')
+
+
+    # Rename the new column to range_appevent_meanappactive
+
+    Gender_age.rename(columns={''is_active'': ''range_appevent_meanappactive''}, inplace=True)
+
+    '
+  range_appevent_rangeappactive: '
+
+    # Merge Events with App_events to get device_id in App_events
+
+    events_app_events = pd.merge(Events[[''event_id'', ''device_id'']], App_events,
+    on=''event_id'')
+
+
+    # Calculate the range of is_active status for each event_id
+
+    range_is_active_per_event = events_app_events.groupby(''event_id'')[''is_active''].apply(lambda
+    x: x.max() - x.min()).reset_index(name=''range_is_active'')
+
+
+    # Merge the range of is_active status back to events_app_events to get device_id
+
+    events_app_events = pd.merge(events_app_events[[''event_id'', ''device_id'']].drop_duplicates(),
+    range_is_active_per_event, on=''event_id'')
+
+
+    # Calculate the range of these ranges across different event_ids for each device_id
+
+    range_of_ranges_per_device = events_app_events.groupby(''device_id'')[''range_is_active''].apply(lambda
+    x: x.max() - x.min()).reset_index(name=''range_appevent_rangeappactive'')
+
+
+    # Merge the calculated feature back to Gender_age table
+
+    Gender_age = pd.merge(Gender_age, range_of_ranges_per_device, on=''device_id'',
+    how=''left'')
+
+
+    # Fill NaN values with 0 (if any device_id in Gender_age does not have corresponding
+    events)
+
+    Gender_age[''range_appevent_rangeappactive''] = Gender_age[''range_appevent_rangeappactive'']
+
+    '
+  range_appid_proportion: "\n# Merge Events with App_events to get app_id for each\
+    \ event\nevents_app_events = pd.merge(Events, App_events, on='event_id', how='left')\n\
+    \n# Calculate the proportion of distinct app_id for each event_id\nevent_app_proportion\
+    \ = events_app_events.groupby('event_id').agg(\n    distinct_app_count=('app_id',\
+    \ 'nunique'),\n    total_app_count=('app_id', 'count')\n)\nevent_app_proportion['app_id_proportion']\
+    \ = event_app_proportion['distinct_app_count'] / event_app_proportion['total_app_count']\n\
+    event_app_proportion = event_app_proportion[['app_id_proportion']].reset_index()\n\
+    \n# Merge the proportion back to the events\nevents_app_events = pd.merge(events_app_events,\
+    \ event_app_proportion, on='event_id', how='left')\n\n# Calculate the range of\
+    \ app_id proportions for each device_id\ndevice_app_proportion_range = events_app_events.groupby('device_id')['app_id_proportion'].agg(lambda\
+    \ x: x.max() - x.min()).reset_index()\ndevice_app_proportion_range = device_app_proportion_range.rename(columns={'app_id_proportion':\
+    \ 'range_appid_proportion'})\n\n# Merge the range back to the Gender_age table\n\
+    Gender_age = pd.merge(Gender_age, device_app_proportion_range, on='device_id',\
+    \ how='left')\n\n# Fill NaN values with 0 (if any)\nGender_age['range_appid_proportion']\
+    \ = Gender_age['range_appid_proportion']\n"
+  range_date: '
+
+    Events[''timestamp''] = pd.to_datetime(Events[''timestamp''])
+
+    range_date = Events.groupby(''device_id'')[''timestamp''].agg(lambda x: (x.max()
+    - x.min()).days)
+
+    Gender_age = Gender_age.merge(range_date.rename(''range_date''), on=''device_id'',
+    how=''left'')
+
+    '
+name: talkingdata
+table_path: data/talkingdata
+table_schemas:
+- columns:
+  - description: device id
+    dtype: primary_key
+    name: device_id
+  - description: gender of the user
+    dtype: category
+    name: gender
+  - description: age of the user
+    dtype: category
+    name: age
+  - description: this is the target variable you are going to predict
+    dtype: category
+    name: group
+  name: Gender_age
+  time_column: null
+- columns:
+  - description: Unique identifier for a device.
+    dtype: foreign_key
+    link_to: Gender_age.device_id
+    name: device_id
+  - description: Brand of the phone. Note that the brands are in Chinese.
+    dtype: category
+    name: phone_brand
+  - description: Model of the phone.
+    dtype: category
+    name: device_model
+  name: Brand
+  time_column: null
+- columns:
+  - description: Unique identifier for an app.
+    dtype: primary_key
+    name: app_id
+  - description: Unique identifier for a label (joins with label_categories.csv).
+    dtype: foreign_key
+    link_to: Label_categories.label_id
+    name: label_id
+  name: App_labels
+  time_column: null
+- columns:
+  - description: Unique identifier for an event (joins with events.csv).
+    dtype: foreign_key
+    link_to: Events.event_id
+    name: event_id
+  - description: Unique identifier for an app.
+    dtype: foreign_key
+    link_to: App_labels.app_id
+    name: app_id
+  - description: Indicates whether the app is active during the event.
+    dtype: bool
+    name: is_active
+  name: App_events
+  time_column: null
+- columns:
+  - description: Unique identifier for a label.
+    dtype: primary_key
+    name: label_id
+  - description: Category of the app label in text.
+    dtype: text
+    name: category
+  name: Label_categories
+  time_column: null
+- columns:
+  - description: Unique identifier for an event.
+    dtype: primary_key
+    name: event_id
+  - description: Unique identifier for a device.
+    dtype: foreign_key
+    link_to: Gender_age.device_id
+    name: device_id
+  - description: When the user is using an app with TalkingData SDK.
+    dtype: datetime
+    name: timestamp
+  - description: Longitude location of the event.
+    dtype: float
+    name: longitude
+  - description: Latitude location of the event.
+    dtype: float
+    name: latitude
+  name: Events
+  time_column: timestamp
+target_column: group
+target_table: Gender_age
+task_split: null

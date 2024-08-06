@@ -1,0 +1,12 @@
+/tmp/
+/temp/
+/.vscode/
+.env
+/cache_feature/
+/cache/
+/data/
+/features_output/
+/evaluation_result/
+
+__pycache__/
+*.pqt

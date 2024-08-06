@@ -1,0 +1,117 @@
+,feature_description,code
+0,BidCount - The total number of bids made by a bidder.,"
+Bidders['BidCount'] = Bidders['bidder_id'].map(Bids['bidder_id'].value_counts())
+"
+1,AuctionCount - The total number of unique auctions a bidder has participated in.,"
+Bidders['AuctionCount'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['auction'].nunique())
+"
+2,MerchandiseCount - The total number of unique merchandise categories a bidder has bid on.,"
+Bidders['MerchandiseCount'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['merchandise'].nunique())
+"
+3,DeviceCount - The total number of unique devices a bidder has used to make bids.,"
+Bidders['DeviceCount'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['device'].nunique())
+"
+4,CountryCount - The total number of unique countries a bidder's IP addresses belong to.,"
+Bidders['CountryCount'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['country'].nunique())
+"
+5,IPCount - The total number of unique IP addresses a bidder has used to make bids.,"
+Bidders['IPCount'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['ip'].nunique())
+"
+6,URLCount - The total number of unique URLs a bidder has been referred from.,"
+Bidders['URLCount'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['url'].nunique())
+"
+7,AverageBidTime - The average time of day a bidder makes bids.,"
+Bidders['AverageBidTime'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['time'].mean())
+"
+8,AverageBidInterval - The average time interval between consecutive bids made by a bidder.,"
+Bids.sort_values(by=['bidder_id', 'time'], inplace=True)
+Bids['time_diff'] = Bids.groupby('bidder_id')['time'].diff()
+Bids['time_diff'].fillna(pd.Timedelta(seconds=0), inplace=True)
+Bidders['AverageBidInterval'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['time_diff'].mean())
+"
+9,BidStandardDeviation - The standard deviation of the time of day a bidder makes bids.,"
+Bidders['BidStandardDeviation'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['time'].std())
+"
+10,MostCommonMerchandise - The most common merchandise category a bidder has bid on.,"
+Bidders['MostCommonMerchandise'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['merchandise'].apply(lambda x: x.value_counts().index[0]))
+"
+11,MostCommonDevice - The most common device a bidder has used to make bids.,"
+Bidders['MostCommonDevice'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['device'].apply(lambda x: x.value_counts().index[0]))
+"
+12,MostCommonCountry - The most common country a bidder's IP addresses belong to.,"
+Bidders['MostCommonCountry'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['country'].apply(lambda x: x.value_counts().index[0]))
+"
+13,MostCommonIP - The most common IP address a bidder has used to make bids.,"
+Bidders['MostCommonIP'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['ip'].apply(lambda x: x.value_counts().index[0]))
+"
+14,MostCommonURL - The most common URL a bidder has been referred from.,"
+Bidders['MostCommonURL'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['url'].apply(lambda x: x.value_counts().index[0]))
+"
+15,BidEntropy - The entropy of the distribution of merchandise categories a bidder has bid on.,"
+import pandas as pd
+import numpy as np
+
+# Group by bidder_id and compute the entropy of merchandise distribution
+bid_entropy = Bids.groupby('bidder_id')['merchandise'].apply(lambda x: x.value_counts(normalize=True).apply(lambda p: -p * np.log2(p)).sum())
+
+# Merge the computed feature with the Bidders table
+Bidders = Bidders.merge(bid_entropy.reset_index(name='BidEntropy'), on='bidder_id')
+"
+16,DeviceEntropy - The entropy of the distribution of devices a bidder has used to make bids.,"
+import pandas as pd
+from scipy.stats import entropy
+
+# Group by bidder_id and compute the entropy of the distribution of devices
+device_entropy = Bids.groupby('bidder_id')['device'].apply(lambda x: entropy(x.value_counts()))
+
+# Merge the computed feature with the Bidders table
+Bidders = Bidders.merge(device_entropy.reset_index(name='DeviceEntropy'), on='bidder_id')
+"
+17,CountryEntropy - The entropy of the distribution of countries a bidder's IP addresses belong to.,"
+import pandas as pd
+import numpy as np
+
+# Group by bidder_id and compute the entropy of the distribution of countries
+country_entropy = Bids.groupby('bidder_id')['country'].apply(lambda x: x.value_counts(normalize=True).apply(lambda p: -p * np.log2(p)).sum())
+
+# Merge the computed feature with the Bidders table
+Bidders = Bidders.merge(country_entropy.reset_index(name='CountryEntropy'), on='bidder_id')
+"
+18,IPEntropy - The entropy of the distribution of IP addresses a bidder has used to make bids.,"
+import pandas as pd
+from scipy.stats import entropy
+
+# Group by bidder_id and compute the entropy of the distribution of IP addresses
+ip_entropy = Bids.groupby('bidder_id')['ip'].apply(lambda x: entropy(x.value_counts()))
+
+# Merge the computed feature with the Bidders table
+Bidders = Bidders.merge(ip_entropy.reset_index(name='IPEntropy'), on='bidder_id')
+"
+19,URLEntropy - The entropy of the distribution of URLs a bidder has been referred from.,"
+import pandas as pd
+from scipy.stats import entropy
+
+# Group by bidder_id and compute the entropy of the distribution of URLs
+url_entropy = Bids.groupby('bidder_id')['url'].apply(lambda x: entropy(x.value_counts()))
+
+# Merge the computed feature with the Bidders table
+Bidders = Bidders.merge(url_entropy.reset_index(name='URLEntropy'), on='bidder_id')
+"
+20,AuctionBidRatio - The ratio of the number of bids made by a bidder to the number of unique auctions they have participated in.,"
+Bidders['AuctionBidRatio'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['auction'].nunique() / Bids.groupby('bidder_id')['bid_id'].count())
+"
+21,MerchandiseBidRatio - The ratio of the number of bids made by a bidder to the number of unique merchandise categories they have bid on.,"
+Bidders['MerchandiseBidRatio'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['merchandise'].nunique() / Bids.groupby('bidder_id')['bid_id'].count())
+"
+22,DeviceBidRatio - The ratio of the number of bids made by a bidder to the number of unique devices they have used to make bids.,"
+Bidders['DeviceBidRatio'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['device'].nunique() / Bids.groupby('bidder_id')['bid_id'].count())
+"
+23,CountryBidRatio - The ratio of the number of bids made by a bidder to the number of unique countries their IP addresses belong to.,"
+Bidders['CountryBidRatio'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['country'].nunique() / Bids.groupby('bidder_id')['bid_id'].count())
+"
+24,IPBidRatio - The ratio of the number of bids made by a bidder to the number of unique IP addresses they have used to make bids.,"
+Bidders['IPBidRatio'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['ip'].nunique() / Bids.groupby('bidder_id')['bid_id'].count())
+"
+25,URLBidRatio - The ratio of the number of bids made by a bidder to the number of unique URLs they have been referred from.,"
+Bidders['URLBidRatio'] = Bidders['bidder_id'].map(Bids.groupby('bidder_id')['url'].nunique() / Bids.groupby('bidder_id')['bid_id'].count())
+"

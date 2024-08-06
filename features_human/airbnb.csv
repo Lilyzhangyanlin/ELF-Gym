@@ -1,0 +1,391 @@
+,feature_description,code
+0,`dac_year` - Year when the account was created extracted from date_account_created,"
+User[""dac_year""] = pd.to_datetime(User[""date_account_created""]).dt.year
+"
+1,`dac_month` - Month when the account was created extracted from date_account_created,"
+User[""dac_month""] = pd.to_datetime(User[""date_account_created""]).dt.month
+"
+2,`dac_day` - Day when the account was created extracted from date_account_created,"
+User[""dac_day""] = pd.to_datetime(User[""date_account_created""]).dt.day
+"
+3,`dac_yearmonth` - Concatenated year and month of account creation from date_account_created,"
+User[""date_account_created""] = pd.to_datetime(User[""date_account_created""], errors='coerce')
+User[""dac_yearmonth""] = User[""date_account_created""].dt.strftime('%Y%m')
+"
+4,`dac_yearmonthday` - Numerical representation of year month and day concatenated from date_account_created,"
+User[""dac_yearmonthday""] = pd.to_datetime(User[""date_account_created""]).dt.strftime('%Y%m%d').astype(int)
+"
+5,`dac_week` - Week number of the year when the account was created from date_account_created,"
+User['dac_week'] = pd.to_datetime(User['date_account_created']).dt.isocalendar().week
+"
+6,`dac_yearmonthweek` - Numerical representation of year month and week number concatenated from date_account_created,"
+User[""dac_yearmonthweek""] = User[""date_account_created""].apply(lambda x: pd.to_datetime(x).strftime('%Y%m%U'))
+"
+7,`tfa_year` - Year when the user first became active extracted from timestamp_first_active,"
+User[""tfa_year""] = pd.to_datetime(User[""timestamp_first_active""], format='%Y%m%d%H%M%S').dt.year
+"
+8,`tfa_month` - Month when the user first became active extracted from timestamp_first_active,"
+User[""tfa_month""] = pd.to_datetime(User[""timestamp_first_active""], format='%Y%m%d%H%M%S').dt.month
+"
+9,`tfa_day` - Day when the user first became active extracted from timestamp_first_active,"
+User[""tfa_day""] = pd.to_datetime(User[""timestamp_first_active""], format='%Y%m%d%H%M%S').dt.day
+"
+10,`tfa_yearmonth` - Concatenated year and month of first activity from timestamp_first_active,"
+User[""tfa_yearmonth""] = pd.to_datetime(User[""timestamp_first_active""], format='%Y%m%d%H%M%S').dt.strftime('%Y%m')
+"
+11,`tfa_yearmonthday` - Numerical representation of year month and day concatenated from timestamp_first_active,"
+User[""tfa_yearmonthday""] = pd.to_datetime(User[""timestamp_first_active""], format='%Y%m%d%H%M%S').dt.strftime('%Y%m%d').astype(int)
+"
+12,`tfa_date` - Date of the user's first activity converted from timestamp_first_active,"
+User[""tfa_date""] = pd.to_datetime(User[""timestamp_first_active""], format='%Y%m%d%H%M%S').dt.date
+"
+13,`tfa_week` - Week number of the year when the user first became active from timestamp_first_active,"
+User[""tfa_week""] = pd.to_datetime(User[""timestamp_first_active""], format='%Y%m%d%H%M%S').dt.isocalendar().week
+"
+14,`tfa_yearmonthweek` - Numerical representation of year month and week number concatenated from timestamp_first_active,"
+User['timestamp_first_active'] = pd.to_datetime(User['timestamp_first_active'], format='%Y%m%d%H%M%S')
+User['tfa_yearmonthweek'] = User['timestamp_first_active'].dt.strftime('%Y%m%U').astype(int)
+"
+15,`dac_lag` - Difference in days between account creation date and first activity date,"
+User[""dac_lag""] = (pd.to_datetime(User[""date_account_created""]) - pd.to_datetime(User[""timestamp_first_active""], format='%Y%m%d%H%M%S')).dt.days
+"
+16,`dfb_dac_lag` - Difference in days between first booking date and account creation date,"
+User[""dfb_dac_lag""] = (pd.to_datetime(User[""date_first_booking""]) - pd.to_datetime(User[""date_account_created""])).dt.days
+"
+17,`dfb_tfa_lag` - Difference in days between first booking date and first activity date,"
+User[""dfb_tfa_lag""] = (pd.to_datetime(User[""date_first_booking""]) - pd.to_datetime(User[""timestamp_first_active""], format='%Y%m%d%H%M%S')).dt.days
+"
+18,`secs_elapsed_sum` - Total sum of seconds elapsed during sessions for each user,"
+secs_elapsed_sum = Session.groupby('user_id')['secs_elapsed'].sum().reset_index()
+secs_elapsed_sum.columns = ['id', 'secs_elapsed_sum']
+User = User.merge(secs_elapsed_sum, on='id', how='left')
+User['secs_elapsed_sum'] = User['secs_elapsed_sum']
+"
+19,`secs_elapsed_mean` - Mean of seconds elapsed during sessions for each user,"
+secs_elapsed_mean = Session.groupby('user_id')['secs_elapsed'].mean().reset_index()
+secs_elapsed_mean.columns = ['id', 'secs_elapsed_mean']
+User = User.merge(secs_elapsed_mean, on='id', how='left')
+"
+20,`secs_elapsed_sd` - Standard deviation of seconds elapsed during sessions for each user,"
+secs_elapsed_sd = Session.groupby('user_id')['secs_elapsed'].std().reset_index()
+secs_elapsed_sd.columns = ['id', 'secs_elapsed_sd']
+User = User.merge(secs_elapsed_sd, on='id', how='left')
+"
+21,`secs_elapsed_wrmean` - Weighted reciprocal mean of seconds elapsed during sessions for each user,"
+import pandas as pd
+
+# Assuming the dataframes are already loaded as User, Session, Country, and Population
+
+# Compute the weighted reciprocal mean of seconds elapsed for each user
+Session['reciprocal_secs_elapsed'] = 1 / Session['secs_elapsed']
+weighted_reciprocal_mean = Session.groupby('user_id')['reciprocal_secs_elapsed'].mean().reset_index()
+weighted_reciprocal_mean.columns = ['id', 'secs_elapsed_wrmean']
+
+# Merge the computed feature into the User table
+User = User.merge(weighted_reciprocal_mean, on='id', how='left')
+
+# Fill NaN values with 0 (if any user has no session data)
+User['secs_elapsed_wrmean']
+"
+22,`secs_elapsed_wmean` - Weighted mean of seconds elapsed during sessions for each user,"
+import numpy as np
+
+# Compute weighted mean of seconds elapsed for each user
+weighted_mean = Session.groupby('user_id').apply(
+    lambda x: np.average(x['secs_elapsed'], weights=x['secs_elapsed'])
+).reset_index(name='secs_elapsed_wmean')
+
+# Merge the computed feature into the User table
+User = User.merge(weighted_mean, how='left', left_on='id', right_on='user_id').drop(columns=['user_id'])
+"
+23,`sessions_action_se_sum` - Total sum of seconds elapsed for each user-action combination,"
+sessions_action_se_sum = Session.groupby('user_id')['secs_elapsed'].sum().reset_index()
+sessions_action_se_sum.columns = ['id', 'sessions_action_se_sum']
+User = User.merge(sessions_action_se_sum, on='id', how='left')
+User['sessions_action_se_sum'] = User['sessions_action_se_sum']
+"
+24,`sessions_action_type_se_sum` - Total sum of seconds elapsed for each user-action_type combination,"
+sessions_action_type_se_sum = Session.groupby(['user_id', 'action_type'])['secs_elapsed'].sum().reset_index()
+sessions_action_type_se_sum = sessions_action_type_se_sum.groupby('user_id')['secs_elapsed'].sum().reset_index()
+sessions_action_type_se_sum.columns = ['id', 'sessions_action_type_se_sum']
+User = User.merge(sessions_action_type_se_sum, on='id', how='left')
+"
+25,`sessions_action_detail_se_sum` - Total sum of seconds elapsed for each user-action_detail combination,"
+sessions_action_detail_se_sum = Session.groupby('user_id')['secs_elapsed'].sum().reset_index()
+sessions_action_detail_se_sum.columns = ['id', 'sessions_action_detail_se_sum']
+User = User.merge(sessions_action_detail_se_sum, on='id', how='left')
+"
+26,`sessions_device_type_se_sum` - Total sum of seconds elapsed for each user-device_type combination,"
+sessions_device_type_se_sum = Session.groupby(['user_id', 'device_type'])['secs_elapsed'].sum().reset_index()
+sessions_device_type_se_sum = sessions_device_type_se_sum.groupby('user_id')['secs_elapsed'].sum().reset_index()
+sessions_device_type_se_sum.columns = ['id', 'sessions_device_type_se_sum']
+User = User.merge(sessions_device_type_se_sum, on='id', how='left')
+"
+27,`sessions_action_flg_sum` - Total count of each user-action combination,"
+sessions_action_flg_sum = Session.groupby('user_id').size().reset_index(name='sessions_action_flg_sum')
+User = User.merge(sessions_action_flg_sum, how='left', left_on='id', right_on='user_id').drop(columns='user_id')
+User['sessions_action_flg_sum'] = User['sessions_action_flg_sum']
+"
+28,`sessions_action_type_flg_sum` - Total count of each user-action_type combination,"
+# Compute the total count of each user-action_type combination
+sessions_action_type_flg_sum = Session.groupby(['user_id', 'action_type']).size().unstack(fill_value=0).sum(axis=1).reset_index()
+sessions_action_type_flg_sum.columns = ['id', 'sessions_action_type_flg_sum']
+
+# Merge the computed feature with the User table
+User = User.merge(sessions_action_type_flg_sum, on='id', how='left')
+
+# Fill NaN values with 0 (in case some users have no session data)
+User['sessions_action_type_flg_sum'] = User['sessions_action_type_flg_sum']
+"
+29,`sessions_action_detail_flg_sum` - Total count of each user-action_detail combination,"
+sessions_action_detail_flg_sum = Session.groupby('user_id')['action_detail'].count().reset_index()
+sessions_action_detail_flg_sum.columns = ['id', 'sessions_action_detail_flg_sum']
+User = User.merge(sessions_action_detail_flg_sum, on='id', how='left')
+User['sessions_action_detail_flg_sum'] = User['sessions_action_detail_flg_sum']
+"
+30,`sessions_device_type_flg_sum` - Total count of each user-device_type combination,"
+sessions_device_type_flg_sum = Session.groupby('user_id')['device_type'].count().reset_index()
+sessions_device_type_flg_sum.columns = ['id', 'sessions_device_type_flg_sum']
+User = User.merge(sessions_device_type_flg_sum, on='id', how='left')
+User['sessions_device_type_flg_sum'] = User['sessions_device_type_flg_sum']
+"
+31,`sessions_action_se_mean` - Average of seconds elapsed for each user-action combination,"
+sessions_action_se_mean = Session.groupby(['user_id', 'action'])['secs_elapsed'].mean().reset_index()
+sessions_action_se_mean = sessions_action_se_mean.groupby('user_id')['secs_elapsed'].mean().reset_index()
+sessions_action_se_mean.columns = ['id', 'sessions_action_se_mean']
+User = User.merge(sessions_action_se_mean, on='id', how='left')
+"
+32,`sessions_action_type_se_mean` - Average of seconds elapsed for each user-action_type combination,"
+sessions_action_type_se_mean = Session.groupby(['user_id', 'action_type'])['secs_elapsed'].mean().reset_index()
+sessions_action_type_se_mean = sessions_action_type_se_mean.groupby('user_id')['secs_elapsed'].mean().reset_index()
+sessions_action_type_se_mean.columns = ['id', 'sessions_action_type_se_mean']
+
+User = User.merge(sessions_action_type_se_mean, on='id', how='left')
+"
+33,`sessions_action_detail_se_mean` - Average of seconds elapsed for each user-action_detail combination,"
+sessions_action_detail_se_mean = Session.groupby(['user_id', 'action_detail'])['secs_elapsed'].mean().reset_index()
+sessions_action_detail_se_mean = sessions_action_detail_se_mean.groupby('user_id')['secs_elapsed'].mean().reset_index()
+sessions_action_detail_se_mean.columns = ['id', 'sessions_action_detail_se_mean']
+
+User = User.merge(sessions_action_detail_se_mean, on='id', how='left')
+"
+34,`sessions_device_type_se_mean` - Average of seconds elapsed for each user-device_type combination,"
+sessions_device_type_se_mean = Session.groupby(['user_id', 'device_type'])['secs_elapsed'].mean().reset_index()
+sessions_device_type_se_mean = sessions_device_type_se_mean.rename(columns={'secs_elapsed': 'sessions_device_type_se_mean'})
+User = User.merge(sessions_device_type_se_mean.groupby('user_id')['sessions_device_type_se_mean'].mean().reset_index(), left_on='id', right_on='user_id', how='left').drop(columns=['user_id'])
+"
+35,`sessions_action_se_sd` - Standard deviation of seconds elapsed for each user-action combination,"
+import pandas as pd
+
+# Compute the standard deviation of seconds elapsed for each user-action combination
+sessions_action_se_sd = Session.groupby(['user_id', 'action'])['secs_elapsed'].std().reset_index()
+
+# Rename the column to match the desired feature name
+sessions_action_se_sd.rename(columns={'secs_elapsed': 'sessions_action_se_sd'}, inplace=True)
+
+# Merge the computed feature back to the User table
+User = User.merge(sessions_action_se_sd.groupby('user_id')['sessions_action_se_sd'].mean().reset_index(), 
+                  left_on='id', right_on='user_id', how='left')
+
+# Drop the extra 'user_id' column after merge
+User.drop(columns=['user_id'], inplace=True)
+"
+36,`sessions_action_type_se_sd` - Standard deviation of seconds elapsed for each user-action_type combination,"
+import pandas as pd
+
+# Compute the standard deviation of seconds elapsed for each user-action_type combination
+sessions_action_type_se_sd = Session.groupby(['user_id', 'action_type'])['secs_elapsed'].std().reset_index()
+
+# Rename the column to match the desired feature name
+sessions_action_type_se_sd.rename(columns={'secs_elapsed': 'sessions_action_type_se_sd'}, inplace=True)
+
+# Merge the computed feature back to the User table
+User = User.merge(sessions_action_type_se_sd.groupby('user_id')['sessions_action_type_se_sd'].mean().reset_index(), 
+                  left_on='id', right_on='user_id', how='left')
+
+# Drop the extra user_id column after merge
+User.drop(columns=['user_id'], inplace=True)
+"
+37,`sessions_action_detail_se_sd` - Standard deviation of seconds elapsed for each user-action_detail combination,"
+import pandas as pd
+
+# Compute the standard deviation of seconds elapsed for each user-action_detail combination
+sessions_action_detail_se_sd = Session.groupby(['user_id', 'action_detail'])['secs_elapsed'].std().reset_index()
+
+# Rename the column to match the desired feature name
+sessions_action_detail_se_sd.rename(columns={'secs_elapsed': 'sessions_action_detail_se_sd'}, inplace=True)
+
+# Merge the computed feature back to the User table
+User = User.merge(sessions_action_detail_se_sd.groupby('user_id')['sessions_action_detail_se_sd'].mean().reset_index(), 
+                  left_on='id', right_on='user_id', how='left')
+
+# Drop the extra user_id column after merge
+User.drop(columns=['user_id'], inplace=True)
+"
+38,`sessions_device_type_se_sd` - Standard deviation of seconds elapsed for each user-device_type combination,"
+import pandas as pd
+
+# Compute the standard deviation of seconds elapsed for each user-device_type combination
+sessions_device_type_se_sd = Session.groupby(['user_id', 'device_type'])['secs_elapsed'].std().reset_index()
+
+# Rename the column to match the desired feature name
+sessions_device_type_se_sd.rename(columns={'secs_elapsed': 'sessions_device_type_se_sd'}, inplace=True)
+
+# Merge the computed feature back to the User table
+User = User.merge(sessions_device_type_se_sd.groupby('user_id')['sessions_device_type_se_sd'].mean().reset_index(), left_on='id', right_on='user_id', how='left')
+
+# Drop the user_id column from the merge
+User.drop(columns=['user_id'], inplace=True)
+"
+39,`sessions_action_se_wrmean` - Weighted reciprocal mean of seconds elapsed for each user-action combination,"
+import pandas as pd
+
+# Compute the weighted reciprocal mean of seconds elapsed for each user-action combination
+session_grouped = Session.groupby(['user_id', 'action'])['secs_elapsed'].apply(lambda x: (1 / x).mean()).reset_index()
+session_grouped = session_grouped.rename(columns={'secs_elapsed': 'sessions_action_se_wrmean'})
+
+# Merge the computed feature with the User table
+User = User.merge(session_grouped[['user_id', 'sessions_action_se_wrmean']].groupby('user_id')['sessions_action_se_wrmean'].mean().reset_index(), left_on='id', right_on='user_id', how='left')
+
+# Drop the extra user_id column after merge
+User = User.drop(columns=['user_id'])
+"
+40,`sessions_action_type_se_wrmean` - Weighted reciprocal mean of seconds elapsed for each user-action_type combination,"
+import pandas as pd
+import numpy as np
+
+# Assuming the dataframes are already loaded as User, Session, Country, and Population
+
+# Compute the weighted reciprocal mean of seconds elapsed for each user-action_type combination
+Session['reciprocal_secs_elapsed'] = 1 / Session['secs_elapsed']
+weighted_reciprocal_mean = Session.groupby(['user_id', 'action_type'])['reciprocal_secs_elapsed'].mean().reset_index()
+weighted_reciprocal_mean = weighted_reciprocal_mean.rename(columns={'reciprocal_secs_elapsed': 'sessions_action_type_se_wrmean'})
+
+# Aggregate the weighted reciprocal mean for each user
+user_action_type_wrmean = weighted_reciprocal_mean.groupby('user_id')['sessions_action_type_se_wrmean'].mean().reset_index()
+
+# Merge the computed feature back to the User table
+User = User.merge(user_action_type_wrmean, how='left', left_on='id', right_on='user_id')
+
+# Drop the user_id column from the merge
+User = User.drop(columns=['user_id'])
+
+# Fill NaN values with 0 (or any other appropriate value)
+User['sessions_action_type_se_wrmean'] = User['sessions_action_type_se_wrmean']
+
+# Display the updated User table
+print(User.head())
+"
+41,`sessions_action_detail_se_wrmean` - Weighted reciprocal mean of seconds elapsed for each user-action_detail combination,"
+import pandas as pd
+import numpy as np
+
+# Compute the weighted reciprocal mean of seconds elapsed for each user-action_detail combination
+session_grouped = Session.groupby(['user_id', 'action_detail'])['secs_elapsed'].apply(lambda x: np.sum(1 / x) / len(x)).reset_index()
+session_grouped = session_grouped.rename(columns={'secs_elapsed': 'sessions_action_detail_se_wrmean'})
+
+# Merge the computed feature with the User table
+User = User.merge(session_grouped.groupby('user_id')['sessions_action_detail_se_wrmean'].mean().reset_index(), how='left', left_on='id', right_on='user_id')
+
+# Drop the extra user_id column after merge
+User = User.drop(columns=['user_id'])
+"
+42,`sessions_device_type_se_wrmean` - Weighted reciprocal mean of seconds elapsed for each user-device_type combination,"
+import pandas as pd
+import numpy as np
+
+# Assuming the dataframes are already loaded as User, Session, Country, and Population
+
+# Compute the weighted reciprocal mean of seconds elapsed for each user-device_type combination
+Session['reciprocal_secs_elapsed'] = 1 / Session['secs_elapsed']
+weighted_reciprocal_mean = Session.groupby(['user_id', 'device_type'])['reciprocal_secs_elapsed'].mean().reset_index()
+weighted_reciprocal_mean = weighted_reciprocal_mean.rename(columns={'reciprocal_secs_elapsed': 'sessions_device_type_se_wrmean'})
+
+# Merge the computed feature back to the User table
+User = User.merge(weighted_reciprocal_mean.groupby('user_id')['sessions_device_type_se_wrmean'].mean().reset_index(), left_on='id', right_on='user_id', how='left')
+
+# Drop the user_id column from the merge
+User = User.drop(columns=['user_id'])
+
+# Fill NaN values with 0 (or any other appropriate value)
+User['sessions_device_type_se_wrmean'] = User['sessions_device_type_se_wrmean']
+"
+43,`sessions_action_se_wmean` - Weighted mean of seconds elapsed for each user-action combination,"
+import pandas as pd
+
+# Compute the weighted mean of seconds elapsed for each user-action combination
+session_grouped = Session.groupby(['user_id', 'action'])['secs_elapsed'].mean().reset_index()
+session_grouped = session_grouped.rename(columns={'secs_elapsed': 'sessions_action_se_wmean'})
+
+# Merge the computed feature back to the User table
+User = User.merge(session_grouped.groupby('user_id')['sessions_action_se_wmean'].mean().reset_index(), left_on='id', right_on='user_id', how='left')
+
+# Drop the user_id column from the merge
+User = User.drop(columns=['user_id'])
+"
+44,`sessions_action_type_se_wmean` - Weighted mean of seconds elapsed for each user-action_type combination,"
+import pandas as pd
+
+# Compute the weighted mean of seconds elapsed for each user-action_type combination
+weighted_mean = Session.groupby(['user_id', 'action_type'])['secs_elapsed'].mean().reset_index()
+weighted_mean = weighted_mean.rename(columns={'secs_elapsed': 'sessions_action_type_se_wmean'})
+
+# Merge the computed feature back to the User table
+User = User.merge(weighted_mean.groupby('user_id')['sessions_action_type_se_wmean'].mean().reset_index(), 
+                  left_on='id', right_on='user_id', how='left')
+
+# Drop the extra 'user_id' column after merge
+User = User.drop(columns=['user_id'])
+"
+45,`sessions_action_detail_se_wmean` - Weighted mean of seconds elapsed for each user-action_detail combination,"
+import pandas as pd
+
+# Compute the weighted mean of seconds elapsed for each user-action_detail combination
+weighted_mean = Session.groupby(['user_id', 'action_detail'])['secs_elapsed'].mean().reset_index()
+
+# Merge the weighted mean back to the Session table
+Session = Session.merge(weighted_mean, on=['user_id', 'action_detail'], suffixes=('', '_wmean'))
+
+# Compute the overall weighted mean for each user
+user_weighted_mean = Session.groupby('user_id')['secs_elapsed_wmean'].mean().reset_index()
+
+# Rename the column to match the desired feature name
+user_weighted_mean.rename(columns={'secs_elapsed_wmean': 'sessions_action_detail_se_wmean'}, inplace=True)
+
+# Merge the new feature into the User table
+User = User.merge(user_weighted_mean, left_on='id', right_on='user_id', how='left').drop(columns=['user_id'])
+"
+46,`sessions_device_type_se_wmean` - Weighted mean of seconds elapsed for each user-device_type combination,"
+import pandas as pd
+
+# Assuming the dataframes are already loaded as User, Session, Country, and Population
+
+# Compute the weighted mean of seconds elapsed for each user-device_type combination
+session_grouped = Session.groupby(['user_id', 'device_type'])['secs_elapsed'].mean().reset_index()
+session_grouped = session_grouped.rename(columns={'secs_elapsed': 'sessions_device_type_se_wmean'})
+
+# Merge the computed feature with the User table
+User = User.merge(session_grouped.groupby('user_id')['sessions_device_type_se_wmean'].mean().reset_index(), left_on='id', right_on='user_id', how='left')
+
+# Drop the user_id column from the merge
+User = User.drop(columns=['user_id'])
+
+# The updated User table now contains the new feature
+"
+47,`action_flg_sum` - Sum of flags for user actions,"
+Session['action_flg'] = 1
+action_flg_sum = Session.groupby('user_id')['action_flg'].sum().reset_index()
+action_flg_sum.columns = ['id', 'action_flg_sum']
+User = User.merge(action_flg_sum, on='id', how='left')
+User['action_flg_sum'] = User['action_flg_sum']
+"
+48,`distance_km` - Distance to the destination country in kilometers,"
+User = User.merge(Country[['country_destination', 'distance_km']], on='country_destination', how='left')
+"
+49,`destination_km2` - Area of the destination country in square kilometers,"
+User = User.merge(Country[['country_destination', 'destination_km2']], on='country_destination', how='left')
+"
+50,`language_levenshtein_distance` - Levenshtein distance between the user's language and the destination language,"
+User = User.merge(Country[['country_destination', 'language_levenshtein_distance']], on='country_destination', how='left')
+"
+51,`population_in_thousands` - Population of users in thousands for each age （bucket；gender； and country destination）,

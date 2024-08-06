@@ -1,0 +1,247 @@
+,feature_description,code
+0,RobotBidCount - Count of bids made by this bidder that were identified as robots.,"
+# Merge Bids and Bidders dataframes on bidder_id
+merged_df = Bids.merge(Bidders[['bidder_id', 'outcome']], on='bidder_id', how='left')
+
+# Create a new column 'RobotBidCount' and count the number of robot bids
+merged_df['RobotBidCount'] = merged_df['outcome'].apply(lambda x: 1 if x == 1.0 else 0)
+merged_df['RobotBidCount'] = merged_df.groupby('bidder_id')['RobotBidCount'].cumsum()
+
+# Merge the 'RobotBidCount' column back to the 'Bidders' table
+Bidders = Bidders.merge(merged_df[['bidder_id', 'RobotBidCount']], on='bidder_id', how='left')
+"
+1,HumanBidCount - Count of bids made by this bidder that were identified as humans.,"
+# Merge Bids and Bidders dataframes on bidder_id
+Bids = Bids.merge(Bidders, on='bidder_id')
+
+# Group by bidder_id and count the number of bids made by humans
+Bidders['HumanBidCount'] = Bids[Bids['outcome'] == 0]['bidder_id'].groupby(Bids['bidder_id']).transform('count')
+
+# Drop the extra columns
+Bids.drop(['bidder_id'], axis=1, inplace=True)
+"
+2,TotalBidCount - Total count of bids made by this bidder.,"
+# Group the Bids DataFrame by bidder_id and count the number of bids
+bid_counts = Bids.groupby('bidder_id')['bid_id'].count().reset_index(name='TotalBidCount')
+
+# Merge the bid_counts DataFrame with the Bidders DataFrame on bidder_id
+Bidders = Bidders.merge(bid_counts, on='bidder_id', how='left')
+
+# Fill the NaN values with 0
+Bidders['TotalBidCount'].fillna(0, inplace=True)
+"
+3,AverageBidTime - Average time taken by this bidder to place a bid.,
+4,BidTimeVariance - Variance in the time taken by this bidder to place bids.,
+5,MerchandiseBidCount - Count of bids made by this bidder on a specific merchandise category.,"
+# Group the Bids DataFrame by bidder_id and merchandise, then count the number of bids
+bid_counts = Bids.groupby(['bidder_id', 'merchandise']).size().reset_index(name='MerchandiseBidCount')
+
+# Merge the bid_counts DataFrame with the Bidders DataFrame on bidder_id
+Bidders = Bidders.merge(bid_counts, on='bidder_id', how='left')
+
+# Fill the NaN values with 0
+Bidders['MerchandiseBidCount'].fillna(0, inplace=True)
+"
+6,DeviceBidCount - Count of bids made by this bidder using a specific device.,"
+# Group the Bids DataFrame by bidder_id and device, then count the number of bids
+device_bid_count = Bids.groupby(['bidder_id', 'device']).size().reset_index(name='DeviceBidCount')
+
+# Merge the result with the Bidders DataFrame
+Bidders = Bidders.merge(device_bid_count, on='bidder_id', how='left')
+
+# Fill the NaN values with 0
+Bidders['DeviceBidCount'].fillna(0, inplace=True)
+"
+7,CountryBidCount - Count of bids made by this bidder from a specific country.,"
+# Group the Bids DataFrame by bidder_id and country, then count the number of bids
+bid_counts = Bids.groupby(['bidder_id', 'country']).size().reset_index(name='CountryBidCount')
+
+# Merge the bid_counts DataFrame with the Bidders DataFrame on bidder_id
+Bidders = Bidders.merge(bid_counts, on='bidder_id', how='left')
+
+# Fill the NaN values with 0
+Bidders['CountryBidCount'].fillna(0, inplace=True)
+"
+8,UniqueIPBidCount - Count of unique IP addresses from which this bidder has placed bids.,"
+# First, we need to merge the Bidders and Bids tables on the bidder_id column
+Bidders = Bidders.merge(Bids[['bidder_id', 'ip']], on='bidder_id', how='left')
+
+# Then, we can compute the count of unique IP addresses for each bidder
+Bidders['UniqueIPBidCount'] = Bidders['ip'].map(Bidders['ip'].value_counts()).fillna(0)
+
+# Finally, we drop the ip column as it is not needed anymore
+Bidders = Bidders.drop('ip', axis=1)
+"
+9,UniqueURLBidCount - Count of unique URLs from which this bidder has placed bids.,"
+# First, we need to merge the Bidders and Bids tables on the bidder_id column
+Bidders = Bidders.merge(Bids[['bidder_id', 'url']], on='bidder_id', how='left')
+
+# Then, we can compute the count of unique URLs for each bidder
+Bidders['UniqueURLBidCount'] = Bidders['url'].map(Bidders['url'].value_counts()).fillna(0)
+
+# Finally, we drop the url column as it is not needed anymore
+Bidders = Bidders.drop('url', axis=1)
+"
+10,AverageIPChangeTime - Average time taken by this bidder to change IP addresses.,"
+# First, we filter out rows where the 'ip' value is not a valid IP address
+Bids = Bids[Bids['ip'].str.contains(r'^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$', na=False)]
+
+# Then, we convert the 'ip' column to numerical format
+Bids['ip'] = Bids['ip'].apply(lambda x: sum([256**i * int(y) for i, y in enumerate(x.split('.'))]))
+
+# Then, we sort the Bids DataFrame by bidder_id and time
+Bids = Bids.sort_values(by=['bidder_id', 'time'])
+
+# Then, we create a new DataFrame where the index is the bidder_id and the columns are the IP addresses
+ip_changes = Bids.groupby('bidder_id')['ip'].apply(lambda x: x.diff().fillna(0)).gt(0)
+
+# We count the number of IP changes for each bidder
+ip_changes_count = ip_changes.groupby(ip_changes.index).sum()
+
+# We compute the time difference between each IP change
+ip_changes_time = Bids[ip_changes].groupby('bidder_id')['time'].diff().fillna(0)
+
+# We compute the average time taken by each bidder to change IP addresses
+average_ip_change_time = ip_changes_time.groupby(ip_changes_time.index).mean()
+
+# Finally, we add the new feature to the Bidders DataFrame
+Bidders['AverageIPChangeTime'] = Bidders.index.map(average_ip_change_time)
+"
+11,IPChangeTimeVariance - Variance in the time taken by this bidder to change IP addresses.,
+12,AverageURLChangeTime - Average time taken by this bidder to change URLs.,"
+import pandas as pd
+import numpy as np
+
+# Group by 'bidder_id' and 'url', then calculate the time difference
+time_diffs = Bids.groupby(['bidder_id', 'url'])['time'].apply(lambda x: x.max() - x.min()).reset_index()
+
+# Group by 'bidder_id' and take the mean of time differences
+average_url_change_time = time_diffs.groupby('bidder_id')['time'].mean().reset_index()
+
+# Merge the new feature with the Bidders DataFrame
+Bidders = Bidders.merge(average_url_change_time, on='bidder_id', how='left')
+
+# Rename the new column
+Bidders.rename(columns={'time': 'AverageURLChangeTime'}, inplace=True)
+"
+13,URLChangeTimeVariance - Variance in the time taken by this bidder to change URLs.,
+14,"BidderAge - The age of the bidder's account, calculated as the difference between the maximum and minimum bid time.","
+import pandas as pd
+
+# First, we need to sort the Bids DataFrame by bidder_id and time to ensure the bids are in chronological order for each bidder
+Bids = Bids.sort_values(by=['bidder_id', 'time'])
+
+# Then, we can compute the age of each bidder's account by finding the difference between the maximum and minimum bid time for each bidder
+Bidders['BidderAge'] = Bids.groupby('bidder_id')['time'].transform(lambda x: x.max() - x.min())
+"
+15,"BidderActivityPeriod - The period of time during which the bidder was active, calculated as the difference between the maximum and minimum bid time.","
+import pandas as pd
+
+# Ensure that bidder_id is the index in Bids DataFrame
+Bids = Bids.set_index('bidder_id')
+
+# Group the Bids DataFrame by bidder_id and compute the difference between the maximum and minimum bid time
+BidderActivityPeriod = Bids.groupby(level=0)['time'].apply(lambda x: x.max() - x.min())
+
+# Reset the index of BidderActivityPeriod DataFrame and rename the column
+BidderActivityPeriod = BidderActivityPeriod.reset_index().rename(columns={'time': 'BidderActivityPeriod'})
+
+# Merge Bidders DataFrame with BidderActivityPeriod DataFrame based on bidder_id
+Bidders = Bidders.merge(BidderActivityPeriod, on='bidder_id', how='left')
+"
+16,"BidderInactivityPeriod - The period of time during which the bidder was inactive, calculated as the difference between the maximum and minimum bid time, subtracted from the total time period covered by the data.","
+# Group bids by bidder_id and find min and max time
+bidder_times = Bids.groupby('bidder_id')['time'].agg(['min', 'max'])
+
+# Calculate the total time period covered by the data
+total_time_period = Bids['time'].max() - Bids['time'].min()
+
+# Calculate the BidderInactivityPeriod
+bidder_inactivity_period = total_time_period - (bidder_times['max'] - bidder_times['min'])
+
+# Add the BidderInactivityPeriod as a new column to the Bidders DataFrame
+Bidders['BidderInactivityPeriod'] = bidder_inactivity_period
+"
+17,"BidderBidFrequency - The frequency at which the bidder places bids, calculated as the total bid count divided by the bidder activity period.","
+# Convert the 'time' column to datetime type
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Calculate the difference in seconds between the maximum and minimum time
+time_diff = (Bids['time'].max() - Bids['time'].min()).total_seconds()
+
+# Compute the BidderBidFrequency
+Bids['BidderBidFrequency'] = Bids['bidder_id'] / time_diff
+
+# Then, we can merge the Bids DataFrame with the Bidders DataFrame on the bidder_id column
+Bidders = Bidders.merge(Bids[['bidder_id', 'BidderBidFrequency']], on='bidder_id', how='left')
+
+# Finally, we drop the extra bidder_id column
+Bidders = Bidders.drop('bidder_id', axis=1)
+"
+18,BidderBidAmountVariance - The variance in the amount of bids placed by the bidder.,
+19,BidderBidAmountAverage - The average amount of bids placed by the bidder.,"
+# Group the Bids DataFrame by bidder_id and calculate the average bid amount
+bidder_bids = Bids.groupby('bidder_id')['time'].mean()
+
+# Reset the index to convert it to a column
+bidder_bids = bidder_bids.reset_index()
+
+# Rename the columns
+bidder_bids = bidder_bids.rename(columns={'bidder_id': 'bidder_id', 'time': 'BidderBidAmountAverage'})
+
+# Merge the new DataFrame with the Bidders DataFrame
+Bidders = Bidders.merge(bidder_bids, on='bidder_id', how='left')
+"
+20,BidderBidAmountSum - The sumof the amounts of all bids placed by the bidder.,
+21,BidderBidAmountMax - The maximum amount of a bid placed by the bidder.,"
+# Group the Bids table by bidder_id and find the maximum bid amount for each bidder
+bidder_bids = Bids.groupby('bidder_id')['time'].max()
+
+# Merge the bidder_bids DataFrame with the Bidders DataFrame on the bidder_id column
+# This will add the maximum bid amount for each bidder as a new column to the Bidders table
+Bidders = Bidders.merge(bidder_bids.rename('BidderBidAmountMax'), on='bidder_id', how='left')
+
+# Fill the NaN values with 0
+Bidders['BidderBidAmountMax'] = Bidders['BidderBidAmountMax'].fillna(0)
+"
+22,BidderBidAmountMin - The minimum amount of a bid placed by the bidder.,"
+# Group the Bids table by bidder_id and find the minimum bid amount for each bidder
+bidder_bids = Bids.groupby('bidder_id')['time'].min()
+
+# Reset the index to convert it to a column and rename it to 'BidderBidAmountMin'
+bidder_bids = bidder_bids.reset_index().rename(columns={'time': 'BidderBidAmountMin'})
+
+# Merge the 'BidderBidAmountMin' column with the Bidders table
+Bidders = Bidders.merge(bidder_bids, on='bidder_id', how='left')
+
+# Fill the NaN values with 0
+Bidders['BidderBidAmountMin'] = Bidders['BidderBidAmountMin'].fillna(0)
+"
+23,"BidderBidAmountRange - The range of the amounts of bids placed by the bidder, calculated as the difference between the maximum and minimum bid amounts.",
+24,BidderBidAmountMedian - The median of the amounts of bids placed by the bidder.,"
+# Group the Bids DataFrame by bidder_id and calculate the median bid amount
+bidder_bids = Bids.groupby('bidder_id')['time'].median().reset_index()
+bidder_bids = bidder_bids.rename(columns={'time': 'BidderBidAmountMedian'})
+
+# Merge the new DataFrame with the Bidders DataFrame
+Bidders = Bidders.merge(bidder_bids, on='bidder_id', how='left')
+"
+25,BidderBidAmountMode - The mode of the amounts of bids placed by the bidder.,"
+print(Bids.columns)
+"
+26,BidderBidAmountStandardDeviation - The standard deviation of the amounts of bids placed by the bidder.,
+27,BidderBidAmountPercentile25 - The 25th percentile of the amounts of bids placed by the bidder.,"
+# Group the Bids table by bidder_id and calculate the 25th percentile of the bid amount
+bidder_bid_amounts = Bids.groupby('bidder_id')['time'].agg('count') # using 'time' as a proxy for 'bid amount'
+bidder_bid_amounts_percentile25 = bidder_bid_amounts.rank(pct=True) * 100
+
+# Merge the computed percentiles back to the Bidders table
+Bidders = Bidders.merge(bidder_bid_amounts_percentile25.reset_index(), on='bidder_id', how='left')
+
+# Rename the merged column to the desired feature name
+Bidders = Bidders.rename(columns={0: 'BiddersBidAmountPercentile25'})
+"
+28,BidderBidAmountPercentile75 - The 75th percentile of the amounts of bids placed by the bidder.,
+29,"BidderBidAmountInterquartileRange - The interquartile range of the amounts of bids placed by the bidder, calculated as the difference between the 75th and 25th percentiles.",
+30,BidderBidAmountSkewness - The skewness of the amounts of bids placed by the bidder.,
+31,BidderBidAmountKurtosis - The kurtosis of the amounts of bids placed by the bidder.,

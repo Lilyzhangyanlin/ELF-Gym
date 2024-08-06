@@ -1,0 +1,173 @@
+,feature_description,code
+0,"AisleName - The name of the aisle the order belongs to, derived from the aisle_id in the Aisles table.",
+1,"DepartmentName - The name of the department the order belongs to, derived from the department_id in the Departments table.",
+2,ProductCount - The number of unique products in the order.,"
+# Merge Order_products__train and Order_products__prior DataFrames
+order_products = pd.concat([Order_products__train, Order_products__prior], ignore_index=True)
+
+# Merge Orders and order_products DataFrames
+orders_with_products = pd.merge(Orders, order_products, on='order_id')
+
+# Group by order_id and count unique product_id
+product_count = orders_with_products.groupby('order_id')['product_id'].nunique()
+
+# Merge the result with the Orders DataFrame
+Orders = Orders.merge(product_count.rename('ProductCount'), on='order_id', how='left')
+"
+3,ProductCountReordered - The number of unique reordered products in the order.,
+4,ProductCountNew - The number of unique new products in the order.,"
+# First, merge the Orders and Order_products__train tables on order_id
+Orders = Orders.merge(Order_products__train[['order_id', 'product_id']], on='order_id', how='left')
+
+# Then, drop the duplicate order_id columns
+Orders = Orders.drop_duplicates(subset='order_id')
+
+# Now, merge the Orders table with the Products table to get the aisle_id for each product
+Orders = Orders.merge(Products[['product_id', 'aisle_id']], on='product_id', how='left')
+
+# Drop the duplicate product_id columns
+Orders = Orders.drop_duplicates(subset='product_id')
+
+# Now, we can count the number of unique new products in each order
+Orders['ProductCountNew'] = Orders.groupby('order_id')['aisle_id'].transform('nunique')
+
+# Finally, drop the product_id and aisle_id columns that we used for the computation
+Orders = Orders.drop(['product_id', 'aisle_id'], axis=1)
+"
+5,ProductCountAisle - The number of unique products from the same aisle in the order.,"
+# Merge Order_products__train and Order_products__prior tables with Products table
+merged_products = pd.merge(Order_products__train, Products, on='product_id', how='left')
+merged_products = pd.merge(merged_products, Order_products__prior, on=['order_id', 'product_id'], how='left')
+merged_products['product_id'].fillna(-1, inplace=True)  # Fill Na values with -1 for non-existing product_id in Order_products__prior
+
+# Group by order_id and aisle_id, then count unique product_id
+grouped = merged_products.groupby(['order_id', 'aisle_id']).agg({'product_id': lambda x: x.nunique()})
+grouped.reset_index(inplace=True)
+
+# Merge the grouped table with the Orders table
+Orders = pd.merge(Orders, grouped, on='order_id', how='left')
+
+# Rename the column
+Orders.rename(columns={'product_id': 'ProductCountAisle'}, inplace=True)
+"
+6,ProductCountDepartment - The number of unique products from the same department in the order.,"
+# Merge Orders and Order_products__train tables on order_id
+orders_products_train = pd.merge(Orders, Order_products__train, on='order_id')
+
+# Merge orders_products_train and Products tables on product_id
+orders_products_train = pd.merge(orders_products_train, Products, on='product_id')
+
+# Group by order_id and department_id, then count unique product_ids
+orders_products_train['ProductCountDepartment'] = orders_products_train.groupby(['order_id', 'department_id'])['product_id'].transform('nunique')
+
+# Drop unnecessary columns
+orders_products_train = orders_products_train.drop(['product_id', 'aisle_id', 'department_id'], axis=1)
+
+# Merge back to the Orders table
+Orders = pd.merge(Orders, orders_products_train[['order_id', 'ProductCountDepartment']], on='order_id', how='left')
+"
+7,AverageAddToCartOrder - The average order in which products were added to the cart for the order.,"
+# First, merge the Order_products__train and Order_products__prior tables with the Orders table
+Orders = Orders.merge(Order_products__train[['order_id', 'add_to_cart_order']], on='order_id', how='left')
+Orders = Orders.merge(Order_products__prior[['order_id', 'add_to_cart_order']], on='order_id', how='left', suffixes=('', '_prior'))
+
+# Then, fill the NaN values with 0
+Orders['add_to_cart_order'].fillna(0, inplace=True)
+Orders['add_to_cart_order_prior'].fillna(0, inplace=True)
+
+# Next, group by order_id and compute the average add_to_cart_order
+Orders['AverageAddToCartOrder'] = Orders.groupby('order_id')['add_to_cart_order'].transform('mean')
+Orders['AverageAddToCartOrder_prior'] = Orders.groupby('order_id')['add_to_cart_order_prior'].transform('mean')
+
+# Finally, drop the add_to_cart_order_prior column if not needed
+Orders.drop('add_to_cart_order_prior', axis=1, inplace=True)
+"
+8,ReorderRate - The ratio of reordered products to the total number of products in the order.,
+9,"DaysSinceLastOrderCategory - The category of days since the last order (e.g., ""same day"", ""1-7 days"", ""8-14 days"", ""15-30 days"", ""30+ days"").",
+10,"OrderHourOfDayCategory - The category of the hour of the day the order was placed (e.g., ""midnight to 6 am"", ""6 am to noon"", ""noon to 6 pm"", ""6 pm to midnight"").","
+# Remove rows with non-numeric values in 'order_hour_of_day'
+Orders = Orders[Orders['order_hour_of_day'].str.isdigit()]
+
+# Convert 'order_hour_of_day' to integer type
+Orders['order_hour_of_day'] = Orders['order_hour_of_day'].astype(int)
+
+# Define the bins and labels for the hour categories
+bins = [0, 6, 12, 18, 24]
+labels = ['midnight to 6 am', '6 am to noon', 'noon to 6 pm', '6 pm to midnight']
+
+# Create the new column in the Orders DataFrame
+Orders['OrderHourOfDayCategory'] = pd.cut(Orders['order_hour_of_day'], bins, labels=labels)
+"
+11,"OrderDowCategory - The category of the day of the week the order was placed (e.g., ""weekday"", ""weekend"").","
+# Define a function to categorize the day of the week
+def categorize_day(day):
+    if day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']:
+        return 'weekday'
+    else:
+        return 'weekend'
+
+# Apply the function to the 'order_dow' column and add it as a new column 'OrderDowCategory'
+Orders['OrderDowCategory'] = Orders['order_dow'].apply(categorize_day)
+"
+12,ProductCountPerAisle - A list of unique product counts per aisle in the order.,
+13,ProductCountPerDepartment - A list of unique product counts per department in the order.,"
+# First, merge the Orders and Order_products__train tables on the order_id column
+Orders = Orders.merge(Order_products__train[['order_id', 'product_id']], on='order_id', how='left')
+
+# Then, merge the resulting table with the Products table on the product_id column
+Orders = Orders.merge(Products[['product_id', 'department_id']], on='product_id', how='left')
+
+# Then, group by the order_id and department_id, and count the unique product_ids
+# This will give you the number of unique products per department in each order
+ProductCountPerDepartment = Orders.groupby(['order_id', 'department_id'])['product_id'].nunique().reset_index()
+
+# Rename the columns for clarity
+ProductCountPerDepartment = ProductCountPerDepartment.rename(columns={'product_id': 'product_count', 'order_id': 'order_id', 'department_id': 'department_id'})
+
+# Merge the original Orders table with the ProductCountPerDepartment table
+Orders = Orders.merge(ProductCountPerDepartment, on=['order_id'], how='left')
+
+# Fill the NaN values with 0
+Orders['product_count'] = Orders['product_count'].fillna(0)
+"
+14,ReorderedProductIds - A list of product ids that were reordered in the order.,
+15,NewProductIds - A list of product ids that are new in the order.,"
+# First, merge the Orders and Order_products__train tables on order_id
+Orders = Orders.merge(Order_products__train[['order_id', 'product_id']], on='order_id', how='left')
+
+# Then, fill the NaN values in the product_id column with 0
+Orders['product_id'] = Orders['product_id'].fillna(0)
+
+# Create a new column 'NewProductIds' and fill it with an empty list
+Orders['NewProductIds'] = Orders.apply(lambda row: [] if row['product_id'] != 0 else row['product_id'], axis=1)
+
+# Group the DataFrame by order_id and apply a list function to the NewProductIds column
+Orders['NewProductIds'] = Orders.groupby('order_id')['NewProductIds'].apply(list)
+
+# Drop the product_id column
+Orders = Orders.drop('product_id', axis=1)
+
+# Now, Orders table has a new column 'NewProductIds'
+"
+16,ProductIds - A list of all product ids in the order.,
+17,ProductNames - A list of all product names in the order.,"
+# Join Order_products__train and Order_products__prior to Orders on order_id
+Orders = Orders.merge(Order_products__train[['order_id', 'product_id']], on='order_id', how='left')
+Orders = Orders.merge(Order_products__prior[['order_id', 'product_id']], on='order_id', how='left')
+Orders = Orders.rename(columns={'product_id_x': 'product_id_train', 'product_id_y': 'product_id_prior'})
+
+# Merge with Products to get product names
+Products = Products.merge(Aisles, on='aisle_id', how='left')
+Products = Products.merge(Departments, on='department_id', how='left')
+Orders = Orders.merge(Products[['product_id', 'product_name']], left_on='product_id_train', right_on='product_id', how='left')
+Orders = Orders.merge(Products[['product_id', 'product_name']], left_on='product_id_prior', right_on='product_id', how='left')
+Orders = Orders.rename(columns={'product_name_x': 'product_name_train', 'product_name_y': 'product_name_prior'})
+
+# Create ProductNames feature
+Orders['ProductNames'] = Orders['product_name_train'] + ', ' + Orders['product_name_prior']
+Orders['ProductNames'] = Orders['ProductNames'].str.replace(', NaN', '')  # Remove NaN if any
+Orders['ProductNames'] = Orders['ProductNames'].str.replace(', ', ',')  # Remove extra spaces
+Orders['ProductNames'] = Orders['ProductNames'].str.replace('NaN,', '')  # Remove NaN if any
+"
+18,AisleIds - A list of aisle ids the order belongs to.,
+19,DepartmentIds - A list of department ids the order belongs to.,

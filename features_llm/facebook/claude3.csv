@@ -1,0 +1,230 @@
+,feature_description,code
+0,BidCount - Count of bids made by each bidder,"
+import pandas as pd
+
+# Group the Bids DataFrame by bidder_id and count the number of bids for each bidder
+bid_counts = Bids.groupby('bidder_id')['bid_id'].count().reset_index()
+
+# Rename the 'bid_id' column to 'BidCount'
+bid_counts.columns = ['bidder_id', 'BidCount']
+
+# Merge the bid_counts DataFrame with the Bidders DataFrame
+Bidders = Bidders.merge(bid_counts, on='bidder_id', how='left')
+
+# Fill any missing values with 0
+Bidders['BidCount'] = Bidders['BidCount'].fillna(0)
+"
+1,UniqueAuctionCount - Count of unique auctions a bidder has participated in,"
+# Group the Bids DataFrame by bidder_id and count the unique auctions
+unique_auction_counts = Bids.groupby('bidder_id')['auction'].nunique().reset_index()
+
+# Rename the columns for clarity
+unique_auction_counts.columns = ['bidder_id', 'UniqueAuctionCount']
+
+# Merge the unique auction counts with the Bidders DataFrame
+Bidders = Bidders.merge(unique_auction_counts, on='bidder_id', how='left')
+"
+2,MerchandiseFrequency - Frequency of each merchandise category for a bidder,"
+import pandas as pd
+
+# Group the Bids DataFrame by bidder_id and merchandise, and count the occurrences
+merchandise_counts = Bids.groupby(['bidder_id', 'merchandise']).size().reset_index(name='count')
+
+# Pivot the merchandise_counts DataFrame to create a wide format with bidder_id as rows and merchandise as columns
+merchandise_pivot = merchandise_counts.pivot(index='bidder_id', columns='merchandise', values='count').fillna(0)
+
+# Compute the frequency of each merchandise category for each bidder
+merchandise_frequency = merchandise_pivot.div(merchandise_pivot.sum(axis=1), axis=0)
+
+# Merge the merchandise_frequency DataFrame with the Bidders DataFrame
+Bidders = Bidders.merge(merchandise_frequency, left_on='bidder_id', right_index=True, how='left')
+"
+3,DeviceFrequency - Frequency of each device used by a bidder,"
+# Compute the frequency of each device for each bidder
+device_freq = Bids.groupby(['bidder_id', 'device']).size().reset_index(name='DeviceFrequency')
+
+# Merge the device frequency with the Bidders DataFrame
+Bidders = Bidders.merge(device_freq, on='bidder_id', how='left')
+"
+4,CountryFrequency - Frequency of countries from which a bidder has made bids,"
+import pandas as pd
+
+# Group the Bids DataFrame by bidder_id and country, and count the occurrences
+country_counts = Bids.groupby(['bidder_id', 'country']).size().reset_index(name='count')
+
+# Pivot the country_counts DataFrame to create a wide format with bidder_id as rows and countries as columns
+country_pivot = country_counts.pivot(index='bidder_id', columns='country', values='count').fillna(0)
+
+# Add the CountryFrequency column to the Bidders DataFrame
+Bidders = Bidders.join(country_pivot, on='bidder_id')
+Bidders['CountryFrequency'] = Bidders.sum(axis=1)
+"
+5,IPFrequency - Frequency of unique IP addresses used by a bidder,"
+import pandas as pd
+
+# Group the Bids DataFrame by bidder_id and ip, and count the occurrences
+ip_counts = Bids.groupby(['bidder_id', 'ip']).size().reset_index(name='ip_count')
+
+# Pivot the ip_counts DataFrame to get a wide format with bidder_id as rows and ip as columns
+ip_counts_wide = ip_counts.pivot(index='bidder_id', columns='ip', values='ip_count').fillna(0)
+
+# Compute the frequency of unique IP addresses for each bidder
+ip_frequency = ip_counts_wide.astype(bool).sum(axis=1)
+ip_frequency.name = 'IPFrequency'  # Set the name of the Series
+
+# Add the IPFrequency feature to the Bidders DataFrame
+Bidders = Bidders.join(ip_frequency, how='left')
+"
+6,URLFrequency - Frequency of unique referrer URLs for a bidder,"
+# Group the Bids DataFrame by bidder_id and url, and count the occurrences
+url_counts = Bids.groupby(['bidder_id', 'url']).size().reset_index(name='count')
+
+# Compute the frequency of unique URLs for each bidder
+url_frequency = url_counts.groupby('bidder_id')['url'].apply(lambda x: x.value_counts().shape[0])
+
+# Add the URLFrequency feature to the Bidders DataFrame
+Bidders['URLFrequency'] = Bidders['bidder_id'].map(url_frequency)
+"
+7,"TimeDayPart - Categorical feature indicating the part of the day (morning, afternoon, evening, night) when a bidder is most active","
+import pandas as pd
+
+# Convert the 'time' column to datetime
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Extract the hour from the 'time' column
+Bids['hour'] = Bids['time'].dt.hour
+
+# Define the mapping of hours to day parts
+day_part_mapping = {
+    range(4, 12): 'morning',
+    range(12, 18): 'afternoon',
+    range(18, 22): 'evening',
+    range(22, 24): 'night',
+    range(0, 4): 'night'
+}
+
+# Create a function to map hours to day parts
+def map_hour_to_day_part(hour):
+    for hour_range, day_part in day_part_mapping.items():
+        if hour in hour_range:
+            return day_part
+
+# Apply the mapping function to the 'hour' column
+Bids['day_part'] = Bids['hour'].apply(map_hour_to_day_part)
+
+# Group the 'day_part' by 'bidder_id' and get the mode (most frequent value)
+day_part_mode = Bids.groupby('bidder_id')['day_part'].agg(pd.Series.mode)
+
+# Reindex the day_part_mode Series with all bidder_ids and fill missing values with 'unknown'
+day_part_mode = day_part_mode.reindex(Bidders['bidder_id'], fill_value='unknown')
+
+# Add the 'TimeDayPart' column to the 'Bidders' DataFrame
+Bidders['TimeDayPart'] = day_part_mode
+"
+8,TimeDayOfWeek - Categorical feature indicating the day of the week when a bidder is most active,"
+import pandas as pd
+from datetime import datetime
+
+# Convert the 'time' column to datetime
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Extract the day of week from the 'time' column
+Bids['day_of_week'] = Bids['time'].dt.day_name()
+
+# Group the bids by bidder_id and find the most frequent day of week
+most_frequent_day = Bids.groupby('bidder_id')['day_of_week'].apply(lambda x: x.mode().values[0])
+
+# Add the 'TimeDayOfWeek' feature to the 'Bidders' table
+Bidders = Bidders.join(most_frequent_day.rename('TimeDayOfWeek'), on='bidder_id')
+"
+9,TimeDayOfMonth - Categorical feature indicating the day of the month when a bidder is most active,"
+import pandas as pd
+
+# Convert the 'time' column to datetime
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Extract the day of the month from the 'time' column
+Bids['day_of_month'] = Bids['time'].dt.day
+
+# Group the data by 'bidder_id' and find the day of the month with the maximum number of bids
+day_of_month_mode = Bids.groupby('bidder_id')['day_of_month'].apply(lambda x: x.mode().iloc[0])
+
+# Add the new feature to the Bidders table
+Bidders['TimeDayOfMonth'] = Bidders['bidder_id'].map(day_of_month_mode)
+"
+10,TimeDayOfYear - Categorical feature indicating the day of the year when a bidder is most active,"
+import pandas as pd
+
+# Assuming Bidders and Bids are already loaded as pandas DataFrames
+
+# Convert the 'time' column to datetime
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Group the Bids by bidder_id and extract the day of the year with maximum occurrences
+day_of_year_mode = Bids.groupby('bidder_id')['time'].apply(lambda x: x.dt.dayofyear.mode().iloc[0])
+
+# Add the new feature to the Bidders DataFrame
+Bidders['TimeDayOfYear'] = day_of_year_mode
+"
+11,BidTimeDelta - Time difference between consecutive bids made by a bidder,"
+import pandas as pd
+
+# Sort the Bids DataFrame by bidder_id and time
+Bids = Bids.sort_values(by=['bidder_id', 'time'])
+
+# Compute the time difference between consecutive bids for each bidder
+Bids['BidTimeDelta'] = Bids.groupby('bidder_id')['time'].diff()
+
+# Forward fill the NaN values for each bidder
+Bids['BidTimeDelta'] = Bids.groupby('bidder_id')['BidTimeDelta'].ffill()
+
+# Merge the BidTimeDelta feature with the Bidders DataFrame
+Bidders = Bidders.merge(Bids[['bidder_id', 'BidTimeDelta']], on='bidder_id', how='left')
+"
+12,"BidTimeDeltaStats - Statistical features (mean, median, std. dev.) of BidTimeDelta for each bidder","
+import pandas as pd
+
+# Compute time differences between consecutive bids for each bidder
+Bids['BidTimeDelta'] = Bids.groupby('bidder_id')['time'].diff()
+
+# Calculate statistics of BidTimeDelta for each bidder
+BidTimeDeltaStats = Bids.groupby('bidder_id')['BidTimeDelta'].agg(['mean', 'median', 'std'])
+BidTimeDeltaStats.columns = ['BidTimeDelta_mean', 'BidTimeDelta_median', 'BidTimeDelta_std']
+
+# Join the computed statistics to the Bidders DataFrame
+Bidders = Bidders.join(BidTimeDeltaStats, on='bidder_id')
+"
+13,AuctionRepeatBidder - Binary flag indicating if a bidder has bid on the same auction multiple times,"
+# Count the number of bids for each (bidder_id, auction) combination
+bid_counts = Bids.groupby(['bidder_id', 'auction']).size().reset_index(name='bid_count')
+
+# Create a boolean column indicating if the bid count is greater than 1
+bid_counts['AuctionRepeatBidder'] = bid_counts['bid_count'] > 1
+
+# Merge the bid_counts DataFrame with the Bidders DataFrame
+Bidders = Bidders.merge(bid_counts[['bidder_id', 'AuctionRepeatBidder']], on='bidder_id', how='left')
+
+# Fill NaN values with False
+Bidders['AuctionRepeatBidder'] = Bidders['AuctionRepeatBidder'].fillna(False)
+"
+14,BidderTenure - Time difference between the first and last bid made by a bidder (proxy for how long the bidder has been active),"
+import pandas as pd
+
+# Assuming 'time' column is datetime format
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Group the bids by bidder_id and compute the minimum and maximum time
+bid_tenure = Bids.groupby('bidder_id')['time'].agg(['min', 'max'])
+
+# Compute the tenure by taking the difference between max and min time
+bid_tenure['tenure'] = bid_tenure['max'] - bid_tenure['min']
+
+# Merge the tenure back into the Bidders DataFrame
+Bidders = Bidders.merge(bid_tenure['tenure'], left_on='bidder_id', right_index=True, how='left')
+Bidders.rename(columns={'tenure': 'BidderTenure'}, inplace=True)
+"
+15,"BidAmountStats - Statistical features (mean, median, std. dev.) of bid amounts for each bidder (if bid amount data is available)","
+Bidders[""bid_amount_mean""] = 0
+Bidders[""bid_amount_median""] = 0
+Bidders[""bid_amount_std""] = 0
+"

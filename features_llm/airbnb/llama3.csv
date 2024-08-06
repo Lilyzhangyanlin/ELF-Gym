@@ -1,0 +1,93 @@
+,feature_description,code
+0,DaysSinceAccountCreation - Number of days since the user's account was created,"
+User['DaysSinceAccountCreation'] = (User['timestamp_first_active'] - User['date_account_created']).dt.days
+"
+1,DaysSinceFirstActive - Number of days since the user's first activity,"
+User['DaysSinceFirstActive'] = (User['date_account_created'] - User['timestamp_first_active']).dt.days
+"
+2,DaysSinceFirstBooking - Number of days since the user's first booking,"
+User['DaysSinceFirstBooking'] = (pd.to_datetime('today') - pd.to_datetime(User['date_first_booking'])).dt.days
+"
+3,"AgeBucket - Age group of the user (e.g., 18-24, 25-34, etc.)","
+def age_to_bucket(age):
+    if pd.isna(age) or age == '' or not age.isdigit():  # handle missing, empty, or non-numeric values
+        return 'Unknown'
+    age = int(age)  # convert age to integer
+    if age < 18:
+        return 'Under 18'
+    elif age < 25:
+        return '18-24'
+    elif age < 35:
+        return '25-34'
+    elif age < 45:
+        return '35-44'
+    elif age < 55:
+        return '45-54'
+    elif age < 65:
+        return '55-64'
+    else:
+        return '65 and over'
+
+User['AgeBucket'] = User['age'].apply(age_to_bucket)
+"
+4,IsMale - Binary indicator of whether the user is male,"
+User[""IsMale""] = (User[""gender""] == ""male"").astype(int)
+"
+5,LanguageLevenshteinDistance - Levenshtein distance between the user's language and the language of the destination country,"
+User = pd.merge(User, Country, on='country_destination')
+User['LanguageLevenshteinDistance'] = User.apply(lambda row: row['language_levenshtein_distance'] if row['language'] != row['destination_language'] else 0, axis=1)
+User.drop('destination_language', axis=1, inplace=True)
+User.drop('language_levenshtein_distance', axis=1, inplace=True)
+"
+6,AffiliateChannelCount - Count of unique affiliate channels used by the user,"
+User['AffiliateChannelCount'] = User.groupby('id')['affiliate_channel'].transform('nunique')
+"
+7,AffiliateProviderCount - Count of unique affiliate providers used by the user,"
+User['AffiliateProviderCount'] = User.groupby('id')['affiliate_provider'].transform('nunique')
+"
+8,DeviceTypeCount - Count of unique device types used by the user,"
+User['DeviceTypeCount'] = User['id'].map(Session.groupby('user_id')['device_type'].nunique())
+"
+9,BrowserCount - Count of unique browsers used by the user,"
+User['BrowserCount'] = User['id'].map(User.groupby('id')['first_browser'].nunique())
+"
+10,SessionCount - Total number of sessions by the user,"
+User['SessionCount'] = User['id'].map(Session.groupby('user_id')['action'].count())
+"
+11,AverageSessionLength - Average length of sessions by the user in seconds,"
+User['AverageSessionLength'] = User['id'].map(Session.groupby('user_id')['secs_elapsed'].mean())
+"
+12,MostFrequentActionType - Most frequent action type by the user,"
+User['MostFrequentActionType'] = User['id'].map(Session.groupby('user_id')['action_type'].apply(lambda x: x.value_counts().index[0]))
+"
+13,MostFrequentActionDetail - Most frequent action detail by the user,"
+User['MostFrequentActionDetail'] = User['id'].map(Session.groupby('user_id')['action_detail'].apply(lambda x: x.value_counts().index[0]))
+"
+14,CountryDestinationDistanceKM - Distance to the destination country in kilometers,"
+User = pd.merge(User, Country, on='country_destination')
+User['CountryDestinationDistanceKM'] = User['distance_km']
+"
+15,CountryDestinationAreaKM2 - Area of the destination country in square kilometers,"
+User = pd.merge(User, Country[['country_destination', 'destination_km2']], on='country_destination')
+User.rename(columns={'destination_km2': 'CountryDestinationAreaKM2'}, inplace=True)
+"
+16,PopulationInThousands - Population of users in thousands for the user's age group and country destination,
+17,YearOfData - Year of the data for the user's age group and country destination,"
+User['YearOfData'] = User.merge(Population, on=['country_destination']).apply(lambda row: row['year'], axis=1)
+"
+18,IsFirstDeviceTypeMobile - Binary indicator of whether the user's first device type was mobile,"
+User['IsFirstDeviceTypeMobile'] = User['first_device_type'].apply(lambda x: 1 if 'mobile' in x.lower() else 0)
+"
+19,IsFirstBrowserMobile - Binary indicator of whether the user's first browser was mobile,"
+User['IsFirstBrowserMobile'] = User['first_browser'].apply(lambda x: 1 if 'Mobile' in x else 0)
+"
+20,SignupMethodCount - Count of unique signup methods used by the user,"
+User['SignupMethodCount'] = User.groupby('id')['signup_method'].transform('nunique')
+"
+21,SignupFlowCount - Count of unique signup flows used by the user,"
+User['SignupFlowCount'] = User.groupby('id')['signup_flow'].transform('nunique')
+"
+22,LanguageDestinationMatch - Binary indicator of whether the user's language matches the language of the destination country,"
+User = pd.merge(User, Country, on='country_destination')
+User['LanguageDestinationMatch'] = (User['language'] == User['destination_language']).astype(int)
+"

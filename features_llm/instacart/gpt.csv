@@ -1,0 +1,602 @@
+,feature_description,code
+0,user_total_orders - Total number of orders placed by the user.,"
+user_total_orders = Orders.groupby('user_id')['order_id'].nunique().reset_index()
+user_total_orders.columns = ['user_id', 'user_total_orders']
+
+Orders = Orders.merge(user_total_orders, on='user_id', how='left')
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'user_total_orders']], on='order_id', how='left')
+"
+1,user_total_products - Total number of products ordered by the user.,"
+# Merge Orders with Order_products__prior to get user_id for each order
+orders_prior = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id', how='left')
+
+# Compute the total number of products ordered by each user
+user_total_products = orders_prior.groupby('user_id')['product_id'].count().reset_index()
+user_total_products.columns = ['user_id', 'user_total_products']
+
+# Merge Orders with Order_products__train to get user_id for each order in the training set
+orders_train = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id', how='left')
+
+# Merge the user_total_products with the training set
+orders_train = pd.merge(orders_train, user_total_products, on='user_id', how='left')
+
+# Add the new feature to the Order_products__train table
+Order_products__train['user_total_products'] = orders_train['user_total_products']
+"
+2,user_reorder_ratio - Ratio of reordered products to total products ordered by the user.,"
+# Merge Orders with Order_products__prior to get user_id for each order
+order_prior_merged = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id')
+
+# Calculate the total number of products ordered by each user
+user_total_orders = order_prior_merged.groupby('user_id').size().reset_index(name='total_orders')
+
+# Calculate the number of reordered products by each user
+user_reordered = order_prior_merged[order_prior_merged['reordered'] == 1].groupby('user_id').size().reset_index(name='reordered_count')
+
+# Merge the total orders and reordered counts
+user_reorder_ratio = pd.merge(user_total_orders, user_reordered, on='user_id', how='left').fillna(0)
+
+# Calculate the reorder ratio
+user_reorder_ratio['user_reorder_ratio'] = user_reorder_ratio['reordered_count'] / user_reorder_ratio['total_orders']
+
+# Merge the reorder ratio back to the Orders table
+orders_with_ratio = pd.merge(Orders, user_reorder_ratio[['user_id', 'user_reorder_ratio']], on='user_id', how='left')
+
+# Merge the Orders with ratio back to the Order_products__train table
+Order_products__train = pd.merge(Order_products__train, orders_with_ratio[['order_id', 'user_reorder_ratio']], on='order_id', how='left')
+"
+3,user_average_days_between_orders - Average number of days between the user's orders.,"
+user_avg_days = Orders.groupby('user_id')['days_since_prior_order'].mean().reset_index()
+user_avg_days.columns = ['user_id', 'user_average_days_between_orders']
+
+Orders = Orders.merge(user_avg_days, on='user_id', how='left')
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'user_average_days_between_orders']], on='order_id', how='left')
+"
+4,user_average_order_size - Average number of products per order for the user.,"
+# Merge Orders with Order_products__prior to get user_id for each order
+merged_prior = pd.merge(Order_products__prior, Orders, on='order_id')
+
+# Calculate the number of products per order for each user
+user_order_sizes = merged_prior.groupby('user_id')['order_id'].count() / merged_prior.groupby('user_id')['order_number'].nunique()
+
+# Rename the series to match the feature name
+user_order_sizes.name = 'user_average_order_size'
+
+# Merge the calculated feature back to the Orders table
+Orders = Orders.merge(user_order_sizes, on='user_id', how='left')
+
+# Merge Orders with Order_products__train to get user_id for each order
+merged_train = pd.merge(Order_products__train, Orders[['order_id', 'user_average_order_size']], on='order_id', how='left')
+
+# Add the new feature to Order_products__train
+Order_products__train['user_average_order_size'] = merged_train['user_average_order_size']
+"
+5,user_order_dow_mode - Most frequent day of the week the user places orders.,"
+# Merge Orders with Order_products__train to get user_id
+order_train_merged = Order_products__train.merge(Orders[['order_id', 'user_id']], on='order_id', how='left')
+
+# Calculate the most frequent day of the week each user places orders
+user_order_dow_mode = Orders.groupby('user_id')['order_dow'].agg(lambda x: x.mode()[0]).reset_index()
+user_order_dow_mode.columns = ['user_id', 'user_order_dow_mode']
+
+# Merge the calculated feature back to the order_train_merged DataFrame
+order_train_merged = order_train_merged.merge(user_order_dow_mode, on='user_id', how='left')
+
+# Add the new feature to the original Order_products__train DataFrame
+Order_products__train['user_order_dow_mode'] = order_train_merged['user_order_dow_mode']
+"
+6,user_order_hour_mode - Most frequent hour of the day the user places orders.,"
+# Merge Orders with Order_products__train to get user_id
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'user_id']], on='order_id', how='left')
+
+# Compute the most frequent hour of the day the user places orders
+user_order_hour_mode = Orders.groupby('user_id')['order_hour_of_day'].agg(lambda x: x.mode()[0]).reset_index()
+user_order_hour_mode.columns = ['user_id', 'user_order_hour_mode']
+
+# Merge the computed feature back to Order_products__train
+Order_products__train = Order_products__train.merge(user_order_hour_mode, on='user_id', how='left')
+"
+7,product_total_orders - Total number of orders that include the product.,"
+product_total_orders = Order_products__prior.groupby('product_id').size().reset_index(name='product_total_orders')
+Order_products__train = Order_products__train.merge(product_total_orders, on='product_id', how='left')
+"
+8,product_reorder_ratio - Ratio of times the product was reordered to the total number of times it was ordered.,"
+product_reorder_ratio = Order_products__prior.groupby('product_id')['reordered'].mean().reset_index()
+product_reorder_ratio.columns = ['product_id', 'product_reorder_ratio']
+Order_products__train = pd.merge(Order_products__train, product_reorder_ratio, on='product_id', how='left')
+"
+9,product_add_to_cart_order_mean - Mean position of the product in the cart when ordered.,"
+product_add_to_cart_order_mean = Order_products__prior.groupby('product_id')['add_to_cart_order'].mean().reset_index()
+product_add_to_cart_order_mean.columns = ['product_id', 'product_add_to_cart_order_mean']
+Order_products__train = Order_products__train.merge(product_add_to_cart_order_mean, on='product_id', how='left')
+"
+10,product_add_to_cart_order_std - Standard deviation of the product's position in the cart when ordered.,"
+product_add_to_cart_order_std = Order_products__prior.groupby('product_id')['add_to_cart_order'].std().reset_index()
+product_add_to_cart_order_std.columns = ['product_id', 'product_add_to_cart_order_std']
+
+Order_products__train = Order_products__train.merge(product_add_to_cart_order_std, on='product_id', how='left')
+"
+11,aisle_total_orders - Total number of orders that include products from the aisle.,"
+# Merge Order_products__prior with Orders to get the order details
+order_products_prior_orders = pd.merge(Order_products__prior, Orders, on='order_id')
+
+# Merge the result with Products to get the aisle information
+order_products_prior_orders_products = pd.merge(order_products_prior_orders, Products, on='product_id')
+
+# Group by aisle_id and count the number of orders
+aisle_total_orders = order_products_prior_orders_products.groupby('aisle_id')['order_id'].nunique().reset_index()
+aisle_total_orders.columns = ['aisle_id', 'aisle_total_orders']
+
+# Merge the aisle_total_orders with Products to get the aisle_id for each product in Order_products__train
+products_with_aisle_total_orders = pd.merge(Products, aisle_total_orders, on='aisle_id', how='left')
+
+# Merge the result with Order_products__train to add the aisle_total_orders feature
+Order_products__train = pd.merge(Order_products__train, products_with_aisle_total_orders[['product_id', 'aisle_total_orders']], on='product_id', how='left')
+"
+12,department_total_orders - Total number of orders that include products from the department.,"
+# Merge Orders with Order_products__prior to get department_id for each order
+merged_prior = Order_products__prior.merge(Orders, on='order_id', how='left')
+merged_prior = merged_prior.merge(Products[['product_id', 'department_id']], on='product_id', how='left')
+
+# Calculate total number of orders that include products from each department
+department_total_orders = merged_prior.groupby('department_id')['order_id'].nunique().reset_index()
+department_total_orders.columns = ['department_id', 'department_total_orders']
+
+# Merge the department_total_orders with Products to get department_total_orders for each product
+products_with_department_orders = Products.merge(department_total_orders, on='department_id', how='left')
+
+# Merge the result with Order_products__train to add the new feature
+Order_products__train = Order_products__train.merge(products_with_department_orders[['product_id', 'department_total_orders']], on='product_id', how='left')
+"
+13,user_product_orders - Number of times the user has ordered the product.,"
+user_product_orders = Order_products__prior.merge(Orders[['order_id', 'user_id']], on='order_id')
+user_product_orders = user_product_orders.groupby(['user_id', 'product_id']).size().reset_index(name='user_product_orders')
+
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'user_id']], on='order_id')
+Order_products__train = Order_products__train.merge(user_product_orders, on=['user_id', 'product_id'], how='left')
+Order_products__train['user_product_orders'] = Order_products__train['user_product_orders'].fillna(0).astype(int)
+Order_products__train = Order_products__train.drop(columns=['user_id'])
+"
+14,user_product_reorder_ratio - Ratio of times the user has reordered the product to the total number of times the user ordered the product.,"
+# Merge Orders with Order_products__prior to get user_id for each order
+order_prior_merged = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id')
+
+# Calculate the total number of times each user ordered each product
+user_product_total_orders = order_prior_merged.groupby(['user_id', 'product_id']).size().reset_index(name='total_orders')
+
+# Calculate the number of times each user reordered each product
+user_product_reorders = order_prior_merged[order_prior_merged['reordered'] == 1].groupby(['user_id', 'product_id']).size().reset_index(name='reorders')
+
+# Merge the total orders and reorders dataframes
+user_product_reorder_ratio = pd.merge(user_product_total_orders, user_product_reorders, on=['user_id', 'product_id'], how='left').fillna(0)
+
+# Calculate the reorder ratio
+user_product_reorder_ratio['user_product_reorder_ratio'] = user_product_reorder_ratio['reorders'] / user_product_reorder_ratio['total_orders']
+
+# Merge the reorder ratio with the Orders to get user_id in Order_products__train
+order_train_merged = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id')
+
+# Merge the reorder ratio with Order_products__train
+Order_products__train = pd.merge(order_train_merged, user_product_reorder_ratio[['user_id', 'product_id', 'user_product_reorder_ratio']], on=['user_id', 'product_id'], how='left').fillna(0)
+
+# Drop the user_id column as it is no longer needed
+Order_products__train.drop(columns=['user_id'], inplace=True)
+"
+15,user_aisle_orders - Number of times the user has ordered products from the aisle.,"
+# Merge Orders with Order_products__prior to get user_id for each order
+orders_prior = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id', how='left')
+
+# Merge with Products to get aisle_id for each product
+orders_prior = pd.merge(orders_prior, Products[['product_id', 'aisle_id']], on='product_id', how='left')
+
+# Group by user_id and aisle_id to count the number of orders per user per aisle
+user_aisle_orders = orders_prior.groupby(['user_id', 'aisle_id']).size().reset_index(name='user_aisle_orders')
+
+# Merge Orders with Order_products__train to get user_id for each order
+orders_train = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id', how='left')
+
+# Merge with Products to get aisle_id for each product
+orders_train = pd.merge(orders_train, Products[['product_id', 'aisle_id']], on='product_id', how='left')
+
+# Merge with user_aisle_orders to get the count of orders per user per aisle
+orders_train = pd.merge(orders_train, user_aisle_orders, on=['user_id', 'aisle_id'], how='left')
+
+# Fill NaN values with 0 (in case there are users who haven't ordered from certain aisles)
+orders_train['user_aisle_orders'] = orders_train['user_aisle_orders'].fillna(0)
+
+# Add the new feature to Order_products__train
+Order_products__train['user_aisle_orders'] = orders_train['user_aisle_orders']
+"
+16,user_department_orders - Number of times the user has ordered products from the department.,"
+# Merge Orders with Order_products__prior to get user_id for each order
+orders_prior = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id', how='left')
+
+# Merge with Products to get department_id for each product
+orders_prior = pd.merge(orders_prior, Products[['product_id', 'department_id']], on='product_id', how='left')
+
+# Group by user_id and department_id to count the number of orders
+user_department_orders = orders_prior.groupby(['user_id', 'department_id']).size().reset_index(name='user_department_orders')
+
+# Merge Orders with Order_products__train to get user_id for each order
+orders_train = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id', how='left')
+
+# Merge with Products to get department_id for each product
+orders_train = pd.merge(orders_train, Products[['product_id', 'department_id']], on='product_id', how='left')
+
+# Merge with user_department_orders to get the feature
+orders_train = pd.merge(orders_train, user_department_orders, on=['user_id', 'department_id'], how='left')
+
+# Fill NaN values with 0 (in case there are users who haven't ordered from a department before)
+orders_train['user_department_orders'] = orders_train['user_department_orders'].fillna(0)
+
+# Add the feature to Order_products__train
+Order_products__train['user_department_orders'] = orders_train['user_department_orders']
+"
+17,user_product_add_to_cart_order_mean - Mean position of the product in the cart when ordered by the user.,"
+# Merge Orders with Order_products__prior to get user_id for each order
+order_prior_merged = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id')
+
+# Compute the mean add_to_cart_order for each user-product pair
+user_product_mean = order_prior_merged.groupby(['user_id', 'product_id'])['add_to_cart_order'].mean().reset_index()
+user_product_mean.columns = ['user_id', 'product_id', 'user_product_add_to_cart_order_mean']
+
+# Merge Orders with Order_products__train to get user_id for each order
+order_train_merged = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id')
+
+# Merge the computed mean add_to_cart_order with the train data
+Order_products__train = pd.merge(order_train_merged, user_product_mean, on=['user_id', 'product_id'], how='left')
+
+# Drop the user_id column as it is no longer needed
+Order_products__train.drop(columns=['user_id'], inplace=True)
+"
+18,user_product_add_to_cart_order_std - Standard deviation of the product's position in the cart when ordered by the user.,"
+# Merge Orders with Order_products__prior to get user_id and add_to_cart_order
+merged_prior = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id')
+
+# Calculate the standard deviation of add_to_cart_order for each user-product pair
+user_product_add_to_cart_order_std = merged_prior.groupby(['user_id', 'product_id'])['add_to_cart_order'].std().reset_index()
+
+# Rename the column to match the desired feature name
+user_product_add_to_cart_order_std.rename(columns={'add_to_cart_order': 'user_product_add_to_cart_order_std'}, inplace=True)
+
+# Merge the calculated standard deviation back to the Order_products__train table
+Order_products__train = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id')
+Order_products__train = pd.merge(Order_products__train, user_product_add_to_cart_order_std, on=['user_id', 'product_id'], how='left')
+
+# Drop the user_id column as it is no longer needed
+Order_products__train.drop(columns=['user_id'], inplace=True)
+"
+19,days_since_last_order - Days since the user's last order.,"
+# Merge Orders with Order_products__train to get user_id and days_since_prior_order
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'user_id', 'days_since_prior_order']], on='order_id', how='left')
+
+# Sort Orders by user_id and order_number to calculate days_since_last_order
+Orders = Orders.sort_values(by=['user_id', 'order_number'])
+
+# Calculate days_since_last_order for each order
+Orders['days_since_last_order'] = Orders.groupby('user_id')['days_since_prior_order'].shift(-1)
+
+# Merge the calculated days_since_last_order back to Order_products__train
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'days_since_last_order']], on='order_id', how='left')
+"
+20,order_dow - Day of the week the order was placed.,"
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'order_dow']], on='order_id', how='left')
+"
+21,order_hour_of_day - Hour of the day the order was placed.,"
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'order_hour_of_day']], on='order_id', how='left')
+"
+22,days_since_prior_order - Days since the last order.,"
+Order_products__train = Order_products__train.merge(Orders[['order_id', 'days_since_prior_order']], on='order_id', how='left')
+"
+23,user_product_order_rate - Ratio of the number of times the user ordered the product to the total number of orders by the user.,"
+# Merge Orders with Order_products__prior to get user_id for each product order
+order_prior_merged = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id')
+
+# Calculate the number of times each user ordered each product
+user_product_order_counts = order_prior_merged.groupby(['user_id', 'product_id']).size().reset_index(name='user_product_order_count')
+
+# Calculate the total number of orders for each user
+user_total_orders = Orders.groupby('user_id').size().reset_index(name='user_total_orders')
+
+# Merge the counts with the total orders
+user_product_order_rate = pd.merge(user_product_order_counts, user_total_orders, on='user_id')
+
+# Calculate the user_product_order_rate
+user_product_order_rate['user_product_order_rate'] = user_product_order_rate['user_product_order_count'] / user_product_order_rate['user_total_orders']
+
+# Merge the user_product_order_rate with Order_products__train
+Order_products__train = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id')
+Order_products__train = pd.merge(Order_products__train, user_product_order_rate[['user_id', 'product_id', 'user_product_order_rate']], on=['user_id', 'product_id'], how='left')
+
+# Fill NaN values with 0 (if a user-product combination does not exist in prior orders)
+Order_products__train['user_product_order_rate'] = Order_products__train['user_product_order_rate'].fillna(0)
+
+# Drop the user_id column as it was only needed for merging
+Order_products__train = Order_products__train.drop(columns=['user_id'])
+"
+24,user_aisle_order_rate - Ratio of the number of times the user ordered from the aisle to the total number of orders by the user.,"
+# Merge Orders with Order_products__prior to get user_id for each order
+orders_prior = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id')
+
+# Merge with Products to get aisle_id for each product
+orders_prior = pd.merge(orders_prior, Products[['product_id', 'aisle_id']], on='product_id')
+
+# Calculate the number of times each user ordered from each aisle
+user_aisle_counts = orders_prior.groupby(['user_id', 'aisle_id']).size().reset_index(name='user_aisle_count')
+
+# Calculate the total number of orders for each user
+user_order_counts = Orders.groupby('user_id').size().reset_index(name='user_order_count')
+
+# Merge the counts to get the user_aisle_order_rate
+user_aisle_order_rate = pd.merge(user_aisle_counts, user_order_counts, on='user_id')
+user_aisle_order_rate['user_aisle_order_rate'] = user_aisle_order_rate['user_aisle_count'] / user_aisle_order_rate['user_order_count']
+
+# Merge the user_aisle_order_rate with Order_products__train
+Order_products__train = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id')
+Order_products__train = pd.merge(Order_products__train, Products[['product_id', 'aisle_id']], on='product_id')
+Order_products__train = pd.merge(Order_products__train, user_aisle_order_rate[['user_id', 'aisle_id', 'user_aisle_order_rate']], on=['user_id', 'aisle_id'], how='left')
+
+# Fill NaN values with 0 (in case there are users who have not ordered from certain aisles in the prior data)
+Order_products__train['user_aisle_order_rate'] = Order_products__train['user_aisle_order_rate'].fillna(0)
+"
+25,user_department_order_rate - Ratio of the number of times the user ordered from the department to the total number of orders by the user.,"
+# Merge Orders with Order_products__prior to get user_id for each order
+orders_prior = pd.merge(Order_products__prior, Orders[['order_id', 'user_id']], on='order_id')
+
+# Merge with Products to get department_id for each product
+orders_prior = pd.merge(orders_prior, Products[['product_id', 'department_id']], on='product_id')
+
+# Calculate the number of times each user ordered from each department
+user_department_orders = orders_prior.groupby(['user_id', 'department_id']).size().reset_index(name='user_department_order_count')
+
+# Calculate the total number of orders for each user
+user_total_orders = Orders.groupby('user_id').size().reset_index(name='user_total_orders')
+
+# Merge the user_department_orders with user_total_orders to calculate the ratio
+user_department_order_rate = pd.merge(user_department_orders, user_total_orders, on='user_id')
+user_department_order_rate['user_department_order_rate'] = user_department_order_rate['user_department_order_count'] / user_department_order_rate['user_total_orders']
+
+# Merge Orders with Order_products__train to get user_id for each order
+orders_train = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id')
+
+# Merge with Products to get department_id for each product
+orders_train = pd.merge(orders_train, Products[['product_id', 'department_id']], on='product_id')
+
+# Merge with user_department_order_rate to get the desired feature
+orders_train = pd.merge(orders_train, user_department_order_rate[['user_id', 'department_id', 'user_department_order_rate']], on=['user_id', 'department_id'], how='left')
+
+# Add the new feature to Order_products__train
+Order_products__train['user_department_order_rate'] = orders_train['user_department_order_rate']
+"
+26,product_order_rate - Ratio of the number of times the product was ordered to the total number of orders.,"
+# Calculate the total number of orders
+total_orders = Orders['order_id'].nunique()
+
+# Calculate the number of times each product was ordered
+product_order_counts = Order_products__prior['product_id'].value_counts().reset_index()
+product_order_counts.columns = ['product_id', 'order_count']
+
+# Merge the order counts with the products to calculate the order rate
+Products = Products.merge(product_order_counts, on='product_id', how='left').fillna(0)
+Products['product_order_rate'] = Products['order_count'] / total_orders
+
+# Merge the product order rate with the Order_products__train table
+Order_products__train = Order_products__train.merge(Products[['product_id', 'product_order_rate']], on='product_id', how='left')
+
+# Drop the intermediate columns if necessary
+Order_products__train.drop(columns=['order_count'], inplace=True, errors='ignore')
+"
+27,aisle_order_rate - Ratio of the number of times products from the aisle were ordered to the total number of orders.,"
+# Merge Order_products__prior with Products to get aisle_id
+order_prior_products = pd.merge(Order_products__prior, Products, on='product_id')
+
+# Calculate the number of times products from each aisle were ordered
+aisle_order_counts = order_prior_products['aisle_id'].value_counts().reset_index()
+aisle_order_counts.columns = ['aisle_id', 'aisle_order_count']
+
+# Calculate the total number of orders
+total_orders = Orders['order_id'].nunique()
+
+# Calculate the aisle_order_rate
+aisle_order_counts['aisle_order_rate'] = aisle_order_counts['aisle_order_count'] / total_orders
+
+# Merge aisle_order_rate with Products to get the rate for each product
+products_with_aisle_rate = pd.merge(Products, aisle_order_counts[['aisle_id', 'aisle_order_rate']], on='aisle_id', how='left')
+
+# Merge the result with Order_products__train to add the aisle_order_rate feature
+Order_products__train = pd.merge(Order_products__train, products_with_aisle_rate[['product_id', 'aisle_order_rate']], on='product_id', how='left')
+"
+28,department_order_rate - Ratio of the number of times products from the department were ordered to the total number of orders.,"
+# Merge Orders with Order_products__prior to get department_id for each order
+merged_prior = Order_products__prior.merge(Orders, on='order_id', how='left')
+merged_prior = merged_prior.merge(Products[['product_id', 'department_id']], on='product_id', how='left')
+
+# Calculate the number of times products from each department were ordered
+department_order_counts = merged_prior['department_id'].value_counts().reset_index()
+department_order_counts.columns = ['department_id', 'department_order_count']
+
+# Calculate the total number of orders
+total_orders = Orders['order_id'].nunique()
+
+# Calculate the department order rate
+department_order_counts['department_order_rate'] = department_order_counts['department_order_count'] / total_orders
+
+# Merge the department order rate with Products to get the rate for each product
+products_with_rate = Products.merge(department_order_counts[['department_id', 'department_order_rate']], on='department_id', how='left')
+
+# Merge the department order rate with Order_products__train
+Order_products__train = Order_products__train.merge(products_with_rate[['product_id', 'department_order_rate']], on='product_id', how='left')
+"
+29,user_product_order_streak - Longest streak of consecutive orders in which the user ordered the product.,"
+# Merge Orders with Order_products__prior to get user_id and order_number for each product
+orders_prior = pd.merge(Order_products__prior, Orders[['order_id', 'user_id', 'order_number']], on='order_id')
+
+# Sort by user_id, product_id, and order_number to facilitate streak calculation
+orders_prior = orders_prior.sort_values(by=['user_id', 'product_id', 'order_number'])
+
+# Initialize a new column to store the streak length
+orders_prior['streak'] = 0
+
+# Function to calculate the streak
+def calculate_streak(df):
+    streak = 0
+    max_streak = 0
+    previous_order_number = -1
+    for index, row in df.iterrows():
+        if row['order_number'] == previous_order_number + 1:
+            streak += 1
+        else:
+            streak = 1
+        max_streak = max(max_streak, streak)
+        previous_order_number = row['order_number']
+    return max_streak
+
+# Apply the streak calculation function to each user-product group
+streaks = orders_prior.groupby(['user_id', 'product_id']).apply(calculate_streak).reset_index()
+streaks.columns = ['user_id', 'product_id', 'user_product_order_streak']
+
+# Merge the streaks back into the Order_products__train table
+Order_products__train = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id')
+Order_products__train = pd.merge(Order_products__train, streaks, on=['user_id', 'product_id'], how='left')
+
+# Fill NaN values with 0 (in case there are products in the train set that were never ordered before)
+Order_products__train['user_product_order_streak'] = Order_products__train['user_product_order_streak'].fillna(0)
+
+# Drop the user_id column as it was only needed for the merge
+Order_products__train = Order_products__train.drop(columns=['user_id'])
+"
+30,user_aisle_order_streak - Longest streak of consecutive orders in which the user ordered from the aisle.,"
+# Merge Orders with Order_products__prior to get user_id and product details
+orders_prior = pd.merge(Order_products__prior, Orders, on='order_id', how='left')
+
+# Merge with Products to get aisle_id
+orders_prior = pd.merge(orders_prior, Products[['product_id', 'aisle_id']], on='product_id', how='left')
+
+# Sort by user_id, aisle_id, and order_number to facilitate streak calculation
+orders_prior = orders_prior.sort_values(by=['user_id', 'aisle_id', 'order_number'])
+
+# Function to calculate the longest streak of consecutive orders for each user and aisle
+def calculate_streaks(df):
+    df['streak'] = (df['order_number'] != df['order_number'].shift() + 1).cumsum()
+    return df.groupby('streak').size().max()
+
+# Apply the function to calculate the streaks
+streaks = orders_prior.groupby(['user_id', 'aisle_id']).apply(calculate_streaks).reset_index()
+streaks.columns = ['user_id', 'aisle_id', 'user_aisle_order_streak']
+
+# Merge the streaks back to the Orders and Products to get the feature in Order_products__train
+orders_train = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id', how='left')
+orders_train = pd.merge(orders_train, Products[['product_id', 'aisle_id']], on='product_id', how='left')
+orders_train = pd.merge(orders_train, streaks, on=['user_id', 'aisle_id'], how='left')
+
+# Fill NaN values with 0 (if any)
+orders_train['user_aisle_order_streak'] = orders_train['user_aisle_order_streak'].fillna(0)
+
+# Add the new feature to Order_products__train
+Order_products__train['user_aisle_order_streak'] = orders_train['user_aisle_order_streak']
+"
+31,user_department_order_streak - Longest streak of consecutive orders in which the user ordered from the department.,"
+# Merge Orders with Order_products__prior to get user_id and product_id together
+orders_prior = pd.merge(Order_products__prior, Orders, on='order_id')
+
+# Merge with Products to get department_id
+orders_prior = pd.merge(orders_prior, Products[['product_id', 'department_id']], on='product_id')
+
+# Sort by user_id, department_id, and order_number to facilitate streak calculation
+orders_prior = orders_prior.sort_values(by=['user_id', 'department_id', 'order_number'])
+
+# Function to calculate the longest streak of consecutive orders for each user and department
+def calculate_streaks(df):
+    df['streak'] = (df['order_number'] != df['order_number'].shift() + 1).cumsum()
+    streak_lengths = df.groupby(['user_id', 'department_id', 'streak']).size().reset_index(name='streak_length')
+    max_streaks = streak_lengths.groupby(['user_id', 'department_id'])['streak_length'].max().reset_index()
+    return max_streaks
+
+# Apply the function to calculate streaks
+streaks = calculate_streaks(orders_prior)
+
+# Merge streaks back to Order_products__train
+Order_products__train = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id')
+Order_products__train = pd.merge(Order_products__train, Products[['product_id', 'department_id']], on='product_id')
+Order_products__train = pd.merge(Order_products__train, streaks, on=['user_id', 'department_id'], how='left')
+
+# Drop the intermediate columns
+Order_products__train = Order_products__train.drop(columns=['user_id', 'department_id'])
+"
+32,user_product_last_order_interval - Number of orders since the user last ordered the product.,"
+# Merge Orders with Order_products__prior to get user_id and order_number for each product
+order_prior_merged = pd.merge(Order_products__prior, Orders[['order_id', 'user_id', 'order_number']], on='order_id')
+
+# Sort by user_id, product_id, and order_number to facilitate calculation of intervals
+order_prior_merged = order_prior_merged.sort_values(by=['user_id', 'product_id', 'order_number'])
+
+# Calculate the order intervals for each user-product pair
+order_prior_merged['user_product_last_order_interval'] = order_prior_merged.groupby(['user_id', 'product_id'])['order_number'].diff().fillna(0).astype(int)
+
+# Merge the calculated intervals back to the Order_products__train table
+Order_products__train = pd.merge(Order_products__train, Orders[['order_id', 'user_id', 'order_number']], on='order_id')
+Order_products__train = pd.merge(Order_products__train, order_prior_merged[['user_id', 'product_id', 'user_product_last_order_interval']], on=['user_id', 'product_id'], how='left')
+
+# Fill NaN values with a default value (e.g., 0) for cases where there is no prior order
+Order_products__train['user_product_last_order_interval'] = Order_products__train['user_product_last_order_interval'].fillna(0).astype(int)
+
+# Drop the temporary columns used for merging
+Order_products__train = Order_products__train.drop(columns=['user_id', 'order_number'])
+"
+33,user_aisle_last_order_interval - Number of orders since the user last ordered from the aisle.,"
+# Merge Orders with Order_products__prior to get user_id and order_number
+orders_prior = Orders[['order_id', 'user_id', 'order_number']].merge(Order_products__prior, on='order_id')
+
+# Merge with Products to get aisle_id
+orders_prior = orders_prior.merge(Products[['product_id', 'aisle_id']], on='product_id')
+
+# Sort by user_id, aisle_id, and order_number
+orders_prior = orders_prior.sort_values(by=['user_id', 'aisle_id', 'order_number'])
+
+# Calculate the number of orders since the user last ordered from the aisle
+orders_prior['user_aisle_last_order_interval'] = orders_prior.groupby(['user_id', 'aisle_id'])['order_number'].diff().fillna(0).astype(int)
+
+# Merge Orders with Order_products__train to get user_id and order_number
+orders_train = Orders[['order_id', 'user_id', 'order_number']].merge(Order_products__train, on='order_id')
+
+# Merge with Products to get aisle_id
+orders_train = orders_train.merge(Products[['product_id', 'aisle_id']], on='product_id')
+
+# Merge with orders_prior to get the last order interval
+orders_train = orders_train.merge(orders_prior[['user_id', 'aisle_id', 'order_number', 'user_aisle_last_order_interval']], 
+                                  on=['user_id', 'aisle_id', 'order_number'], 
+                                  how='left')
+
+# Fill NaN values with a large number (indicating no prior orders for that aisle)
+orders_train['user_aisle_last_order_interval'] = orders_train['user_aisle_last_order_interval'].fillna(9999).astype(int)
+
+# Add the new feature to Order_products__train
+Order_products__train['user_aisle_last_order_interval'] = orders_train['user_aisle_last_order_interval']
+"
+34,user_department_last_order_interval - Number of orders since the user last ordered from the department.,"
+# Merge Orders with Order_products__prior to get user_id and department_id
+order_prior_merged = pd.merge(Order_products__prior, Orders, on='order_id', how='left')
+order_prior_merged = pd.merge(order_prior_merged, Products[['product_id', 'department_id']], on='product_id', how='left')
+
+# Sort by user_id and order_number to calculate the interval
+order_prior_merged = order_prior_merged.sort_values(by=['user_id', 'order_number'])
+
+# Calculate the interval since the user last ordered from the department
+order_prior_merged['user_department_last_order_interval'] = order_prior_merged.groupby(['user_id', 'department_id'])['order_number'].diff().fillna(0).astype(int)
+
+# Get the last order interval for each user and department
+last_order_interval = order_prior_merged.groupby(['user_id', 'department_id'])['user_department_last_order_interval'].last().reset_index()
+
+# Merge Orders with Order_products__train to get user_id and department_id
+order_train_merged = pd.merge(Order_products__train, Orders, on='order_id', how='left')
+order_train_merged = pd.merge(order_train_merged, Products[['product_id', 'department_id']], on='product_id', how='left')
+
+# Merge with last_order_interval to get the feature
+order_train_merged = pd.merge(order_train_merged, last_order_interval, on=['user_id', 'department_id'], how='left')
+
+# Fill NaN values with 0 (if a user has never ordered from the department before)
+order_train_merged['user_department_last_order_interval'] = order_train_merged['user_department_last_order_interval'].fillna(0).astype(int)
+
+# Add the feature to the original Order_products__train table
+Order_products__train['user_department_last_order_interval'] = order_train_merged['user_department_last_order_interval']
+"

@@ -1,0 +1,509 @@
+,feature_description,code
+0,`MosquitoDensity` - Number of mosquitoes caught per trap per day.,"
+Virus[""MosquitoDensity""] = Virus.groupby(['Date', 'Trap'])['NumMosquitos'].transform('sum')
+"
+1,`TrapActivity` - Total number of mosquitoes caught in the same trap over the past week.,"
+import pandas as pd
+from datetime import timedelta
+
+# Assuming Virus DataFrame is already loaded
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Initialize the new column with zeros
+Virus['TrapActivity'] = 0
+
+# Iterate over each row to calculate TrapActivity
+for idx, row in Virus.iterrows():
+    start_date = row['Date'] - timedelta(days=7)
+    end_date = row['Date']
+    trap_id = row['Trap']
+    
+    # Filter rows within the past week for the same trap
+    past_week_data = Virus[(Virus['Trap'] == trap_id) & 
+                           (Virus['Date'] >= start_date) & 
+                           (Virus['Date'] < end_date)]
+    
+    # Sum the number of mosquitoes caught in the past week
+    Virus.at[idx, 'TrapActivity'] = past_week_data['NumMosquitos'].sum()
+
+# Display the updated Virus DataFrame
+print(Virus.head())
+"
+2,`SpeciesCount` - Count of different mosquito species caught in the same trap on the same day.,"
+Virus['SpeciesCount'] = Virus.groupby(['Date', 'Trap'])['Species'].transform('count')
+"
+3,`TrapLatitude` - Latitude of the trap location.,"
+Virus[""TrapLatitude""] = Virus[""Latitude""]
+"
+4,`TrapLongitude` - Longitude of the trap location.,"
+Virus[""TrapLongitude""] = Virus[""Longitude""]
+"
+5,`DaysSinceLastSpray` - Number of days since the last spray at the trap's location.,"
+import pandas as pd
+from datetime import datetime
+
+# Convert Date columns to datetime
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Spray['Date'] = pd.to_datetime(Spray['Date'])
+
+# Initialize the new feature column with a large number
+Virus['DaysSinceLastSpray'] = float('inf')
+
+# Iterate over each row in the Virus table
+for i, virus_row in Virus.iterrows():
+    # Filter the Spray table for sprays before the virus test date and at the same location
+    relevant_sprays = Spray[(Spray['Date'] <= virus_row['Date']) & 
+                            (Spray['Latitude'] == virus_row['Latitude']) & 
+                            (Spray['Longitude'] == virus_row['Longitude'])]
+    
+    if not relevant_sprays.empty:
+        # Calculate the number of days since the last spray
+        days_since_last_spray = (virus_row['Date'] - relevant_sprays['Date'].max()).days
+        Virus.at[i, 'DaysSinceLastSpray'] = days_since_last_spray
+
+# Replace 'inf' with a large number (e.g., 9999) to indicate no prior spray
+Virus['DaysSinceLastSpray'].replace(float('inf'), 9999, inplace=True)
+"
+6,`DistanceToNearestSpray` - Distance from the trap to the nearest spray location on the same day.,"
+import numpy as np
+
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371  # Radius of the Earth in kilometers
+    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+    return R * c * 1000  # Convert to meters
+
+def compute_distance_to_nearest_spray(row, spray_df):
+    trap_location = (row['Latitude'], row['Longitude'])
+    same_day_sprays = spray_df[spray_df['Date'] == row['Date']]
+    if same_day_sprays.empty:
+        return float('inf')
+    distances = same_day_sprays.apply(lambda spray: haversine(trap_location[0], trap_location[1], spray['Latitude'], spray['Longitude']), axis=1)
+    return distances.min()
+
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Spray['Date'] = pd.to_datetime(Spray['Date'])
+
+Virus['DistanceToNearestSpray'] = Virus.apply(compute_distance_to_nearest_spray, spray_df=Spray, axis=1)
+"
+7,`SprayCountLastWeek` - Number of sprays conducted within a 1 km radius of the trap in the past week.,"
+from datetime import timedelta
+import numpy as np
+
+# Convert Date columns to datetime
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Spray['Date'] = pd.to_datetime(Spray['Date'])
+
+# Initialize the new feature column with zeros
+Virus['SprayCountLastWeek'] = 0
+
+# Function to calculate haversine distance
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371  # Radius of the Earth in km
+    dlat = np.radians(lat2 - lat1)
+    dlon = np.radians(lon2 - lon1)
+    a = np.sin(dlat / 2) ** 2 + np.cos(np.radians(lat1)) * np.cos(np.radians(lat2)) * np.sin(dlon / 2) ** 2
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+    return R * c
+
+# Function to count sprays within 1 km radius in the past week
+def count_sprays_last_week(row):
+    trap_location = (row['Latitude'], row['Longitude'])
+    one_week_ago = row['Date'] - timedelta(days=7)
+    relevant_sprays = Spray[(Spray['Date'] >= one_week_ago) & (Spray['Date'] <= row['Date'])]
+    count = 0
+    for _, spray_row in relevant_sprays.iterrows():
+        spray_location = (spray_row['Latitude'], spray_row['Longitude'])
+        distance = haversine(trap_location[0], trap_location[1], spray_location[0], spray_location[1])
+        if distance <= 1:
+            count += 1
+    return count
+
+# Apply the function to each row in the Virus DataFrame
+Virus['SprayCountLastWeek'] = Virus.apply(count_sprays_last_week, axis=1)
+"
+8,`SprayCountLastMonth` - Number of sprays conducted within a 1 km radius of the trap in the past month.,"
+from datetime import timedelta
+import numpy as np
+
+# Convert Date columns to datetime
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Spray['Date'] = pd.to_datetime(Spray['Date'])
+
+# Initialize the new feature column with zeros
+Virus['SprayCountLastMonth'] = 0
+
+# Function to calculate the number of sprays within 1 km radius in the past month
+def haversine(lat1, lon1, lat2, lon2):
+    # Calculate the great circle distance in kilometers between two points 
+    # on the earth (specified in decimal degrees)
+    # Convert decimal degrees to radians 
+    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+    # Haversine formula 
+    dlon = lon2 - lon1 
+    dlat = lat2 - lat1 
+    a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+    c = 2 * np.arcsin(np.sqrt(a)) 
+    km = 6371 * c
+    return km
+
+# Apply the function to each row in the Virus DataFrame
+for i, virus_row in Virus.iterrows():
+    one_month_ago = virus_row['Date'] - timedelta(days=30)
+    relevant_sprays = Spray[(Spray['Date'] >= one_month_ago) & (Spray['Date'] <= virus_row['Date'])]
+    count = 0
+    for _, spray_row in relevant_sprays.iterrows():
+        distance = haversine(virus_row['Latitude'], virus_row['Longitude'], spray_row['Latitude'], spray_row['Longitude'])
+        if distance <= 1:
+            count += 1
+    Virus.at[i, 'SprayCountLastMonth'] = count
+"
+9,`MaxTempLastWeek` - Maximum temperature recorded in the past week.,"
+# Ensure the Date columns are in datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Merge Virus table with Weather table on Date
+Virus = Virus.merge(Weather[['Date', 'Tmax']], on='Date', how='left')
+
+# Function to calculate MaxTempLastWeek
+def calculate_max_temp_last_week(date, weather_df):
+    start_date = date - pd.Timedelta(days=7)
+    end_date = date - pd.Timedelta(days=1)
+    mask = (weather_df['Date'] >= start_date) & (weather_df['Date'] <= end_date)
+    return weather_df.loc[mask, 'Tmax'].max()
+
+# Apply the function to each row in Virus table
+Virus['MaxTempLastWeek'] = Virus['Date'].apply(lambda x: calculate_max_temp_last_week(x, Weather))
+
+# Drop the Tmax column as it was only needed for merging
+Virus = Virus.drop(columns=['Tmax'])
+"
+10,`MinTempLastWeek` - Minimum temperature recorded in the past week.,"
+# Ensure the Date columns are in datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort the Weather dataframe by Date for easier processing
+Weather = Weather.sort_values(by='Date')
+
+# Create a dictionary to store the minimum temperature for each date
+min_temp_dict = {}
+
+# Iterate over the Weather dataframe to compute the minimum temperature for the past week
+for i in range(len(Weather)):
+    current_date = Weather.iloc[i]['Date']
+    past_week = Weather[(Weather['Date'] < current_date) & (Weather['Date'] >= current_date - pd.Timedelta(days=7))]
+    if not past_week.empty:
+        min_temp_dict[current_date] = past_week['Tmin'].min()
+    else:
+        min_temp_dict[current_date] = None
+
+# Map the minimum temperature of the past week to the Virus dataframe
+Virus['MinTempLastWeek'] = Virus['Date'].map(min_temp_dict)
+
+# Fill any missing values with a default value, e.g., the minimum temperature recorded in the entire dataset
+Virus['MinTempLastWeek'].fillna(Weather['Tmin'].min(), inplace=True)
+"
+11,`AvgTempLastWeek` - Average temperature recorded in the past week.,"
+# Ensure the Date columns are in datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort the Weather DataFrame by Date
+Weather = Weather.sort_values(by='Date')
+
+# Calculate the rolling average temperature for the past week
+Weather['AvgTempLastWeek'] = Weather['Tavg'].rolling(window=7, min_periods=1).mean()
+
+# Merge the rolling average temperature with the Virus DataFrame
+Virus = Virus.merge(Weather[['Date', 'AvgTempLastWeek']], on='Date', how='left')
+"
+12,`DewPointLastWeek` - Average dew point temperature recorded in the past week.,"
+# Convert Date columns to datetime
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Calculate DewPointLastWeek
+Weather['DewPointLastWeek'] = Weather.groupby('Station')['DewPoint'].transform(lambda x: x.rolling(window=7, min_periods=1).mean())
+
+# Merge the DewPointLastWeek feature into the Virus table
+Virus = Virus.merge(Weather[['Date', 'DewPointLastWeek']], on='Date', how='left')
+"
+13,`PrecipTotalLastWeek` - Total precipitation recorded in the past week.,"
+# Ensure the Date columns are in datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort the Weather dataframe by Date
+Weather = Weather.sort_values(by='Date')
+
+# Calculate the total precipitation for the past week
+Weather['PrecipTotal'] = pd.to_numeric(Weather['PrecipTotal'], errors='coerce').fillna(0)
+Weather['PrecipTotalLastWeek'] = Weather['PrecipTotal'].rolling(window=7, min_periods=1).sum()
+
+# Merge the PrecipTotalLastWeek feature into the Virus dataframe
+Virus = Virus.merge(Weather[['Date', 'PrecipTotalLastWeek']], on='Date', how='left')
+
+# Display the updated Virus dataframe
+Virus.head()
+"
+14,`AvgWindSpeedLastWeek` - Average wind speed recorded in the past week.,"
+# Convert Date columns to datetime
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort Weather data by Date
+Weather = Weather.sort_values(by='Date')
+
+# Calculate the rolling average wind speed for the past week
+Weather['AvgWindSpeedLastWeek'] = Weather['AvgSpeed'].rolling(window=7, min_periods=1).mean()
+
+# Merge the rolling average wind speed with the Virus table
+Virus = Virus.merge(Weather[['Date', 'AvgWindSpeedLastWeek']], on='Date', how='left')
+"
+15,`MaxTempLastMonth` - Maximum temperature recorded in the past month.,"
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Create a dictionary to store the max temperature for each date
+max_temp_dict = {}
+
+# Iterate over each date in the Virus table
+for date in Virus['Date'].unique():
+    # Calculate the start and end date for the past month
+    start_date = date - pd.DateOffset(months=1)
+    end_date = date
+    
+    # Filter the weather data for the past month
+    past_month_weather = Weather[(Weather['Date'] >= start_date) & (Weather['Date'] < end_date)]
+    
+    # Get the maximum temperature in the past month
+    if not past_month_weather.empty:
+        max_temp = past_month_weather['Tmax'].max()
+    else:
+        max_temp = None
+    
+    # Store the max temperature in the dictionary
+    max_temp_dict[date] = max_temp
+
+# Map the max temperature to the Virus table
+Virus['MaxTempLastMonth'] = Virus['Date'].map(max_temp_dict)
+"
+16,`MinTempLastMonth` - Minimum temperature recorded in the past month.,"
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Merge Virus with Weather data to get the weather station information
+Virus = Virus.merge(Weather[['Date', 'Tmin']], on='Date', how='left')
+
+# Calculate the minimum temperature in the past month for each date in Virus
+Virus['MinTempLastMonth'] = Virus.apply(
+    lambda row: Weather[(Weather['Date'] < row['Date']) & (Weather['Date'] >= row['Date'] - pd.DateOffset(months=1))]['Tmin'].min(), axis=1
+)
+"
+17,`AvgTempLastMonth` - Average temperature recorded in the past month.,"
+# Ensure the Date columns are in datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort the Weather DataFrame by Date
+Weather = Weather.sort_values(by='Date')
+
+# Calculate the rolling average temperature for the past month (30 days)
+Weather['AvgTempLastMonth'] = Weather['Tavg'].rolling(window=30, min_periods=1).mean()
+
+# Merge the rolling average temperature with the Virus DataFrame
+Virus = Virus.merge(Weather[['Date', 'AvgTempLastMonth']], on='Date', how='left')
+"
+18,`DewPointLastMonth` - Average dew point temperature recorded in the past month.,"
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Sort Weather data by Date
+Weather = Weather.sort_values(by='Date')
+
+# Calculate DewPointLastMonth
+Weather['DewPointLastMonth'] = Weather.groupby('Station')['DewPoint'].transform(lambda x: x.rolling(window=30, min_periods=1).mean())
+
+# Merge Weather data with Virus data
+Virus = Virus.merge(Weather[['Date', 'DewPointLastMonth']], on='Date', how='left')
+"
+19,`PrecipTotalLastMonth` - Total precipitation recorded in the past month.,"
+# Ensure the Date columns are in datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort the Weather DataFrame by Date
+Weather = Weather.sort_values(by='Date')
+
+# Calculate the total precipitation for the last month for each date in the Virus table
+def get_precip_total_last_month(date):
+    last_month_start = date - pd.DateOffset(months=1)
+    precip_total = Weather[(Weather['Date'] >= last_month_start) & (Weather['Date'] < date)]['PrecipTotal'].sum()
+    return precip_total
+
+# Apply the function to each row in the Virus DataFrame
+Virus['PrecipTotalLastMonth'] = Virus['Date'].apply(get_precip_total_last_month)
+"
+20,`AvgWindSpeedLastMonth` - Average wind speed recorded in the past month.,"
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Calculate the average wind speed for the past month for each date in the Virus table
+def avg_wind_speed_last_month(date):
+    past_month = Weather[(Weather['Date'] < date) & (Weather['Date'] >= date - pd.DateOffset(months=1))]
+    return past_month['AvgSpeed'].mean()
+
+Virus['AvgWindSpeedLastMonth'] = Virus['Date'].apply(avg_wind_speed_last_month)
+"
+21,`HeatLastWeek` - Total heating degree days recorded in the past week.,"
+# Ensure the Date columns are in datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort the Weather dataframe by Date
+Weather = Weather.sort_values(by='Date')
+
+# Calculate the HeatLastWeek for each date in the Weather dataframe
+Weather['HeatLastWeek'] = Weather['Heat'].rolling(window=7, min_periods=1).sum()
+
+# Merge the Virus dataframe with the Weather dataframe to get the HeatLastWeek feature
+Virus = Virus.merge(Weather[['Date', 'HeatLastWeek']], on='Date', how='left')
+"
+22,`CoolLastWeek` - Total cooling degree days recorded in the past week.,"
+# Ensure the Date columns are in datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort the Weather dataframe by Date and Station
+Weather = Weather.sort_values(by=['Station', 'Date'])
+
+# Calculate the rolling sum of Cool for the past week for each station
+Weather['CoolLastWeek'] = Weather.groupby('Station')['Cool'].rolling(window=7, min_periods=1).sum().reset_index(level=0, drop=True)
+
+# Merge the Virus table with the Weather table to get the CoolLastWeek feature
+# Assuming the Virus table is associated with a specific weather station, we will use Station 1 for this example
+Virus = Virus.merge(Weather[['Date', 'CoolLastWeek']], on='Date', how='left')
+
+# Fill any missing values with 0 (in case there are dates in Virus that are not in Weather)
+Virus['CoolLastWeek'] = Virus['CoolLastWeek'].fillna(0)
+"
+23,`HeatLastMonth` - Total heating degree days recorded in the past month.,"
+# Convert the Date columns to datetime
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort the Weather dataframe by Date
+Weather = Weather.sort_values(by='Date')
+
+# Create a new column in Virus to store the HeatLastMonth feature
+Virus['HeatLastMonth'] = 0
+
+# Iterate over each row in the Virus dataframe
+for i, row in Virus.iterrows():
+    # Get the date of the current row
+    current_date = row['Date']
+    
+    # Calculate the start date of the last month
+    start_date = current_date - pd.DateOffset(days=30)
+    
+    # Filter the Weather dataframe to get the last month's data
+    last_month_weather = Weather[(Weather['Date'] >= start_date) & (Weather['Date'] < current_date)]
+    
+    # Sum the Heat values for the last month
+    heat_last_month = last_month_weather['Heat'].sum()
+    
+    # Assign the calculated value to the new column in Virus
+    Virus.at[i, 'HeatLastMonth'] = heat_last_month
+
+# Display the updated Virus dataframe
+print(Virus.head())
+"
+24,`CoolLastMonth` - Total cooling degree days recorded in the past month.,"
+# Ensure the Date columns are in datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Sort the Weather data by Date
+Weather = Weather.sort_values(by='Date')
+
+# Calculate the CoolLastMonth feature
+Weather['CoolLastMonth'] = Weather['Cool'].rolling(window=30, min_periods=1).sum()
+
+# Merge the CoolLastMonth feature into the Virus table
+Virus = Virus.merge(Weather[['Date', 'CoolLastMonth']], on='Date', how='left')
+
+# Fill any missing values in CoolLastMonth with 0 (if any)
+Virus['CoolLastMonth'] = Virus['CoolLastMonth'].fillna(0)
+"
+25,`SunriseTime` - Sunrise time on the day of the test.,"
+Virus = Virus.merge(Weather[['Date', 'Sunrise']], on='Date', how='left')
+Virus.rename(columns={'Sunrise': 'SunriseTime'}, inplace=True)
+"
+26,`SunsetTime` - Sunset time on the day of the test.,"
+Virus = Virus.merge(Weather[['Date', 'Sunset']], on='Date', how='left')
+Virus.rename(columns={'Sunset': 'SunsetTime'}, inplace=True)
+"
+27,`DayLength` - Length of the day (time between sunrise and sunset) on the day of the test.,"
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Merge Virus with Weather to get Sunrise and Sunset times
+Virus = Virus.merge(Weather[['Date', 'Sunrise', 'Sunset']], on='Date', how='left')
+
+# Convert Sunrise and Sunset to datetime.time
+Virus['Sunrise'] = pd.to_datetime(Virus['Sunrise'], format='%H%M').dt.time
+Virus['Sunset'] = pd.to_datetime(Virus['Sunset'], format='%H%M').dt.time
+
+# Calculate DayLength
+Virus['DayLength'] = (pd.to_datetime(Virus['Sunset'].astype(str)) - pd.to_datetime(Virus['Sunrise'].astype(str))).dt.total_seconds() / 3600
+
+# Drop the intermediate columns
+Virus = Virus.drop(columns=['Sunrise', 'Sunset'])
+"
+28,`WeatherPhenomena` - Encoded weather phenomena codes on the day of the test.,"
+Virus = Virus.merge(Weather[['Date', 'CodeSum']], on='Date', how='left')
+Virus.rename(columns={'CodeSum': 'WeatherPhenomena'}, inplace=True)
+"
+29,`TempDewPointDiff` - Difference between average temperature and dew point temperature on the day of the test.,"
+Virus = Virus.merge(Weather[['Date', 'Tavg', 'DewPoint']], on='Date', how='left')
+Virus['TempDewPointDiff'] = Virus['Tavg'] - Virus['DewPoint']
+"
+30,`TempPrecipInteraction` - Interaction term between average temperature and total precipitation on the day of the test.,"
+Virus = Virus.merge(Weather[['Date', 'Tavg', 'PrecipTotal']], on='Date', how='left')
+Virus['TempPrecipInteraction'] = Virus['Tavg'] * Virus['PrecipTotal']
+"
+31,`WindSpeedPrecipInteraction` - Interaction term between average wind speed and total precipitation on the day of the test.,"
+Virus = Virus.merge(Weather[['Date', 'AvgSpeed', 'PrecipTotal']], on='Date', how='left')
+Virus['WindSpeedPrecipInteraction'] = Virus['AvgSpeed'] * Virus['PrecipTotal']
+"
+32,`DayOfYear` - Day of the year when the test was performed.,"
+Virus[""DayOfYear""] = pd.to_datetime(Virus[""Date""]).dt.dayofyear
+"
+33,`WeekOfYear` - Week of the year when the test was performed.,"
+Virus[""WeekOfYear""] = pd.to_datetime(Virus[""Date""]).dt.isocalendar().week
+"
+34,`Month` - Month when the test was performed.,"
+Virus[""Month""] = pd.to_datetime(Virus[""Date""]).dt.month
+"
+35,"`Season` - Season when the test was performed (e.g., Spring, Summer, Fall, Winter).","
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+def get_season(date):
+    Y = 2000  # dummy leap year to handle leap years
+    seasons = [
+        ('winter', (pd.Timestamp(f'{Y}-01-01'), pd.Timestamp(f'{Y}-03-20'))),
+        ('spring', (pd.Timestamp(f'{Y}-03-21'), pd.Timestamp(f'{Y}-06-20'))),
+        ('summer', (pd.Timestamp(f'{Y}-06-21'), pd.Timestamp(f'{Y}-09-22'))),
+        ('fall', (pd.Timestamp(f'{Y}-09-23'), pd.Timestamp(f'{Y}-12-20'))),
+        ('winter', (pd.Timestamp(f'{Y}-12-21'), pd.Timestamp(f'{Y}-12-31')))
+    ]
+    date = date.replace(year=Y)
+    return next(season for season, (start, end) in seasons if start <= date <= end)
+
+Virus['Season'] = Virus['Date'].apply(get_season)
+"

@@ -1,0 +1,679 @@
+,feature_description,code
+0,TotalBids - Total number of bids made by the bidder.,"
+TotalBids = Bids.groupby('bidder_id').size().reset_index(name='TotalBids')
+Bidders = Bidders.merge(TotalBids, on='bidder_id', how='left').fillna(0)
+"
+1,UniqueAuctions - Number of unique auctions the bidder has participated in.,"
+# Compute the number of unique auctions each bidder has participated in
+unique_auctions = Bids.groupby('bidder_id')['auction'].nunique().reset_index()
+unique_auctions.columns = ['bidder_id', 'UniqueAuctions']
+
+# Merge the computed feature with the Bidders table
+Bidders = Bidders.merge(unique_auctions, on='bidder_id', how='left')
+
+# Fill NaN values with 0 (in case some bidders have no bids)
+Bidders['UniqueAuctions'].fillna(0, inplace=True)
+"
+2,UniqueMerchandise - Number of unique merchandise categories the bidder has bid on.,"
+unique_merchandise = Bids.groupby('bidder_id')['merchandise'].nunique().reset_index()
+unique_merchandise.columns = ['bidder_id', 'UniqueMerchandise']
+Bidders = Bidders.merge(unique_merchandise, on='bidder_id', how='left')
+Bidders['UniqueMerchandise'] = Bidders['UniqueMerchandise'].fillna(0)
+"
+3,UniqueDevices - Number of unique devices used by the bidder.,"
+unique_devices = Bids.groupby('bidder_id')['device'].nunique().reset_index()
+unique_devices.columns = ['bidder_id', 'UniqueDevices']
+Bidders = Bidders.merge(unique_devices, on='bidder_id', how='left')
+Bidders['UniqueDevices'] = Bidders['UniqueDevices'].fillna(0)
+"
+4,UniqueCountries - Number of unique countries from which the bidder has placed bids.,"
+unique_countries = Bids.groupby('bidder_id')['country'].nunique().reset_index()
+unique_countries.columns = ['bidder_id', 'UniqueCountries']
+Bidders = Bidders.merge(unique_countries, on='bidder_id', how='left')
+Bidders['UniqueCountries'] = Bidders['UniqueCountries'].fillna(0)
+"
+5,UniqueIPs - Number of unique IP addresses used by the bidder.,"
+# Compute the number of unique IP addresses used by each bidder
+unique_ips = Bids.groupby('bidder_id')['ip'].nunique().reset_index()
+unique_ips.columns = ['bidder_id', 'UniqueIPs']
+
+# Merge the unique IPs feature into the Bidders table
+Bidders = Bidders.merge(unique_ips, on='bidder_id', how='left')
+
+# Fill NaN values with 0 (in case some bidders have no bids)
+Bidders['UniqueIPs'] = Bidders['UniqueIPs'].fillna(0)
+"
+6,AverageBidsPerAuction - Average number of bids per auction for the bidder.,"
+average_bids_per_auction = Bids.groupby('bidder_id')['auction'].nunique() / Bids.groupby('bidder_id')['bid_id'].count()
+Bidders = Bidders.merge(average_bids_per_auction.rename('AverageBidsPerAuction'), on='bidder_id', how='left')
+"
+7,AverageBidsPerMerchandise - Average number of bids per merchandise category for the bidder.,"
+average_bids_per_merchandise = Bids.groupby('bidder_id').apply(lambda x: x.groupby('merchandise').size().mean()).reset_index(name='AverageBidsPerMerchandise')
+Bidders = Bidders.merge(average_bids_per_merchandise, on='bidder_id', how='left')
+Bidders['AverageBidsPerMerchandise'] = Bidders['AverageBidsPerMerchandise'].fillna(0)
+"
+8,AverageBidsPerDevice - Average number of bids per device for the bidder.,"
+# Compute the average number of bids per device for each bidder
+average_bids_per_device = Bids.groupby('bidder_id').apply(lambda x: x['bid_id'].nunique() / x['device'].nunique()).reset_index()
+average_bids_per_device.columns = ['bidder_id', 'AverageBidsPerDevice']
+
+# Merge the computed feature with the Bidders table
+Bidders = Bidders.merge(average_bids_per_device, on='bidder_id', how='left')
+
+# Fill NaN values with 0 (in case there are bidders with no bids)
+Bidders['AverageBidsPerDevice'] = Bidders['AverageBidsPerDevice'].fillna(0)
+"
+9,AverageBidsPerCountry - Average number of bids per country for the bidder.,"
+# Compute the average number of bids per country for each bidder
+average_bids_per_country = Bids.groupby('bidder_id').apply(lambda x: x.groupby('country').size().mean()).reset_index()
+average_bids_per_country.columns = ['bidder_id', 'AverageBidsPerCountry']
+
+# Merge the computed feature with the Bidders table
+Bidders = Bidders.merge(average_bids_per_country, on='bidder_id', how='left')
+
+# Fill NaN values with 0 (in case some bidders have no bids)
+Bidders['AverageBidsPerCountry'] = Bidders['AverageBidsPerCountry'].fillna(0)
+"
+10,AverageBidsPerIP - Average number of bids per IP address for the bidder.,"
+average_bids_per_ip = Bids.groupby('bidder_id')['ip'].nunique() / Bids.groupby('bidder_id')['ip'].count()
+Bidders = Bidders.merge(average_bids_per_ip.rename('AverageBidsPerIP'), on='bidder_id', how='left')
+"
+11,FirstBidTime - Timestamp of the first bid made by the bidder.,"
+# Convert the 'time' column in Bids to datetime for easier manipulation
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Compute the first bid time for each bidder
+first_bid_time = Bids.groupby('bidder_id')['time'].min().reset_index()
+
+# Rename the 'time' column to 'FirstBidTime'
+first_bid_time.rename(columns={'time': 'FirstBidTime'}, inplace=True)
+
+# Merge the first bid time with the Bidders table
+Bidders = Bidders.merge(first_bid_time, on='bidder_id', how='left')
+"
+12,LastBidTime - Timestamp of the last bid made by the bidder.,"
+# Convert the 'time' column in Bids to datetime if it's not already
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Compute the last bid time for each bidder
+last_bid_time = Bids.groupby('bidder_id')['time'].max().reset_index()
+
+# Rename the 'time' column to 'LastBidTime'
+last_bid_time.rename(columns={'time': 'LastBidTime'}, inplace=True)
+
+# Merge the last bid time with the Bidders table
+Bidders = Bidders.merge(last_bid_time, on='bidder_id', how='left')
+
+# Display the updated Bidders table
+print(Bidders.head())
+"
+13,BidTimeRange - Time range between the first and last bid made by the bidder.,"
+# Convert the 'time' column in Bids to datetime if it's not already in that format
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Calculate the time range for each bidder
+bid_time_range = Bids.groupby('bidder_id')['time'].agg(lambda x: x.max() - x.min()).reset_index()
+bid_time_range.columns = ['bidder_id', 'BidTimeRange']
+
+# Merge the new feature into the Bidders table
+Bidders = Bidders.merge(bid_time_range, on='bidder_id', how='left')
+
+# Fill NaN values with a default value (e.g., 0) if there are bidders with no bids
+Bidders['BidTimeRange'] = Bidders['BidTimeRange'].fillna(pd.Timedelta(0))
+
+# Convert the time delta to a numeric value (e.g., total seconds) if needed
+Bidders['BidTimeRange'] = Bidders['BidTimeRange'].dt.total_seconds()
+
+# Display the updated Bidders table
+print(Bidders.head())
+"
+14,BidsPerHour - Average number of bids made by the bidder per hour.,"
+import pandas as pd
+
+# Assuming Bidders and Bids are already loaded as DataFrames
+
+# Convert the time column to datetime
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Calculate the total number of bids and the time span for each bidder
+bids_per_bidder = Bids.groupby('bidder_id').size().reset_index(name='total_bids')
+time_span_per_bidder = Bids.groupby('bidder_id')['time'].agg(lambda x: (x.max() - x.min()).total_seconds() / 3600).reset_index(name='time_span_hours')
+
+# Merge the total bids and time span dataframes
+bids_per_bidder = bids_per_bidder.merge(time_span_per_bidder, on='bidder_id')
+
+# Calculate the average number of bids per hour
+bids_per_bidder['BidsPerHour'] = bids_per_bidder['total_bids'] / bids_per_bidder['time_span_hours']
+
+# Merge the BidsPerHour feature into the Bidders dataframe
+Bidders = Bidders.merge(bids_per_bidder[['bidder_id', 'BidsPerHour']], on='bidder_id', how='left')
+
+# Fill NaN values with 0 (in case there are bidders with no bids)
+Bidders['BidsPerHour'].fillna(0, inplace=True)
+"
+15,BidsPerDay - Average number of bids made by the bidder per day.,"
+import pandas as pd
+
+# Assuming Bidders and Bids are already loaded as DataFrames
+
+# Convert the time column to datetime
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Calculate the number of days each bidder has been active
+Bids['date'] = Bids['time'].dt.date
+active_days = Bids.groupby('bidder_id')['date'].nunique().reset_index()
+active_days.columns = ['bidder_id', 'active_days']
+
+# Calculate the total number of bids per bidder
+total_bids = Bids.groupby('bidder_id')['bid_id'].count().reset_index()
+total_bids.columns = ['bidder_id', 'total_bids']
+
+# Merge the active days and total bids dataframes
+bids_per_day = pd.merge(total_bids, active_days, on='bidder_id')
+
+# Calculate the average number of bids per day
+bids_per_day['BidsPerDay'] = bids_per_day['total_bids'] / bids_per_day['active_days']
+
+# Merge the BidsPerDay feature into the Bidders dataframe
+Bidders = pd.merge(Bidders, bids_per_day[['bidder_id', 'BidsPerDay']], on='bidder_id', how='left')
+
+# Fill NaN values with 0 (in case some bidders have no bids)
+Bidders['BidsPerDay'].fillna(0, inplace=True)
+"
+16,BidsPerWeek - Average number of bids made by the bidder per week.,"
+import pandas as pd
+
+# Assuming Bidders and Bids are already loaded as DataFrames
+
+# Convert the time column to datetime
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Calculate the number of weeks for each bidder
+Bids['week'] = Bids['time'].dt.isocalendar().week
+
+# Group by bidder_id and week to count the number of bids per week
+bids_per_week = Bids.groupby(['bidder_id', 'week']).size().reset_index(name='bids_per_week')
+
+# Calculate the average number of bids per week for each bidder
+avg_bids_per_week = bids_per_week.groupby('bidder_id')['bids_per_week'].mean().reset_index()
+
+# Rename the column to BidsPerWeek
+avg_bids_per_week.rename(columns={'bids_per_week': 'BidsPerWeek'}, inplace=True)
+
+# Merge the new feature with the Bidders table
+Bidders = Bidders.merge(avg_bids_per_week, on='bidder_id', how='left')
+
+# Fill NaN values with 0 (in case some bidders have no bids)
+Bidders['BidsPerWeek'].fillna(0, inplace=True)
+"
+17,MostFrequentAuction - Auction ID where the bidder has placed the most bids.,"
+# Compute the most frequent auction for each bidder
+most_frequent_auction = Bids.groupby('bidder_id')['auction'].agg(lambda x: x.value_counts().idxmax()).reset_index()
+
+# Rename the columns to match the desired feature name
+most_frequent_auction.columns = ['bidder_id', 'MostFrequentAuction']
+
+# Merge the new feature into the Bidders table
+Bidders = Bidders.merge(most_frequent_auction, on='bidder_id', how='left')
+
+# Display the updated Bidders table
+print(Bidders.head())
+"
+18,MostFrequentMerchandise - Merchandise category where the bidder has placed the most bids.,"
+# Compute the most frequent merchandise category for each bidder
+most_frequent_merchandise = Bids.groupby('bidder_id')['merchandise'].agg(lambda x: x.value_counts().idxmax()).reset_index()
+
+# Rename the columns for merging
+most_frequent_merchandise.columns = ['bidder_id', 'MostFrequentMerchandise']
+
+# Merge the new feature into the Bidders table
+Bidders = Bidders.merge(most_frequent_merchandise, on='bidder_id', how='left')
+"
+19,MostFrequentDevice - Device from which the bidder has placed the most bids.,"
+# Group by bidder_id and device, then count the number of bids for each device per bidder
+device_counts = Bids.groupby(['bidder_id', 'device']).size().reset_index(name='device_count')
+
+# Find the device with the maximum count for each bidder
+most_frequent_device = device_counts.loc[device_counts.groupby('bidder_id')['device_count'].idxmax()]
+
+# Merge the most frequent device back into the Bidders table
+Bidders = Bidders.merge(most_frequent_device[['bidder_id', 'device']], on='bidder_id', how='left')
+
+# Rename the column to MostFrequentDevice
+Bidders.rename(columns={'device': 'MostFrequentDevice'}, inplace=True)
+"
+20,MostFrequentCountry - Country from which the bidder has placed the most bids.,"
+# Compute the most frequent country for each bidder
+most_frequent_country = Bids.groupby('bidder_id')['country'].agg(lambda x: x.value_counts().idxmax()).reset_index()
+
+# Rename the column to 'MostFrequentCountry'
+most_frequent_country.rename(columns={'country': 'MostFrequentCountry'}, inplace=True)
+
+# Merge the new feature into the Bidders table
+Bidders = Bidders.merge(most_frequent_country, on='bidder_id', how='left')
+"
+21,MostFrequentIP - IP address from which the bidder has placed the most bids.,"
+MostFrequentIP = Bids.groupby('bidder_id')['ip'].agg(lambda x: x.value_counts().idxmax()).reset_index()
+MostFrequentIP.columns = ['bidder_id', 'MostFrequentIP']
+Bidders = Bidders.merge(MostFrequentIP, on='bidder_id', how='left')
+"
+22,BidTimeVariance - Variance in the time intervals between consecutive bids made by the bidder.,"
+import numpy as np
+
+# Convert 'time' column to numeric if it's not already
+Bids['time'] = pd.to_numeric(Bids['time'], errors='coerce')
+
+# Compute the time differences for each bidder
+Bids['time_diff'] = Bids.groupby('bidder_id')['time'].diff().fillna(0)
+
+# Compute the variance of time differences for each bidder
+bid_time_variance = Bids.groupby('bidder_id')['time_diff'].var().fillna(0)
+
+# Add the new feature to the Bidders table
+Bidders = Bidders.set_index('bidder_id')
+Bidders['BidTimeVariance'] = bid_time_variance
+Bidders = Bidders.reset_index()
+"
+23,BidTimeSkewness - Skewness in the time intervals between consecutive bids made by the bidder.,"
+import pandas as pd
+from scipy.stats import skew
+
+# Assuming Bidders and Bids are already loaded as DataFrames
+
+# Compute the time intervals between consecutive bids for each bidder
+Bids['time'] = pd.to_datetime(Bids['time'])
+Bids = Bids.sort_values(by=['bidder_id', 'time'])
+Bids['time_diff'] = Bids.groupby('bidder_id')['time'].diff().dt.total_seconds()
+
+# Compute the skewness of the time intervals for each bidder
+time_skewness = Bids.groupby('bidder_id')['time_diff'].apply(lambda x: skew(x.dropna()))
+
+# Add the new feature to the Bidders table
+Bidders = Bidders.set_index('bidder_id')
+Bidders['BidTimeSkewness'] = time_skewness
+Bidders = Bidders.reset_index()
+
+# Fill NaN values with 0 (or any other strategy you prefer)
+Bidders['BidTimeSkewness'] = Bidders['BidTimeSkewness'].fillna(0)
+"
+24,BidTimeKurtosis - Kurtosis in the time intervals between consecutive bids made by the bidder.,"
+import pandas as pd
+from scipy.stats import kurtosis
+
+# Assuming Bidders and Bids DataFrames are already loaded
+# Bidders = pd.read_csv('Bidders.csv')
+# Bids = pd.read_csv('Bids.csv')
+
+# Function to compute kurtosis of bid time intervals for a given bidder
+def compute_bid_time_kurtosis(bidder_id):
+    bidder_bids = Bids[Bids['bidder_id'] == bidder_id].sort_values(by='time')
+    time_intervals = bidder_bids['time'].diff().dropna().dt.total_seconds()
+    if len(time_intervals) > 1:
+        return kurtosis(time_intervals)
+    else:
+        return 0  # If there's only one bid or no bids, kurtosis is not defined
+
+# Apply the function to each bidder
+Bidders['BidTimeKurtosis'] = Bidders['bidder_id'].apply(compute_bid_time_kurtosis)
+"
+25,BidTimeEntropy - Entropy of the time intervals between consecutive bids made by the bidder.,"
+import pandas as pd
+import numpy as np
+from scipy.stats import entropy
+
+# Function to compute entropy of time intervals
+def compute_time_entropy(bid_times):
+    if len(bid_times) < 2:
+        return 0
+    time_intervals = np.diff(np.sort(bid_times))
+    if len(time_intervals) == 0:
+        return 0
+    value, counts = np.unique(time_intervals, return_counts=True)
+    return entropy(counts)
+
+# Group bids by bidder_id and compute the BidTimeEntropy for each bidder
+bid_time_entropy = Bids.groupby('bidder_id')['time'].apply(compute_time_entropy).reset_index()
+bid_time_entropy.columns = ['bidder_id', 'BidTimeEntropy']
+
+# Merge the computed feature with the Bidders table
+Bidders = Bidders.merge(bid_time_entropy, on='bidder_id', how='left')
+
+# Fill NaN values with 0 (in case some bidders have no bids)
+Bidders['BidTimeEntropy'] = Bidders['BidTimeEntropy'].fillna(0)
+
+# Display the updated Bidders table
+print(Bidders.head())
+"
+26,AuctionParticipationRate - Ratio of unique auctions participated in to total auctions available.,"
+# Calculate the total number of unique auctions
+total_auctions = Bids['auction'].nunique()
+
+# Calculate the number of unique auctions each bidder participated in
+bidder_auction_counts = Bids.groupby('bidder_id')['auction'].nunique().reset_index()
+bidder_auction_counts.columns = ['bidder_id', 'unique_auctions']
+
+# Calculate the AuctionParticipationRate for each bidder
+bidder_auction_counts['AuctionParticipationRate'] = bidder_auction_counts['unique_auctions'] / total_auctions
+
+# Merge the AuctionParticipationRate back into the Bidders table
+Bidders = Bidders.merge(bidder_auction_counts[['bidder_id', 'AuctionParticipationRate']], on='bidder_id', how='left')
+
+# Fill NaN values with 0 (in case some bidders did not participate in any auctions)
+Bidders['AuctionParticipationRate'].fillna(0, inplace=True)
+"
+27,"MerchandiseDiversityIndex - Diversity index (e.g., Shannon index) of merchandise categories bid on by the bidder.","
+from scipy.stats import entropy
+
+# Calculate the MerchandiseDiversityIndex for each bidder
+def calculate_merchandise_diversity(bids):
+    # Group by bidder_id and merchandise, then count the occurrences
+    merchandise_counts = bids.groupby(['bidder_id', 'merchandise']).size().unstack(fill_value=0)
+    
+    # Calculate the Shannon diversity index for each bidder
+    diversity_index = merchandise_counts.apply(lambda x: entropy(x, base=2), axis=1)
+    
+    return diversity_index
+
+# Compute the diversity index
+diversity_index = calculate_merchandise_diversity(Bids)
+
+# Add the diversity index as a new column to the Bidders table
+Bidders = Bidders.set_index('bidder_id')
+Bidders['MerchandiseDiversityIndex'] = diversity_index
+Bidders = Bidders.reset_index()
+
+# Fill NaN values with 0 (if a bidder has no bids, their diversity index is 0)
+Bidders['MerchandiseDiversityIndex'] = Bidders['MerchandiseDiversityIndex'].fillna(0)
+"
+28,"DeviceDiversityIndex - Diversity index (e.g., Shannon index) of devices used by the bidder.","
+import pandas as pd
+from scipy.stats import entropy
+
+# Assuming Bidders and Bids DataFrames are already loaded
+
+# Compute the DeviceDiversityIndex for each bidder
+def compute_device_diversity_index(bidder_id, bids_df):
+    devices = bids_df[bids_df['bidder_id'] == bidder_id]['device']
+    device_counts = devices.value_counts()
+    return entropy(device_counts)
+
+# Apply the function to each bidder
+Bidders['DeviceDiversityIndex'] = Bidders['bidder_id'].apply(lambda x: compute_device_diversity_index(x, Bids))
+"
+29,"CountryDiversityIndex - Diversity index (e.g., Shannon index) of countries from which the bidder has placed bids.","
+import pandas as pd
+from scipy.stats import entropy
+
+# Assuming Bidders and Bids are already loaded as DataFrames
+# Bidders = pd.read_csv('Bidders.csv')
+# Bids = pd.read_csv('Bids.csv')
+
+# Compute the CountryDiversityIndex for each bidder
+def compute_country_diversity(bidder_id, bids_df):
+    country_counts = bids_df[bids_df['bidder_id'] == bidder_id]['country'].value_counts()
+    return entropy(country_counts)
+
+# Apply the function to each bidder
+Bidders['CountryDiversityIndex'] = Bidders['bidder_id'].apply(lambda x: compute_country_diversity(x, Bids))
+"
+30,"IPDiversityIndex - Diversity index (e.g., Shannon index) of IP addresses used by the bidder.","
+import pandas as pd
+from scipy.stats import entropy
+
+# Assuming Bidders and Bids are already loaded as DataFrames
+
+# Compute the IP diversity index for each bidder
+def compute_ip_diversity(bidder_id, bids_df):
+    ip_counts = bids_df[bids_df['bidder_id'] == bidder_id]['ip'].value_counts()
+    return entropy(ip_counts)
+
+# Apply the function to each bidder
+Bidders['IPDiversityIndex'] = Bidders['bidder_id'].apply(lambda x: compute_ip_diversity(x, Bids))
+"
+31,BidFrequencyChangeRate - Rate of change in bid frequency over time for the bidder.,"
+import pandas as pd
+
+# Assuming Bidders and Bids DataFrames are already loaded
+# Bidders = pd.read_csv('Bidders.csv')
+# Bids = pd.read_csv('Bids.csv')
+
+# Convert time to datetime for easier manipulation
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Calculate the bid frequency change rate for each bidder
+def calculate_bid_frequency_change_rate(bidder_id):
+    bidder_bids = Bids[Bids['bidder_id'] == bidder_id]
+    if len(bidder_bids) < 2:
+        return 0  # Not enough data to calculate change rate
+    
+    bidder_bids = bidder_bids.sort_values(by='time')
+    bidder_bids['time_diff'] = bidder_bids['time'].diff().dt.total_seconds().fillna(0)
+    bidder_bids['bid_frequency'] = 1 / bidder_bids['time_diff'].replace(0, float('inf'))
+    
+    if len(bidder_bids) < 3:
+        return 0  # Not enough data to calculate change rate
+    
+    bidder_bids['frequency_change'] = bidder_bids['bid_frequency'].diff().fillna(0)
+    change_rate = bidder_bids['frequency_change'].mean()
+    
+    return change_rate
+
+Bidders['BidFrequencyChangeRate'] = Bidders['bidder_id'].apply(calculate_bid_frequency_change_rate)
+"
+32,"ConsecutiveBids - Number of consecutive bids made by the bidder within a short time frame (e.g., within 1 minute).","
+import pandas as pd
+
+# Assuming Bidders and Bids are already loaded as DataFrames
+
+# Convert the time column to datetime
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Sort the bids by bidder_id and time
+Bids = Bids.sort_values(by=['bidder_id', 'time'])
+
+# Calculate the time difference between consecutive bids for each bidder
+Bids['time_diff'] = Bids.groupby('bidder_id')['time'].diff().dt.total_seconds()
+
+# Define a short time frame (e.g., 1 minute = 60 seconds)
+short_time_frame = 60
+
+# Identify consecutive bids within the short time frame
+Bids['consecutive'] = (Bids['time_diff'] <= short_time_frame) & (Bids['time_diff'].notna())
+
+# Count the number of consecutive bids for each bidder
+consecutive_bids_count = Bids.groupby('bidder_id')['consecutive'].sum().reset_index()
+
+# Rename the columns
+consecutive_bids_count.columns = ['bidder_id', 'ConsecutiveBids']
+
+# Merge the consecutive bids count with the Bidders table
+Bidders = Bidders.merge(consecutive_bids_count, on='bidder_id', how='left')
+
+# Fill NaN values with 0 (in case some bidders have no consecutive bids)
+Bidders['ConsecutiveBids'] = Bidders['ConsecutiveBids'].fillna(0)
+
+# Display the updated Bidders table
+print(Bidders.head())
+"
+33,"BidHourDistribution - Distribution of bids across different hours of the day (e.g., percentage of bids made in each hour).","
+import pandas as pd
+
+# Assuming Bidders and Bids are already loaded as DataFrames
+
+# Convert time to datetime
+Bids['time'] = pd.to_datetime(Bids['time'], unit='s')
+
+# Extract hour from time
+Bids['hour'] = Bids['time'].dt.hour
+
+# Calculate the distribution of bids across different hours for each bidder
+hour_distribution = Bids.groupby('bidder_id')['hour'].value_counts(normalize=True).unstack(fill_value=0)
+
+# Rename columns to indicate hour
+hour_distribution.columns = [f'hour_{int(col)}_pct' for col in hour_distribution.columns]
+
+# Merge the distribution back to the Bidders table
+Bidders = Bidders.merge(hour_distribution, how='left', left_on='bidder_id', right_index=True)
+
+# Fill NaN values with 0 (in case some bidders have no bids)
+Bidders.fillna(0, inplace=True)
+
+# The Bidders table now has the new feature columns
+"
+34,"BidDayDistribution - Distribution of bids across different days of the week (e.g., percentage of bids made on each day).","
+import pandas as pd
+
+# Assuming Bidders and Bids are already loaded as DataFrames
+# Bidders = pd.read_csv('Bidders.csv')
+# Bids = pd.read_csv('Bids.csv')
+
+# Convert time to datetime
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Extract day of the week from time
+Bids['day_of_week'] = Bids['time'].dt.dayofweek
+
+# Calculate the distribution of bids across different days of the week for each bidder
+day_distribution = Bids.groupby(['bidder_id', 'day_of_week']).size().unstack(fill_value=0)
+
+# Ensure all days of the week are present in the columns
+for i in range(7):
+    if i not in day_distribution.columns:
+        day_distribution[i] = 0
+
+# Normalize the distribution to get percentages
+day_distribution = day_distribution.div(day_distribution.sum(axis=1), axis=0).fillna(0)
+
+# Rename columns to indicate day of the week
+day_distribution.columns = [f'day_{i}_percentage' for i in range(7)]
+
+# Merge the distribution back to the Bidders table
+Bidders = Bidders.merge(day_distribution, how='left', left_on='bidder_id', right_index=True).fillna(0)
+
+# The Bidders DataFrame now has the new feature
+"
+35,"BidWeekDistribution - Distribution of bids across different weeks (e.g., percentage of bids made in each week).","
+import pandas as pd
+
+# Convert time to datetime
+Bids['time'] = pd.to_datetime(Bids['time'], unit='s')
+
+# Extract week number from time
+Bids['week'] = Bids['time'].dt.isocalendar().week
+
+# Calculate the distribution of bids across different weeks for each bidder
+bid_week_distribution = Bids.groupby(['bidder_id', 'week']).size().unstack(fill_value=0)
+bid_week_distribution = bid_week_distribution.div(bid_week_distribution.sum(axis=1), axis=0)
+
+# Add the distribution as a new feature to the Bidders table
+Bidders = Bidders.merge(bid_week_distribution, on='bidder_id', how='left').fillna(0)
+
+# Rename columns to indicate they are week distributions
+Bidders.rename(columns=lambda x: f'week_{x}' if isinstance(x, int) else x, inplace=True)
+"
+36,"BidSeasonality - Seasonal patterns in bidding behavior (e.g., more bids during certain months or holidays).","
+import pandas as pd
+
+# Convert the 'time' column to datetime
+Bids['time'] = pd.to_datetime(Bids['time'], unit='s')
+
+# Extract month from the 'time' column
+Bids['month'] = Bids['time'].dt.month
+
+# Calculate the number of bids per month for each bidder
+monthly_bids = Bids.groupby(['bidder_id', 'month']).size().unstack(fill_value=0)
+
+# Calculate the standard deviation of bids per month for each bidder
+monthly_bids_std = monthly_bids.std(axis=1)
+
+# Add the standard deviation as a new feature to the Bidders table
+Bidders = Bidders.set_index('bidder_id')
+Bidders['BidSeasonality'] = monthly_bids_std
+Bidders = Bidders.reset_index()
+"
+37,BidderActivitySpan - Total duration (in days) of the bidder's activity from the first to the last bid.,"
+# Convert the 'time' column to datetime
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Calculate the first and last bid time for each bidder
+first_bid_time = Bids.groupby('bidder_id')['time'].min()
+last_bid_time = Bids.groupby('bidder_id')['time'].max()
+
+# Calculate the activity span in days
+activity_span = (last_bid_time - first_bid_time).dt.days
+
+# Merge the activity span with the Bidders table
+Bidders = Bidders.merge(activity_span.rename('BidderActivitySpan'), on='bidder_id', how='left')
+
+# Fill NaN values with 0 (in case there are bidders with no bids)
+Bidders['BidderActivitySpan'] = Bidders['BidderActivitySpan'].fillna(0)
+"
+38,"BidderInactivityPeriods - Number of inactive periods (e.g., days with no bids) within the bidder's activity span.","
+# Convert the 'time' column to datetime
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Group by bidder_id and calculate the number of inactive periods
+inactive_periods = Bids.groupby('bidder_id')['time'].apply(lambda x: (x.max() - x.min()).days - x.dt.date.nunique())
+
+# Merge the inactive periods with the Bidders table
+Bidders = Bidders.merge(inactive_periods.rename('BidderInactivityPeriods'), on='bidder_id', how='left')
+
+# Fill NaN values with 0 (assuming no bids means no inactive periods)
+Bidders['BidderInactivityPeriods'] = Bidders['BidderInactivityPeriods'].fillna(0)
+"
+39,BidderInactivityDuration - Total duration (in days) of all inactive periods within the bidder's activity span.,"
+import pandas as pd
+
+# Convert time to datetime for easier manipulation
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Sort bids by bidder_id and time
+Bids = Bids.sort_values(by=['bidder_id', 'time'])
+
+# Calculate the difference in time between consecutive bids for each bidder
+Bids['time_diff'] = Bids.groupby('bidder_id')['time'].diff()
+
+# Define a threshold for inactivity (e.g., 1 day)
+inactivity_threshold = pd.Timedelta(days=1)
+
+# Calculate inactivity periods
+Bids['inactive_period'] = Bids['time_diff'].apply(lambda x: x if x >= inactivity_threshold else pd.Timedelta(0))
+
+# Sum the inactive periods for each bidder
+inactive_duration = Bids.groupby('bidder_id')['inactive_period'].sum().reset_index()
+
+# Convert inactive duration to days
+inactive_duration['inactive_days'] = inactive_duration['inactive_period'].dt.total_seconds() / (24 * 3600)
+
+# Merge the inactive duration with the Bidders table
+Bidders = Bidders.merge(inactive_duration[['bidder_id', 'inactive_days']], on='bidder_id', how='left')
+
+# Fill NaN values with 0 (for bidders with no inactivity periods)
+Bidders['inactive_days'] = Bidders['inactive_days'].fillna(0)
+
+# Rename the column to BidderInactivityDuration
+Bidders.rename(columns={'inactive_days': 'BidderInactivityDuration'}, inplace=True)
+"
+40,BidderInactivityFrequency - Frequency of inactive periods within the bidder's activity span.,"
+import pandas as pd
+
+# Assuming Bidders and Bids DataFrames are already loaded
+
+# Convert time to datetime for easier manipulation
+Bids['time'] = pd.to_datetime(Bids['time'])
+
+# Sort bids by bidder_id and time
+Bids = Bids.sort_values(by=['bidder_id', 'time'])
+
+# Calculate the time differences between consecutive bids for each bidder
+Bids['time_diff'] = Bids.groupby('bidder_id')['time'].diff()
+
+# Define a threshold for inactivity (e.g., 1 hour)
+inactivity_threshold = pd.Timedelta(hours=1)
+
+# Count the number of inactive periods for each bidder
+inactive_periods = Bids[Bids['time_diff'] > inactivity_threshold].groupby('bidder_id').size()
+
+# Add the feature to the Bidders table
+Bidders['BidderInactivityFrequency'] = Bidders['bidder_id'].map(inactive_periods).fillna(0).astype(int)
+"

@@ -1,0 +1,165 @@
+,feature_description,code
+0,user_order_sequence - The order sequence number for the user corresponding to the order_id,"
+# Merge Orders and Order_products__train tables
+merged = pd.merge(Order_products__train, Orders[['order_id', 'order_number']], on='order_id', how='left')
+
+# Rename the order_number column to user_order_sequence
+merged.rename(columns={'order_number': 'user_order_sequence'}, inplace=True)
+
+# Update the Order_products__train table with the new feature
+Order_products__train = merged[['order_id', 'product_id', 'label', 'user_order_sequence']]
+"
+1,order_day_of_week - The day of the week corresponding to the order_dow,"
+import numpy as np
+
+# Merge Order_products__train with Orders table
+merged = Order_products__train.merge(Orders[['order_id', 'order_dow']], on='order_id', how='left')
+
+# Create a dictionary to map order_dow values to day of week names
+dow_map = {0: 'Monday', 1: 'Tuesday', 2: 'Wednesday', 3: 'Thursday', 4: 'Friday', 5: 'Saturday', 6: 'Sunday'}
+
+# Map order_dow values to day of week names
+merged['order_day_of_week'] = merged['order_dow'].map(dow_map)
+
+# Replace NaN values with 'Unknown'
+merged['order_day_of_week'] = merged['order_day_of_week'].fillna('Unknown')
+
+# Update the Order_products__train table with the new feature
+Order_products__train['order_day_of_week'] = merged['order_day_of_week']
+"
+2,order_hour - The hour of the day corresponding to the order_hour_of_day,"
+import pandas as pd
+
+# Merge Order_products__train with Orders table
+merged = pd.merge(Order_products__train, Orders[['order_id', 'order_hour_of_day']], on='order_id', how='left')
+
+# Convert order_hour_of_day to numeric
+merged['order_hour_of_day'] = pd.to_numeric(merged['order_hour_of_day'], errors='coerce')
+
+# Extract hour from order_hour_of_day
+merged['order_hour'] = merged['order_hour_of_day'].apply(lambda x: int(x // 100) if pd.notnull(x) else None)
+
+# Drop the temporary order_hour_of_day column
+Order_products__train = merged.drop('order_hour_of_day', axis=1)
+"
+3,"days_since_last_order - The number of days since the user's previous order, corresponding to the days_since_prior_order","
+# Merge Order_products__train and Orders tables
+merged = pd.merge(Order_products__train, Orders, on='order_id', how='left')
+
+# Group by user_id and order_number, and sort by order_number
+grouped = merged.sort_values(['user_id', 'order_number']).groupby('user_id')
+
+# Compute the difference in days between consecutive orders for each user
+merged['days_since_last_order'] = grouped['days_since_prior_order'].diff(-1).shift(1)
+
+# Replace NaN values with 0 for the first order of each user
+merged['days_since_last_order'] = merged['days_since_last_order'].fillna(0)
+
+# Update the Order_products__train table with the new feature
+Order_products__train['days_since_last_order'] = merged['days_since_last_order']
+"
+4,"product_aisle - The name of the aisle the product belongs to, obtained by joining with the Aisles table","
+# Merge Products and Aisles tables to get product_aisle mapping
+product_aisle_mapping = Products.merge(Aisles, left_on='aisle_id', right_on='aisle_id', how='left')[['product_id', 'aisle']]
+product_aisle_mapping.columns = ['product_id', 'product_aisle']
+
+# Join Order_products__train with product_aisle_mapping to add the product_aisle feature
+Order_products__train = Order_products__train.merge(product_aisle_mapping, on='product_id', how='left')
+"
+5,"product_department - The name of the department the product belongs to, obtained by joining with the Departments table","
+# Merge Products and Departments tables to get product_department
+product_department = pd.merge(Products[['product_id', 'department_id']], Departments, left_on='department_id', right_on='department_id', how='left')
+product_department = product_department[['product_id', 'department']]
+product_department.columns = ['product_id', 'product_department']
+
+# Join with Order_products__train to add the new feature
+Order_products__train = pd.merge(Order_products__train, product_department, on='product_id', how='left')
+"
+6,"product_reordered - Indicates if the product was previously ordered by the user, obtained by joining with the Order_products__prior table","
+# Merge Order_products__train with Order_products__prior
+merged = pd.merge(Order_products__train, Order_products__prior[['order_id', 'product_id', 'reordered']],
+                  on=['order_id', 'product_id'], how='left')
+
+# Fill NaN values with False (assuming a product not present in prior orders is not reordered)
+merged['reordered'] = merged['reordered'].fillna(False)
+
+# Rename the 'reordered' column to 'product_reordered'
+merged = merged.rename(columns={'reordered': 'product_reordered'})
+
+# Update the Order_products__train DataFrame with the new feature
+Order_products__train = merged[Order_products__train.columns.tolist() + ['product_reordered']]
+"
+7,"product_add_to_cart_order - The order in which the product was added to the cart in the previous order, obtained by joining with the Order_products__prior table","
+import pandas as pd
+
+# Merge Order_products__train with Order_products__prior
+merged = pd.merge(Order_products__train, Order_products__prior[['order_id', 'product_id', 'add_to_cart_order']],
+                  how='left', on=['order_id', 'product_id'])
+
+# Add the new feature column
+Order_products__train['product_add_to_cart_order'] = merged['add_to_cart_order']
+"
+8,"user_product_order_count - The number of times the user has ordered the product in the past, calculated by aggregating the Order_products__prior table","
+import pandas as pd
+
+# Merge the Orders and Order_products__prior tables to get order_id and product_id together
+orders_products_prior = pd.merge(Orders[['order_id', 'user_id']], Order_products__prior, on='order_id', how='inner')
+
+# Count the number of times each user has ordered each product
+user_product_order_count = orders_products_prior.groupby(['user_id', 'product_id'])['order_id'].count().reset_index()
+user_product_order_count.rename(columns={'order_id': 'user_product_order_count'}, inplace=True)
+
+# Merge the computed feature with the Order_products__train table using order_id
+Order_products__train = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id', how='left')
+Order_products__train = pd.merge(Order_products__train, user_product_order_count, on=['user_id', 'product_id'], how='left')
+Order_products__train['user_product_order_count'] = Order_products__train['user_product_order_count'].fillna(0)
+"
+9,"user_aisle_order_count - The number of times the user has ordered products from the same aisle in the past, calculated by aggregating the Order_products__prior table and joining with the Aisles table","
+import pandas as pd
+
+# Join Order_products__prior with Orders, Products, and Aisles to get user_id and aisle information
+prior_with_aisle = Order_products__prior.merge(Orders[['order_id', 'user_id']], on='order_id')
+prior_with_aisle = prior_with_aisle.merge(Products[['product_id', 'aisle_id']], on='product_id')
+prior_with_aisle = prior_with_aisle.merge(Aisles[['aisle_id', 'aisle']], on='aisle_id')
+
+# Group by user_id and aisle_id, and count the number of orders
+user_aisle_order_count = prior_with_aisle.groupby(['user_id', 'aisle_id']).size().reset_index()
+user_aisle_order_count.rename(columns={0: 'user_aisle_order_count'}, inplace=True)
+
+# Join Order_products__train with user_aisle_order_count to add the new feature
+Order_products__train = Order_products__train.merge(
+    Orders[['order_id', 'user_id']],
+    on='order_id',
+    how='left'
+)
+Order_products__train = Order_products__train.merge(
+    Products[['product_id', 'aisle_id']],
+    on='product_id',
+    how='left'
+)
+Order_products__train = Order_products__train.merge(
+    user_aisle_order_count,
+    on=['user_id', 'aisle_id'],
+    how='left'
+)
+
+# Fill NaN values with 0 (for new users or new aisles)
+Order_products__train['user_aisle_order_count'] = Order_products__train['user_aisle_order_count'].fillna(0)
+"
+10,"user_department_order_count - The number of times the user has ordered products from the same department in the past, calculated by aggregating the Order_products__prior table and joining with the Departments table","
+import pandas as pd
+
+# Join Order_products__prior with Departments to get department information
+order_products_prior_with_dept = pd.merge(Order_products__prior, Products[['product_id', 'department_id']], on='product_id', how='left')
+order_products_prior_with_dept = pd.merge(order_products_prior_with_dept, Orders[['order_id', 'user_id']], on='order_id', how='left')
+
+# Count the number of orders for each user and department combination
+user_department_order_count = order_products_prior_with_dept.groupby(['user_id', 'department_id']).size().reset_index()
+user_department_order_count.columns = ['user_id', 'department_id', 'user_department_order_count']
+
+# Join the result with Order_products__train to add the new feature
+Order_products__train = pd.merge(Order_products__train, Products[['product_id', 'department_id']], on='product_id', how='left')
+Order_products__train = pd.merge(Order_products__train, Orders[['order_id', 'user_id']], on='order_id', how='left')
+Order_products__train = pd.merge(Order_products__train, user_department_order_count, on=['user_id', 'department_id'], how='left')
+Order_products__train['user_department_order_count'] = Order_products__train['user_department_order_count'].fillna(0).astype(int)
+"

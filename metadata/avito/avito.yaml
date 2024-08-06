@@ -1,0 +1,763 @@
+human_feature_desc:
+  adid_cnt: count of the ad id in stream data
+  af_3h_cnt: count of records in 3 hours after the search session
+  af_cnt: count of records after the search session
+  bf_3h_cnt: count of records in 3 hours before the search session
+  bf_clk_cnt: count of click records before the search session
+  bf_cnt: count of records before the search session
+  bf_ctr: click through rate before the search session
+  ca_match: matched category id
+  ca_pid_match: matched parent category id
+  clk_cnt: historic click count of user on some ad
+  hl_lcnt: count of highlighted ads below the position in search session
+  hl_ucnt: count of highlighted ads above the position in search session
+  ot*_cnt: count of different object type in search session
+  pos_ot_type: hash value of object type tuple in search session
+  pos_type: hash value of position tuple in search session
+  price_pos: rank by price in search session
+  price_ratio: divide price by average price in search session
+  qe_ng_cnt: count of matched 2-ngram words between query and title
+  qe_ng_min_pos: earliest position of matched 2-ngram words between query and title
+  qe_ng_ratio: ratio of matched words 2-ngram between query and title
+  qe_w_cnt: count of matched words between query and title
+  qe_w_pos: earliest position of matched words between query and title
+  qe_w_ratio: ratio of matched words between query and title
+  record_cnt: count of records in search session
+  show_cnt: historic impression count of user on some ad
+  t_cnt: total search count of user
+  t_match: check if query is in the title
+  t_show_cnt: total impression count of user on some ad
+  title_len: the length of title
+  u_aid_ctr: historic click through rate of user on some ad
+human_feature_impl:
+  adid_cnt: '
+
+    ad_count = SearchStream[''AdID''].value_counts()
+
+    ad_count.name = ''AdIDCount''
+
+    SearchStream = SearchStream.join(ad_count, on=''AdID'')
+
+    '
+  af_3h_cnt: "\nSearchInfo['SearchDate'] = pd.to_datetime(SearchInfo['SearchDate'])\n\
+    SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchDate']], on='SearchID',\
+    \ how='left')\n\nSearchStream = SearchStream.sort_values(by='SearchDate')\n\n\
+    # Create a new column to store the count of records in 3 hours after the search\
+    \ session\nSearchStream['count_3h_after'] = SearchStream.apply(\n    lambda row:\
+    \ SearchStream[(SearchStream['SearchDate'] > row['SearchDate']) & \n         \
+    \                    (SearchStream['SearchDate'] <= row['SearchDate'] + pd.Timedelta(hours=3))].shape[0],\
+    \ axis=1\n)\n"
+  af_cnt: '
+
+    # Merge SearchStream with SearchInfo to get SearchDate
+
+    SearchStream = SearchStream.merge(SearchInfo[[''SearchID'', ''SearchDate'']],
+    on=''SearchID'', how=''left'')
+
+
+    # Convert SearchDate to datetime
+
+    SearchStream[''SearchDate''] = pd.to_datetime(SearchStream[''SearchDate''])
+
+
+    # Sort by SearchDate
+
+    SearchStream = SearchStream.sort_values(by=''SearchDate'')
+
+
+    # Compute the count of records after the search session
+
+    SearchStream[''CountAfterSearch''] = SearchStream.groupby(''SearchID'').cumcount(ascending=False)
+
+
+    # Drop the SearchDate column as it''s no longer needed
+
+    SearchStream = SearchStream.drop(columns=[''SearchDate''])
+
+    '
+  bf_3h_cnt: "\nimport pandas as pd\n\n# Convert SearchDate to datetime\nSearchInfo['SearchDate']\
+    \ = pd.to_datetime(SearchInfo['SearchDate'])\n\n# Merge SearchStream with SearchInfo\
+    \ to get SearchDate\nSearchStream = SearchStream.merge(SearchInfo[['SearchID',\
+    \ 'SearchDate']], on='SearchID', how='left')\n\n# Sort by SearchDate\nSearchStream\
+    \ = SearchStream.sort_values(by='SearchDate')\n\n# Initialize the new feature\
+    \ column\nSearchStream['Count3HoursBefore'] = 0\n\n# Compute the count of records\
+    \ in 3 hours before the search session\nfor idx, row in SearchStream.iterrows():\n\
+    \    start_time = row['SearchDate'] - pd.Timedelta(hours=3)\n    end_time = row['SearchDate']\n\
+    \    count = SearchStream[(SearchStream['SearchDate'] >= start_time) & (SearchStream['SearchDate']\
+    \ < end_time)].shape[0]\n    SearchStream.at[idx, 'Count3HoursBefore'] = count\n\
+    \n# Drop the SearchDate column as it was only needed for computation\nSearchStream\
+    \ = SearchStream.drop(columns=['SearchDate'])\n"
+  bf_clk_cnt: '
+
+    # Merge SearchStream with SearchInfo to get SearchDate
+
+    SearchStream = SearchStream.merge(SearchInfo[[''SearchID'', ''SearchDate'']],
+    on=''SearchID'', how=''left'')
+
+
+    # Filter contextual ads
+
+    contextual_ads = SearchStream[SearchStream[''ObjectType''] == 3]
+
+
+    # Sort by SearchDate
+
+    contextual_ads = contextual_ads.sort_values(by=''SearchDate'')
+
+
+    # Compute cumulative count of clicks before each search session
+
+    contextual_ads[''ClickCountBefore''] = contextual_ads.groupby(''AdID'')[''IsClick''].cumsum().shift(fill_value=0)
+
+
+    # Merge back to the original SearchStream
+
+    SearchStream = SearchStream.merge(contextual_ads[[''SearchID'', ''AdID'', ''ClickCountBefore'']],
+    on=[''SearchID'', ''AdID''], how=''left'')
+
+    '
+  bf_cnt: '
+
+    # Merge SearchStream with SearchInfo to get SearchDate
+
+    SearchStream = SearchStream.merge(SearchInfo[[''SearchID'', ''SearchDate'']],
+    on=''SearchID'', how=''left'')
+
+
+    # Convert SearchDate to datetime
+
+    SearchStream[''SearchDate''] = pd.to_datetime(SearchStream[''SearchDate''])
+
+
+    # Sort by SearchDate
+
+    SearchStream = SearchStream.sort_values(by=''SearchDate'')
+
+
+    # Compute the count of records before the search session
+
+    SearchStream[''CountBeforeSearch''] = SearchStream.groupby(''SearchID'').cumcount()
+
+
+    # Drop the SearchDate column as it is no longer needed
+
+    SearchStream = SearchStream.drop(columns=[''SearchDate''])
+
+    '
+  bf_ctr: '
+
+    # Merge SearchStream with SearchInfo to get SearchDate
+
+    SearchStream = SearchStream.merge(SearchInfo[[''SearchID'', ''SearchDate'']],
+    on=''SearchID'', how=''left'')
+
+
+    # Filter contextual ads (ObjectType == 3)
+
+    contextual_ads = SearchStream[SearchStream[''ObjectType''] == 3]
+
+
+    # Calculate cumulative clicks and impressions for each AdID before each search
+    session
+
+    contextual_ads = contextual_ads.sort_values(by=''SearchDate'')
+
+    contextual_ads[''CumulativeClicks''] = contextual_ads.groupby(''AdID'')[''IsClick''].cumsum().shift(1)
+
+    contextual_ads[''CumulativeImpressions''] = contextual_ads.groupby(''AdID'').cumcount()
+
+
+    # Calculate CTR before the search session
+
+    contextual_ads[''CTRBeforeSearch''] = contextual_ads[''CumulativeClicks''] / contextual_ads[''CumulativeImpressions'']
+
+    contextual_ads[''CTRBeforeSearch''] = contextual_ads[''CTRBeforeSearch'']
+
+
+    # Merge the CTRBeforeSearch back to the original SearchStream
+
+    SearchStream = SearchStream.merge(contextual_ads[[''SearchID'', ''AdID'', ''CTRBeforeSearch'']],
+    on=[''SearchID'', ''AdID''], how=''left'')
+
+
+    # Fill NaN values with 0 for non-contextual ads
+
+    SearchStream[''CTRBeforeSearch''] = SearchStream[''CTRBeforeSearch'']
+
+    '
+  ca_match: '
+
+    SearchStream = SearchStream.merge(SearchInfo[[''SearchID'', ''SearchCategoryID'']],
+    on=''SearchID'', how=''left'')
+
+    SearchStream = SearchStream.merge(AdsInfo[[''AdID'', ''CategoryID'']], on=''AdID'',
+    how=''left'')
+
+    SearchStream[''MatchedCategoryID''] = (SearchStream[''SearchCategoryID''] == SearchStream[''CategoryID'']).astype(int)
+
+    '
+  ca_pid_match: '
+
+    # Merge SearchStream with AdsInfo to get CategoryID
+
+    SearchStream = SearchStream.merge(AdsInfo[[''AdID'', ''CategoryID'']], on=''AdID'',
+    how=''left'')
+
+
+    # Merge the result with Category to get ParentCategoryID
+
+    SearchStream = SearchStream.merge(Category[[''CategoryID'', ''ParentCategoryID'']],
+    on=''CategoryID'', how=''left'')
+
+
+    # Rename the column to matched_parent_category_id
+
+    SearchStream.rename(columns={''ParentCategoryID'': ''matched_parent_category_id''},
+    inplace=True)
+
+    '
+  clk_cnt: '
+
+    # Merge SearchStream with SearchInfo to get UserID
+
+    SearchStream = SearchStream.merge(SearchInfo[[''SearchID'', ''UserID'']], on=''SearchID'',
+    how=''left'')
+
+
+    # Calculate historic click count of user on some ad
+
+    historic_clicks = SearchStream.groupby([''UserID'', ''AdID''])[''IsClick''].sum().reset_index()
+
+    historic_clicks.columns = [''UserID'', ''AdID'', ''HistoricClickCount'']
+
+
+    # Merge the historic click count back to the SearchStream
+
+    SearchStream = SearchStream.merge(historic_clicks, on=[''UserID'', ''AdID''],
+    how=''left'')
+
+
+    # Fill NaN values with 0 (for cases where there are no historic clicks)
+
+    SearchStream[''HistoricClickCount''] = SearchStream[''HistoricClickCount'']
+
+    '
+  hl_lcnt: "\nSearchStream['HighlightedAdsBelow'] = SearchStream.groupby('SearchID').apply(\n\
+    \    lambda x: x[::-1].cumsum()['ObjectType'].shift(-1)\n).reset_index(level=0,\
+    \ drop=True)\nSearchStream['HighlightedAdsBelow'] = SearchStream['HighlightedAdsBelow'].where(SearchStream['ObjectType']\
+    \ == 2, 0)\n"
+  hl_ucnt: "\nSearchStream = SearchStream.sort_values(by=['SearchID', 'Position'])\n\
+    SearchStream['HighlightedAdsAbove'] = SearchStream.groupby('SearchID').apply(\n\
+    \    lambda x: x['ObjectType'].eq(2).cumsum().shift(fill_value=0)\n).reset_index(level=0,\
+    \ drop=True)\n"
+  ot*_cnt: '
+
+    # Merge SearchStream with SearchInfo to get SearchID and SearchDate
+
+    merged_df = pd.merge(SearchStream, SearchInfo[[''SearchID'', ''SearchDate'']],
+    on=''SearchID'', how=''left'')
+
+
+    # Count different object types in each search session
+
+    object_type_counts = merged_df.groupby(''SearchID'')[''ObjectType''].nunique().reset_index()
+
+    object_type_counts.columns = [''SearchID'', ''ObjectTypeCount'']
+
+
+    # Merge the counts back to the original SearchStream table
+
+    SearchStream = pd.merge(SearchStream, object_type_counts, on=''SearchID'', how=''left'')
+
+
+    # Rename the new column to match the requested feature name
+
+    SearchStream.rename(columns={''ObjectTypeCount'': ''CountOfDifferentObjectTypeInSearchSession''},
+    inplace=True)
+
+    '
+  pos_ot_type: '
+
+    import hashlib
+
+
+    # Merge SearchStream with SearchInfo to get SearchID and ObjectType together
+
+    merged_df = pd.merge(SearchStream, SearchInfo[[''SearchID'', ''UserID'']], on=''SearchID'',
+    how=''left'')
+
+
+    # Group by SearchID and create a tuple of ObjectType for each search session
+
+    object_type_tuples = merged_df.groupby(''SearchID'')[''ObjectType''].apply(tuple).reset_index()
+
+
+    # Compute the hash value for each tuple
+
+    object_type_tuples[''ObjectTypeHash''] = object_type_tuples[''ObjectType''].apply(lambda
+    x: hashlib.md5(str(x).encode()).hexdigest())
+
+
+    # Merge the hash values back to the original SearchStream dataframe
+
+    SearchStream = pd.merge(SearchStream, object_type_tuples[[''SearchID'', ''ObjectTypeHash'']],
+    on=''SearchID'', how=''left'')
+
+    '
+  pos_type: '
+
+    import hashlib
+
+
+    # Merge SearchStream with SearchInfo to get SearchID and Position together
+
+    merged_df = SearchStream.merge(SearchInfo[[''SearchID'', ''SearchDate'']], on=''SearchID'',
+    how=''left'')
+
+
+    # Create a tuple of positions for each search session
+
+    position_tuples = merged_df.groupby(''SearchID'')[''Position''].apply(tuple)
+
+
+    # Compute hash value for each position tuple
+
+    position_hashes = position_tuples.apply(lambda x: hashlib.md5(str(x).encode()).hexdigest())
+
+
+    # Map the hash values back to the SearchStream table
+
+    SearchStream[''PositionTupleHash''] = SearchStream[''SearchID''].map(position_hashes)
+
+    '
+  price_pos: '
+
+    SearchStream = SearchStream.merge(AdsInfo[[''AdID'', ''Price'']], on=''AdID'',
+    how=''left'')
+
+    SearchStream[''RankByPrice''] = SearchStream.groupby(''SearchID'')[''Price''].rank(method=''min'')
+
+    '
+  price_ratio: '
+
+    # Merge SearchStream with AdsInfo to get the Price column
+
+    SearchStream = SearchStream.merge(AdsInfo[[''AdID'', ''Price'']], on=''AdID'',
+    how=''left'')
+
+
+    # Merge SearchStream with SearchInfo to get the SearchID and group by SearchID
+    to calculate average price per search session
+
+    SearchStream = SearchStream.merge(SearchInfo[[''SearchID'']], on=''SearchID'',
+    how=''left'')
+
+    average_price_per_search = SearchStream.groupby(''SearchID'')[''Price''].mean().reset_index()
+
+    average_price_per_search.columns = [''SearchID'', ''AvgPrice'']
+
+
+    # Merge the average price back to the SearchStream
+
+    SearchStream = SearchStream.merge(average_price_per_search, on=''SearchID'', how=''left'')
+
+
+    # Calculate the new feature
+
+    SearchStream[''PriceByAvgPriceInSession''] = SearchStream[''Price''] / SearchStream[''AvgPrice'']
+
+
+    # Drop the intermediate columns
+
+    SearchStream.drop(columns=[''Price'', ''AvgPrice''], inplace=True)
+
+    '
+  qe_ng_cnt: "\nfrom sklearn.feature_extraction.text import CountVectorizer\nimport\
+    \ numpy as np\n\n# Merge SearchStream with SearchInfo to get SearchQuery\nSearchStream\
+    \ = SearchStream.merge(SearchInfo[['SearchID', 'SearchQuery']], on='SearchID',\
+    \ how='left')\n\n# Merge SearchStream with AdsInfo to get Title\nSearchStream\
+    \ = SearchStream.merge(AdsInfo[['AdID', 'Title']], on='AdID', how='left')\n\n\
+    # Function to count matched 2-gram words between query and title\ndef count_2gram_matches(query,\
+    \ title):\n    if pd.isnull(query) or pd.isnull(title) or query is None or title\
+    \ is None:\n        return 0\n    vectorizer = CountVectorizer(ngram_range=(2,\
+    \ 2))\n    try:\n        query_ngrams = vectorizer.fit_transform([query]).toarray()\n\
+    \    except:\n        return 0\n    title_ngrams = vectorizer.transform([title]).toarray()\n\
+    \    return np.sum(np.minimum(query_ngrams, title_ngrams))\n\n# Apply the function\
+    \ to each row\nSearchStream['2gram_match_count'] = SearchStream.apply(lambda row:\
+    \ count_2gram_matches(row['SearchQuery'], row['Title']), axis=1)\n"
+  qe_ng_min_pos: "\nimport pandas as pd\nimport numpy as np\nfrom nltk import ngrams\n\
+    \n# Assuming the dataframes are already loaded as follows:\n# SearchStream, AdsInfo,\
+    \ SearchInfo\n\n# Merge SearchStream with AdsInfo to get the titles\nSearchStream\
+    \ = SearchStream.merge(AdsInfo[['AdID', 'Title']], on='AdID', how='left')\n\n\
+    # Merge SearchStream with SearchInfo to get the search queries\nSearchStream =\
+    \ SearchStream.merge(SearchInfo[['SearchID', 'SearchQuery']], on='SearchID', how='left')\n\
+    \n# Function to find earliest position of matched 2-ngram words between query\
+    \ and title\ndef earliest_ngram_position(query, title):\n    if pd.isnull(query)\
+    \ or pd.isnull(title):\n        return np.nan\n    query_ngrams = list(ngrams(query.split(),\
+    \ 2))\n    title_words = title.split()\n    for i in range(len(title_words) -\
+    \ 1):\n        if (title_words[i], title_words[i+1]) in query_ngrams:\n      \
+    \      return i\n    return np.nan\n\n# Apply the function to each row\nSearchStream['Earliest2NgramPosition']\
+    \ = SearchStream.apply(\n    lambda row: earliest_ngram_position(row['SearchQuery'],\
+    \ row['Title']), axis=1\n)\n\n# Drop the merged columns to clean up\nSearchStream.drop(columns=['Title',\
+    \ 'SearchQuery'], inplace=True)\n"
+  qe_ng_ratio: "\nfrom sklearn.feature_extraction.text import CountVectorizer\nfrom\
+    \ sklearn.metrics.pairwise import cosine_similarity\n\n# Merge SearchStream with\
+    \ SearchInfo to get SearchQuery\nSearchStream = SearchStream.merge(SearchInfo[['SearchID',\
+    \ 'SearchQuery']], on='SearchID', how='left')\n\n# Merge SearchStream with AdsInfo\
+    \ to get Title\nSearchStream = SearchStream.merge(AdsInfo[['AdID', 'Title']],\
+    \ on='AdID', how='left')\n\n# Function to compute 2-gram ratio\ndef compute_ngram_ratio(query,\
+    \ title):\n    if pd.isnull(query) or pd.isnull(title):\n        return 0\n  \
+    \  vectorizer = CountVectorizer(ngram_range=(2, 2))\n    try:\n        ngrams\
+    \ = vectorizer.fit_transform([query, title])\n    except:\n        return 0\n\
+    \    similarity = cosine_similarity(ngrams[0:1], ngrams[1:2])\n    return similarity[0][0]\n\
+    \n# Apply the function to each row\nSearchStream['NgramRatio'] = SearchStream.apply(lambda\
+    \ row: compute_ngram_ratio(row['SearchQuery'], row['Title']), axis=1)\n"
+  qe_w_cnt: "\nimport numpy as np\n\n# Merge SearchStream with SearchInfo to get SearchQuery\n\
+    SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchQuery']], on='SearchID',\
+    \ how='left')\n\n# Merge SearchStream with AdsInfo to get Title\nSearchStream\
+    \ = SearchStream.merge(AdsInfo[['AdID', 'Title']], on='AdID', how='left')\n\n\
+    # Function to count matched words between query and title\ndef count_matched_words(row):\n\
+    \    if pd.isnull(row['SearchQuery']) or pd.isnull(row['Title']):\n        return\
+    \ 0\n    query_words = set(row['SearchQuery'].lower().split())\n    title_words\
+    \ = set(row['Title'].lower().split())\n    return len(query_words & title_words)\n\
+    \n# Apply the function to each row\nSearchStream['CountMatchedWords'] = SearchStream.apply(count_matched_words,\
+    \ axis=1)\n"
+  qe_w_pos: "\nimport numpy as np\n\n# Merge SearchStream with SearchInfo to get SearchQuery\n\
+    SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchQuery']], on='SearchID',\
+    \ how='left')\n\n# Merge SearchStream with AdsInfo to get Title\nSearchStream\
+    \ = SearchStream.merge(AdsInfo[['AdID', 'Title']], on='AdID', how='left')\n\n\
+    # Function to find the earliest position of matched words between query and title\n\
+    def earliest_position(query, title):\n    if pd.isnull(query) or pd.isnull(title):\n\
+    \        return np.nan\n    query_words = query.split()\n    title_words = title.split()\n\
+    \    positions = [title_words.index(word) for word in query_words if word in title_words]\n\
+    \    return min(positions) if positions else np.nan\n\n# Apply the function to\
+    \ create the new feature\nSearchStream['EarliestPosition'] = SearchStream.apply(lambda\
+    \ row: earliest_position(row['SearchQuery'], row['Title']), axis=1)\n"
+  qe_w_ratio: "\nimport pandas as pd\n\n# Assuming the dataframes are already loaded\
+    \ as follows:\n# SearchStream, AdsInfo, SearchInfo\n\n# Merge SearchStream with\
+    \ AdsInfo to get the ad titles\nmerged_df = SearchStream.merge(AdsInfo[['AdID',\
+    \ 'Title']], on='AdID', how='left')\n\n# Merge the result with SearchInfo to get\
+    \ the search queries\nmerged_df = merged_df.merge(SearchInfo[['SearchID', 'SearchQuery']],\
+    \ on='SearchID', how='left')\n\n# Function to compute the ratio of matched words\
+    \ between query and title\ndef compute_ratio(query, title):\n    if pd.isnull(query)\
+    \ or pd.isnull(title):\n        return 0\n    query_words = set(query.lower().split())\n\
+    \    title_words = set(title.lower().split())\n    if not query_words or not title_words:\n\
+    \        return 0\n    matched_words = query_words.intersection(title_words)\n\
+    \    return len(matched_words) / len(query_words)\n\n# Apply the function to compute\
+    \ the new feature\nmerged_df['RatioMatchedWords'] = merged_df.apply(lambda row:\
+    \ compute_ratio(row['SearchQuery'], row['Title']), axis=1)\n\n# Add the new feature\
+    \ to the original SearchStream table\nSearchStream['RatioMatchedWords'] = merged_df['RatioMatchedWords']\n\
+    \n# Now SearchStream has the new feature\n"
+  record_cnt: '
+
+    # Merge SearchStream with SearchInfo to get SearchID and SearchDate
+
+    merged_df = pd.merge(SearchStream, SearchInfo[[''SearchID'', ''SearchDate'']],
+    on=''SearchID'', how=''left'')
+
+
+    # Count the number of records in each search session
+
+    session_counts = merged_df.groupby(''SearchID'').size().reset_index(name=''SessionCount'')
+
+
+    # Merge the session counts back to the original SearchStream table
+
+    SearchStream = pd.merge(SearchStream, session_counts, on=''SearchID'', how=''left'')
+
+    '
+  show_cnt: '
+
+    # Merge SearchStream with SearchInfo to get UserID
+
+    SearchStream = SearchStream.merge(SearchInfo[[''SearchID'', ''UserID'']], on=''SearchID'',
+    how=''left'')
+
+
+    # Calculate historic impression count of user on some ad
+
+    SearchStream[''HistoricImpressionCount''] = SearchStream.groupby([''UserID'',
+    ''AdID'']).cumcount()
+
+
+    # Drop the UserID column as it was only needed for the calculation
+
+    SearchStream = SearchStream.drop(columns=[''UserID''])
+
+    '
+  t_cnt: '
+
+    total_search_count = SearchInfo.groupby(''UserID'')[''SearchID''].count().reset_index()
+
+    total_search_count.columns = [''UserID'', ''TotalSearchCount'']
+
+    SearchStream = SearchStream.merge(SearchInfo[[''SearchID'', ''UserID'']], on=''SearchID'',
+    how=''left'')
+
+    SearchStream = SearchStream.merge(total_search_count, on=''UserID'', how=''left'')
+
+    SearchStream.drop(columns=[''UserID''], inplace=True)
+
+    '
+  t_match: "\n# Merge SearchStream with SearchInfo to get SearchQuery\nSearchStream\
+    \ = SearchStream.merge(SearchInfo[['SearchID', 'SearchQuery']], on='SearchID',\
+    \ how='left')\n\n# Merge SearchStream with AdsInfo to get Title\nSearchStream\
+    \ = SearchStream.merge(AdsInfo[['AdID', 'Title']], on='AdID', how='left')\n\n\
+    # Define a function to check if query is in the title\ndef query_in_title(row):\n\
+    \    if pd.isnull(row['SearchQuery']) or pd.isnull(row['Title']):\n        return\
+    \ 0\n    return int(row['SearchQuery'].lower() in row['Title'].lower())\n\n# Apply\
+    \ the function to create the new feature\nSearchStream['QueryInTitle'] = SearchStream.apply(query_in_title,\
+    \ axis=1)\n"
+  t_show_cnt: '
+
+    # Merge SearchStream with SearchInfo to get UserID
+
+    SearchStream = SearchStream.merge(SearchInfo[[''SearchID'', ''UserID'']], on=''SearchID'',
+    how=''left'')
+
+
+    # Group by UserID and AdID to count total impressions
+
+    impression_counts = SearchStream.groupby([''UserID'', ''AdID'']).size().reset_index(name=''TotalImpressionCount'')
+
+
+    # Merge the impression counts back to the SearchStream
+
+    SearchStream = SearchStream.merge(impression_counts, on=[''UserID'', ''AdID''],
+    how=''left'')
+
+    '
+  title_len: '
+
+    SearchStream = SearchStream.merge(AdsInfo[[''AdID'', ''Title'']], on=''AdID'',
+    how=''left'')
+
+    SearchStream[''TitleLength''] = SearchStream[''Title''].apply(lambda x: len(str(x))
+    if pd.notnull(x) else 0)
+
+    SearchStream.drop(columns=[''Title''], inplace=True)
+
+    '
+  u_aid_ctr: '
+
+    # Merge SearchStream with SearchInfo to get UserID
+
+    SearchStream = SearchStream.merge(SearchInfo[[''SearchID'', ''UserID'']], on=''SearchID'',
+    how=''left'')
+
+
+    # Filter only contextual ads (ObjectType == 3)
+
+    contextual_ads = SearchStream[SearchStream[''ObjectType''] == 3]
+
+
+    # Calculate historic click through rate of user on some ad
+
+    user_ad_clicks = contextual_ads.groupby([''UserID'', ''AdID''])[''IsClick''].sum().reset_index(name=''UserAdClicks'')
+
+    user_ad_impressions = contextual_ads.groupby([''UserID'', ''AdID''])[''IsClick''].count().reset_index(name=''UserAdImpressions'')
+
+
+    # Merge clicks and impressions to calculate CTR
+
+    user_ad_ctr = user_ad_clicks.merge(user_ad_impressions, on=[''UserID'', ''AdID''])
+
+    user_ad_ctr[''UserAdCTR''] = user_ad_ctr[''UserAdClicks''] / user_ad_ctr[''UserAdImpressions'']
+
+
+    # Merge the calculated CTR back to the original SearchStream
+
+    SearchStream = SearchStream.merge(user_ad_ctr[[''UserID'', ''AdID'', ''UserAdCTR'']],
+    on=[''UserID'', ''AdID''], how=''left'')
+
+
+    # Fill NaN values with 0 (assuming no history means 0 CTR)
+
+    SearchStream[''UserAdCTR''] = SearchStream[''UserAdCTR'']
+
+    '
+metric: log_loss
+name: avito
+table_path: data/avito
+table_schemas:
+- columns:
+  - description: anonymized identifier of visitor's cookie.
+    dtype: primary_key
+    name: UserID
+  - description: anonymized identifier of user's browser.
+    dtype: category
+    name: UserAgentID
+  - description: anonymized identifier of user's OS derived from browser family.
+    dtype: category
+    name: UserAgentOSID
+  - description: anonymized identifier of user device type and model (Samsung GT-I9500,
+      iPhone, etc.)
+    dtype: category
+    name: UserDeviceID
+  - description: anonymized identifier of user's browser family (Chrome, Safari, etc).
+    dtype: category
+    name: UserAgentFamilyID
+  name: UserInfo
+  time_column: null
+- columns:
+  - description: identifier of search event.
+    dtype: primary_key
+    name: SearchID
+  - description: date and time of the search event.
+    dtype: datetime
+    name: SearchDate
+  - description: anonymized identifier of visitor's IP.
+    dtype: foreign_key
+    link_to: IP.id
+    name: IPID
+  - description: anonymized identifier of visitor's cookie.
+    dtype: foreign_key
+    link_to: UserInfo.UserID
+    name: UserID
+  - description: whether user was logged on with his/hers login (1) or not (0).
+    dtype: bool
+    name: IsUserLoggedOn
+  - description: raw query text if it was specified while search. NULL otherwise.
+    dtype: text
+    name: SearchQuery
+  - description: identifier of the location where search was made (see also Location
+      table).
+    dtype: foreign_key
+    link_to: Location.LocationID
+    name: SearchLocationID
+  - description: category filter of the search (see also Category table).
+    dtype: foreign_key
+    link_to: Category.CategoryID
+    name: SearchCategoryID
+  name: SearchInfo
+  time_column: null
+- columns:
+  - description: anonymized identifier of visitor's cookie (see also UserInfo table).
+    dtype: foreign_key
+    link_to: UserInfo.UserID
+    name: UserID
+  - description: anonymized identifier of visitor's IP.
+    dtype: foreign_key
+    link_to: IP.id
+    name: IPID
+  - description: identity of the ad's landing page visited by user (see also AdsInfo
+      table).
+    dtype: foreign_key
+    link_to: AdsInfo.AdID
+    name: AdID
+  - description: date and time of the phone request event.
+    dtype: datetime
+    name: PhoneRequestDate
+  name: PhoneRequestsStream
+  time_column: null
+- columns:
+  - description: identifier of the category.
+    dtype: primary_key
+    name: CategoryID
+  - description: level of category for search/impression/ad (3 = subcategory, 2 =
+      category, 1 = total)
+    dtype: category
+    name: Level
+  - description: identifier of parent category.
+    dtype: foreign_key
+    link_to: Category.CategoryID
+    name: ParentCategoryID
+  - description: identifier of subcategory that has parent category.
+    dtype: foreign_key
+    link_to: Category.CategoryID
+    name: SubcategoryID
+  name: Category
+  time_column: null
+- columns:
+  - description: anonymized identifier of visitor's cookie (see also UserInfo table).
+    dtype: foreign_key
+    link_to: UserInfo.UserID
+    name: UserID
+  - description: anonymized identifier of visitor's IP.
+    dtype: foreign_key
+    link_to: IP.id
+    name: IPID
+  - description: identity of the ad's landing page visited by user (see also AdsInfo
+      table).
+    dtype: foreign_key
+    link_to: AdsInfo.AdID
+    name: AdID
+  - description: date and time of viewing the ad.
+    dtype: datetime
+    name: ViewDate
+  name: VisitsStream
+  time_column: null
+- columns:
+  - description: identity of an ad.
+    dtype: primary_key
+    name: AdID
+  - description: ad's geo-targeting. (references Location.tsv for regular ads). NULL
+      for contextual ads.
+    dtype: foreign_key
+    link_to: Location.LocationID
+    name: LocationID
+  - description: ad's category according to avito classification model. (references
+      Category table)
+    dtype: foreign_key
+    link_to: Category.CategoryID
+    name: CategoryID
+  - description: price for an ad
+    dtype: float
+    name: Price
+  - description: raw title text.
+    dtype: text
+    name: Title
+  - description: Unknown feature
+    dtype: bool
+    name: IsContext
+  name: AdsInfo
+  time_column: null
+- columns:
+  - description: identifier of the location.
+    dtype: primary_key
+    name: LocationID
+  - description: level of search/impression (3 = city, 2 = region, 1 = country)
+    dtype: category
+    name: Level
+  - description: identifier of the search/impression region.
+    dtype: category
+    name: RegionID
+  - description: identifier of the search/impression city.
+    dtype: category
+    name: CityID
+  name: Location
+  time_column: null
+- columns:
+  - description: identifier for a visitors's search event.
+    dtype: foreign_key
+    link_to: SearchInfo.SearchID
+    name: SearchID
+  - description: identifier of the ad (see also ad description in AdsInfo table).
+    dtype: foreign_key
+    link_to: AdsInfo.AdID
+    name: AdID
+  - description: position of the ad in search result page (1 - is first ad on a page
+      starting from the top). Only ads on position 1, 2, 6, 7, and 8 are logged.
+    dtype: category
+    name: Position
+  - description: 'type of the ad shown to user. The options are: 1 - regular free
+      ads added by users; 2 - highlighted regular (owners have to pay fixed price
+      to highlight them and stick to the top for some period of time); 3 - contextual
+      ads (owners have to pay per visitor''s click).'
+    dtype: category
+    name: ObjectType
+  - description: some naive history-based estimation of click-through rate for contextual
+      ads, calculated when the ad is showed. For non-contextual ads this field equals
+      NULL.
+    dtype: float
+    name: HistCTR
+  - description: 1 if there was a click on this ad. Otherwise 0. For non-contextual
+      ads this field equals NULL. The goal of this competition is to make a click
+      prediction model for contextual ads.
+    dtype: bool
+    name: IsClick
+  name: SearchStream
+  time_column: null
+target_column: IsClick
+target_table: SearchStream
+task_split: data/avito/split.pqt

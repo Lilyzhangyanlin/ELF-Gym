@@ -1,0 +1,727 @@
+human_feature_desc:
+  ad_doc_category_interaction: Interaction feature of ad document category and user
+    document category
+  ad_impression_counts: Counts of impressions for each ad_id landing document_id campaign_id
+    and advertiser_id
+  ad_landing_page_view_count: Total number of page views for each ad's landing page
+  ad_page_landing_page_dot_product: Inner dot product of document confidence vectors
+    of ad impression page and ad landing page
+  competing_ads_hashed: Hashed feature of each individual competing ad in FFM
+  featurename: feature_description
+  hashed_user_pageview_sources: Hashed sources of all the page view documents for
+    each user from documents_meta
+  immediate_post_click_document: Document viewed immediately after a click event
+  landing_page_confidence_vector: A vector for each landing page composed of confidence
+    levels from documents_*.csv used as numeric data in FFM
+  leak_feature_rcarson: rcarson's leak feature bucketed into rows based on the page_view
+    doc timestamp relative to the display timestamp (1 hour after; 1 day after and
+    >1 day after)
+  log_time_diff_ad_doc_creation: Log of time difference between display document creation
+    time and ad document creation time
+  log_time_diff_display_doc_creation: Log of time difference between display document
+    creation time and current time
+  one_hour_after_clicks_documents: Hashed feature of documents clicked by a user within
+    one hour of the ad click
+  user_confidence_vector: Average of document confidence vectors viewed by each user
+    used as numeric data in FFM
+  user_document_traffic_source_combinations: Hashed combinations of document/traffic_source
+    clicked by a user in page_views.treating different traffic sources separately
+  user_future_ad_doc_view: Flag if the user viewed ad documents in the future
+  user_future_ad_view: Flag if the user viewed this ad in the future
+  user_future_campaign_interaction: Flag if the user has not viewed this ad in the
+    future but viewed ads of the same campaign
+  user_landing_page_dot_product: Inner dot product of user confidence vector and ad
+    landing page document confidence vector
+  user_page_view_count: Total number of page views by each user
+  user_past_ad_interaction: Flag if user viewed this ad in the past and whether they
+    clicked it
+  user_past_category_interaction: Flag if user interacted with the same category in
+    the past
+  user_past_publisher_interaction: Flag if user interacted with the same publisher
+    in the past
+  user_past_source_interaction: Flag if user interacted with the same source in the
+    past
+  user_past_topic_interaction: Flag if user interacted with the same topic in the
+    past
+  user_viewed_same_publisher: Flag if user viewed ad documents of the same publisher
+    within page_views
+  user_viewed_same_source: Flag if user viewed ad documents of the same source within
+    page_views
+  user_viewed_similar_category: Flag if user viewed ad documents of similar category
+  user_viewed_similar_topic: Flag if user viewed ad documents of similar topic
+  weekday_hour_interaction: Interaction feature of weekday and hour of the user activity
+  xgb_leaf_for_ffm_feature: XGBoost leaf node features used for FFM
+human_feature_impl:
+  ad_doc_category_interaction: '
+
+    # Merge Clicks with Promoted to get the ad document_id
+
+    Clicks = Clicks.merge(Promoted[[''ad_id'', ''document_id'']], on=''ad_id'', how=''left'')
+
+    Clicks.rename(columns={''document_id'': ''document_id_ad''}, inplace=True)
+
+
+    # Merge Clicks with Events to get the user document_id
+
+    Clicks = Clicks.merge(Events[[''display_id'', ''document_id'']], on=''display_id'',
+    how=''left'')
+
+    Clicks.rename(columns={''document_id'': ''document_id_user''}, inplace=True)
+
+
+    # Merge Clicks with Documents_categories to get the ad document category
+
+    Clicks = Clicks.merge(Documents_categories[[''document_id'', ''category_id'']],
+    left_on=''document_id_ad'', right_on=''document_id'', how=''left'')
+
+    Clicks.rename(columns={''category_id'': ''category_id_ad''}, inplace=True)
+
+
+    # Merge Clicks with Documents_categories to get the user document category
+
+    Clicks = Clicks.merge(Documents_categories[[''document_id'', ''category_id'']],
+    left_on=''document_id_user'', right_on=''document_id'', how=''left'')
+
+    Clicks.rename(columns={''category_id'': ''category_id_user''}, inplace=True)
+
+
+    # Create the interaction feature
+
+    Clicks[''ad_doc_category_interaction''] = Clicks[''category_id_ad''] == Clicks[''category_id_user'']
+
+    Clicks = Clicks.groupby([''display_id'', ''ad_id'', ''clicked''])[''ad_doc_category_interaction''].sum().reset_index()
+
+    '
+  ad_impression_counts: '
+
+    # Merge Clicks with Promoted to get ad-related information
+
+    Clicks = Clicks.merge(Promoted, on=''ad_id'', how=''left'')
+
+
+    # Calculate ad impression counts
+
+    ad_impression_counts = Clicks.groupby([''ad_id'', ''document_id'', ''campaign_id'',
+    ''advertiser_id'']).size().reset_index(name=''ad_impression_counts'')
+
+
+    # Merge the ad impression counts back to the Clicks table
+
+    Clicks = Clicks.merge(ad_impression_counts, on=[''ad_id'', ''document_id'', ''campaign_id'',
+    ''advertiser_id''], how=''left'')
+
+    '
+  ad_landing_page_view_count: '
+
+    # Merge Pageviews with Promoted to get the document_id for each ad
+
+    pageviews_promoted = Pageviews.merge(Promoted, on=''document_id'', how=''inner'')
+
+
+    # Count the number of page views for each ad''s landing page
+
+    ad_landing_page_view_count = pageviews_promoted.groupby(''ad_id'').size().reset_index(name=''ad_landing_page_view_count'')
+
+
+    # Merge the count back to the Clicks table
+
+    Clicks = Clicks.merge(ad_landing_page_view_count, on=''ad_id'', how=''left'')
+
+
+    # Fill NaN values with 0 (in case some ads have no page views)
+
+    Clicks[''ad_landing_page_view_count''] = Clicks[''ad_landing_page_view_count'']
+
+    '
+  ad_page_landing_page_dot_product: .nan
+  competing_ads_hashed: "\nimport hashlib\n\n# Function to hash competing ads\ndef\
+    \ hash_competing_ads(ad_ids):\n    ad_ids_str = ','.join(map(str, sorted(ad_ids)))\n\
+    \    return hashlib.md5(ad_ids_str.encode()).hexdigest()\n\n# Merge Clicks with\
+    \ Events to get display_id and uuid\nclicks_events = Clicks.merge(Events[['display_id',\
+    \ 'uuid']], on='display_id', how='left')\n\n# Merge with Promoted to get ad_id\
+    \ and document_id\nclicks_events_promoted = clicks_events.merge(Promoted[['ad_id',\
+    \ 'document_id']], on='ad_id', how='left')\n\n# Group by display_id and collect\
+    \ all ad_ids\ncompeting_ads = Clicks.groupby('display_id')['ad_id'].apply(list).reset_index()\n\
+    \n# Hash the competing ads\ncompeting_ads['competing_ads_hashed'] = competing_ads['ad_id'].apply(hash_competing_ads)\n\
+    \n# Merge the hashed competing ads back to the Clicks table\nClicks = Clicks.merge(competing_ads[['display_id',\
+    \ 'competing_ads_hashed']], on='display_id', how='left')\n"
+  featurename: .nan
+  hashed_user_pageview_sources: '
+
+    import hashlib
+
+
+    # Merge Pageviews with Documents_meta to get the source_id for each pageview
+
+    pageviews_with_sources = pd.merge(Pageviews, Documents_meta[[''document_id'',
+    ''source_id'']], on=''document_id'', how=''left'')
+
+
+    # Group by uuid and aggregate the source_ids into a single string
+
+    user_pageview_sources = pageviews_with_sources.groupby(''uuid'')[''source_id''].apply(lambda
+    x: '' ''.join(map(str, x))).reset_index()
+
+
+    # Hash the concatenated source_ids string for each user
+
+    user_pageview_sources[''hashed_user_pageview_sources''] = user_pageview_sources[''source_id''].apply(lambda
+    x: hashlib.md5(x.encode()).hexdigest())
+
+
+    # Merge the hashed sources back to the Clicks table via the Events table
+
+    Clicks = pd.merge(Clicks, Events[[''display_id'', ''uuid'']], on=''display_id'',
+    how=''left'')
+
+    Clicks = pd.merge(Clicks, user_pageview_sources[[''uuid'', ''hashed_user_pageview_sources'']],
+    on=''uuid'', how=''left'')
+
+
+    # Drop the uuid column as it''s no longer needed
+
+    Clicks.drop(columns=[''uuid''], inplace=True)
+
+    '
+  immediate_post_click_document: .nan
+  landing_page_confidence_vector: "\nimport numpy as np\n\n# Merge Promoted with Documents_topics,\
+    \ Documents_entities, and Documents_categories to get confidence levels\npromoted_topics\
+    \ = Promoted.merge(Documents_topics, on='document_id', how='left')\npromoted_entities\
+    \ = Promoted.merge(Documents_entities, on='document_id', how='left')\npromoted_categories\
+    \ = Promoted.merge(Documents_categories, on='document_id', how='left')\n\n# Aggregate\
+    \ confidence levels by ad_id\ntopics_confidence = promoted_topics.groupby('ad_id')['confidence_level'].apply(list).reset_index(name='topics_confidence')\n\
+    entities_confidence = promoted_entities.groupby('ad_id')['confidence_level'].apply(list).reset_index(name='entities_confidence')\n\
+    categories_confidence = promoted_categories.groupby('ad_id')['confidence_level'].apply(list).reset_index(name='categories_confidence')\n\
+    \n# Merge aggregated confidence levels back to Clicks\nClicks = Clicks.merge(topics_confidence,\
+    \ on='ad_id', how='left')\nClicks = Clicks.merge(entities_confidence, on='ad_id',\
+    \ how='left')\nClicks = Clicks.merge(categories_confidence, on='ad_id', how='left')\n\
+    \n# Fill NaN values with empty lists\nClicks['topics_confidence'] = Clicks['topics_confidence'].apply(lambda\
+    \ x: x if isinstance(x, list) else [])\nClicks['entities_confidence'] = Clicks['entities_confidence'].apply(lambda\
+    \ x: x if isinstance(x, list) else [])\nClicks['categories_confidence'] = Clicks['categories_confidence'].apply(lambda\
+    \ x: x if isinstance(x, list) else [])\n\n# Combine all confidence levels into\
+    \ a single vector\nClicks['landing_page_confidence_vector'] = Clicks.apply(\n\
+    \    lambda row: row['topics_confidence'] + row['entities_confidence'] + row['categories_confidence'],\
+    \ axis=1\n)\n\n# Drop intermediate columns\nClicks.drop(columns=['topics_confidence',\
+    \ 'entities_confidence', 'categories_confidence'], inplace=True)\n"
+  leak_feature_rcarson: .nan
+  log_time_diff_ad_doc_creation: .nan
+  log_time_diff_display_doc_creation: .nan
+  one_hour_after_clicks_documents: .nan
+  user_confidence_vector: '
+
+    import pandas as pd
+
+
+    # Merge Pageviews with Documents_topics to get confidence levels for each document
+    viewed by each user
+
+    pageviews_topics = pd.merge(Pageviews, Documents_topics, on=''document_id'', how=''left'')
+
+
+    # Calculate the average confidence vector for each user
+
+    user_confidence_vector = pageviews_topics.groupby(''uuid'')[''confidence_level''].mean().reset_index()
+
+    user_confidence_vector.columns = [''uuid'', ''user_confidence_vector'']
+
+
+    # Merge Events with Clicks to get the uuid for each display_id in Clicks
+
+    events_clicks = pd.merge(Events[[''display_id'', ''uuid'']], Clicks, on=''display_id'',
+    how=''right'')
+
+
+    # Merge the user confidence vector with the Clicks table
+
+    Clicks = pd.merge(events_clicks, user_confidence_vector, on=''uuid'', how=''left'')
+
+
+    # Drop the uuid column as it is no longer needed
+
+    Clicks = Clicks.drop(columns=[''uuid''])
+
+    '
+  user_document_traffic_source_combinations: "\nimport hashlib\n\n# Merge Pageviews\
+    \ with Clicks to get the user and document information\nmerged_df = Clicks.merge(Events,\
+    \ on='display_id', how='left')\n\n# Merge the merged_df with Pageviews to get\
+    \ the traffic_source information\nmerged_df = merged_df.merge(Pageviews[['uuid',\
+    \ 'document_id', 'traffic_source']], on=['uuid', 'document_id'], how='left')\n\
+    \n# Create a new column for the hashed combinations of document_id and traffic_source\n\
+    merged_df['user_document_traffic_source_combinations'] = merged_df.apply(\n  \
+    \  lambda row: hashlib.md5(f\"{row['uuid']}_{row['document_id']}_{row['traffic_source']}\"\
+    .encode()).hexdigest(), axis=1\n)\n\n# Add the new feature to the Clicks table\n\
+    Clicks['user_document_traffic_source_combinations'] = merged_df['user_document_traffic_source_combinations']\n"
+  user_future_ad_doc_view: .nan
+  user_future_ad_view: '
+
+    # Merge Clicks with Promoted to get document_id for each ad
+
+    Clicks = Clicks.merge(Promoted[[''ad_id'', ''document_id'']], on=''ad_id'', how=''left'')
+
+
+    # Merge Clicks with Events to get user and timestamp for each display_id
+
+    Clicks = Clicks.merge(Events[[''display_id'', ''uuid'', ''timestamp'']], on=''display_id'',
+    how=''left'')
+
+
+    Pageviews = Pageviews.rename(columns={''timestamp'': ''timestamp_pageview''})
+
+
+    # Merge Clicks with Pageviews to get future page views of the same ad by the same
+    user
+
+    Clicks = Clicks.merge(Pageviews[[''uuid'', ''document_id'', ''timestamp_pageview'']],
+    on=[''uuid'', ''document_id''], how=''left'', suffixes=('''', ''_pageview''))
+
+
+    # Create the user_future_ad_view feature
+
+    Clicks[''user_future_ad_view''] = (Clicks[''timestamp_pageview''] > Clicks[''timestamp'']).astype(int)
+
+
+    # Drop the intermediate columns used for merging
+
+    Clicks = Clicks.drop(columns=[''document_id'', ''timestamp_pageview''])
+
+
+    # Ensure the Clicks table is sorted by display_id and ad_id
+
+    Clicks = Clicks.sort_values(by=[''display_id'', ''ad_id'']).reset_index(drop=True)
+
+
+    Clicks = Clicks.groupby([''display_id'', ''ad_id'', ''clicked''])[''user_future_ad_view''].sum().reset_index()
+
+    '
+  user_future_campaign_interaction: '
+
+    # Merge Clicks with Promoted to get campaign_id
+
+    Clicks = Clicks.merge(Promoted[[''ad_id'', ''campaign_id'']], on=''ad_id'', how=''left'')
+
+
+    # Merge Clicks with Events to get user and timestamp information
+
+    Clicks = Clicks.merge(Events[[''display_id'', ''uuid'', ''timestamp'']], on=''display_id'',
+    how=''left'')
+
+
+    # Merge Pageviews with Promoted to get campaign_id for each pageview
+
+    Pageviews = Pageviews.merge(Promoted[[''document_id'', ''campaign_id'']], on=''document_id'',
+    how=''left'')
+
+
+    # Create a DataFrame to track future campaign interactions
+
+    future_interactions = Pageviews[[''uuid'', ''campaign_id'', ''timestamp'']].copy()
+
+    future_interactions.rename(columns={''timestamp'': ''future_timestamp''}, inplace=True)
+
+
+    # Merge Clicks with future_interactions to check for future interactions
+
+    Clicks = Clicks.merge(future_interactions, on=[''uuid'', ''campaign_id''], how=''left'')
+
+
+    # Create the user_future_campaign_interaction feature
+
+    Clicks[''user_future_campaign_interaction''] = ((Clicks[''future_timestamp'']
+    > Clicks[''timestamp'']) & (Clicks[''future_timestamp''].notnull())).astype(int)
+
+
+    # Drop the temporary columns used for merging
+
+    Clicks.drop(columns=[''campaign_id'', ''uuid'', ''timestamp'', ''future_timestamp''],
+    inplace=True)
+
+
+    Clicks = Clicks.groupby([''display_id'', ''ad_id'', ''clicked''])[''user_future_campaign_interaction''].sum().reset_index()
+
+    '
+  user_landing_page_dot_product: .nan
+  user_page_view_count: '
+
+    user_page_view_count = Pageviews.groupby(''uuid'').size().reset_index(name=''user_page_view_count'')
+
+    Clicks = Clicks.merge(Events[[''display_id'', ''uuid'']], on=''display_id'', how=''left'')
+
+    Clicks = Clicks.merge(user_page_view_count, on=''uuid'', how=''left'')
+
+    Clicks.drop(columns=[''uuid''], inplace=True)
+
+    '
+  user_past_ad_interaction: "\n# Merge Clicks with Promoted to get document_id for\
+    \ each ad\n_Clicks = Clicks\nClicks = Clicks.merge(Promoted[['ad_id', 'document_id']],\
+    \ on='ad_id', how='left')\n\n# Merge Clicks with Events to get user information\
+    \ for each display_id\nClicks = Clicks.merge(Events[['display_id', 'uuid', 'timestamp']],\
+    \ on='display_id', how='left')\n\n# Merge Pageviews with Clicks to get past interactions\n\
+    Pageviews = Pageviews.rename(columns={'document_id': 'pageview_document_id', 'timestamp':\
+    \ 'pageview_timestamp'})\nClicks = Clicks.merge(Pageviews[['uuid', 'pageview_document_id',\
+    \ 'pageview_timestamp']], \n                      left_on=['uuid', 'document_id'],\
+    \ \n                      right_on=['uuid', 'pageview_document_id'], \n      \
+    \                how='left')\n\n# Create the user_past_ad_interaction feature\n\
+    Clicks['user_past_ad_interaction'] = Clicks.apply(\n    lambda row: 1 if pd.notnull(row['pageview_document_id'])\
+    \ and row['pageview_timestamp'] < row['timestamp'] else 0, axis=1\n)\n\n# Drop\
+    \ unnecessary columns\nClicks = Clicks.drop(columns=['pageview_document_id', 'pageview_timestamp'])\n\
+    \n# Ensure the new feature is in the Clicks table\nClicks['user_past_ad_interaction']\
+    \ = Clicks['user_past_ad_interaction'].astype(int)\n\ninteraction = (Clicks[['display_id',\
+    \ 'ad_id', 'clicked', 'user_past_ad_interaction']]\n               .groupby(['display_id',\
+    \ 'ad_id', 'clicked'])['user_past_ad_interaction']\n               .max())\n\n\
+    Clicks = _Clicks.join(interaction, on=['display_id', 'ad_id', 'clicked'], how='left')\n"
+  user_past_category_interaction: '
+
+    # Merge Clicks with Events to get user and document information
+
+    Clicks = Clicks.merge(Events[[''display_id'', ''uuid'', ''document_id'']], on=''display_id'',
+    how=''left'')
+
+
+    # Merge Clicks with Promoted to get the document_id of the ad
+
+    Clicks = Clicks.merge(Promoted[[''ad_id'', ''document_id'']], on=''ad_id'', how=''left'',
+    suffixes=('''', ''_ad''))
+
+
+    # Merge Clicks with Documents_categories to get the category of the ad document
+
+    Clicks = Clicks.merge(Documents_categories[[''document_id'', ''category_id'']],
+    left_on=''document_id_ad'', right_on=''document_id'', how=''left'')
+
+
+    # Merge Pageviews with Documents_categories to get the category of the viewed
+    documents
+
+    Pageviews = Pageviews.merge(Documents_categories[[''document_id'', ''category_id'']],
+    on=''document_id'', how=''left'')
+
+
+    # Create a set of past user-category interactions
+
+    user_category_interactions = Pageviews.groupby([''uuid'', ''category_id'']).size().reset_index().rename(columns={0:
+    ''interaction_count''})
+
+
+    # Merge Clicks with user_category_interactions to flag if user interacted with
+    the same category in the past
+
+    Clicks = Clicks.merge(user_category_interactions[[''uuid'', ''category_id'']],
+    on=[''uuid'', ''category_id''], how=''left'', indicator=True)
+
+
+    # Create the user_past_category_interaction feature
+
+    Clicks[''user_past_category_interaction''] = (Clicks[''_merge''] == ''both'').astype(int)
+
+
+    # Drop the temporary columns
+
+    Clicks.drop(columns=[''document_id_ad'', ''category_id'', ''_merge''], inplace=True)
+
+
+    Clicks = Clicks.groupby([''display_id'', ''ad_id'', ''clicked''])[''user_past_category_interaction''].sum().reset_index()
+
+    '
+  user_past_publisher_interaction: "\n# Merge Clicks with Events to get user and document\
+    \ information\nclicks_events = Clicks.merge(Events, on='display_id', how='left')\n\
+    \n# Merge with Promoted to get the document_id of the ad\nclicks_events = clicks_events.merge(Promoted,\
+    \ on='ad_id', how='left', suffixes=('_event', '_ad'))\n\n# Merge with Documents_meta\
+    \ to get the publisher_id of the ad document\nclicks_events = clicks_events.merge(Documents_meta[['document_id',\
+    \ 'publisher_id']], left_on='document_id_ad', right_on='document_id', how='left')\n\
+    \n# Merge Pageviews with Documents_meta to get the publisher_id of the viewed\
+    \ documents\npageviews_meta = Pageviews.merge(Documents_meta[['document_id', 'publisher_id']],\
+    \ on='document_id', how='left')\n\n# Create a set of user-publisher interactions\n\
+    user_publisher_interactions = pageviews_meta.groupby('uuid')['publisher_id'].apply(set).reset_index()\n\
+    \n# Merge with clicks_events to check if the user has interacted with the same\
+    \ publisher before\nclicks_events = clicks_events.merge(user_publisher_interactions,\
+    \ on='uuid', how='left', suffixes=('', '_past'))\n\n# Fill NaN values in 'publisher_id_past'\
+    \ with empty sets\nclicks_events['publisher_id_past'] = clicks_events['publisher_id_past'].apply(lambda\
+    \ x: x if isinstance(x, set) else set())\n\n# Create the feature user_past_publisher_interaction\n\
+    clicks_events['user_past_publisher_interaction'] = clicks_events.apply(\n    lambda\
+    \ row: 1 if row['publisher_id'] in row['publisher_id_past'] else 0, axis=1\n)\n\
+    \n# Add the new feature to the Clicks table\nClicks['user_past_publisher_interaction']\
+    \ = clicks_events['user_past_publisher_interaction']\n"
+  user_past_source_interaction: '
+
+    # Merge Clicks with Events to get the user and document information
+
+    Clicks = Clicks.merge(Events[[''display_id'', ''uuid'', ''document_id'']], on=''display_id'',
+    how=''left'')
+
+
+    # Merge Clicks with Promoted to get the document_id of the ad
+
+    Clicks = Clicks.merge(Promoted[[''ad_id'', ''document_id'']], on=''ad_id'', how=''left'',
+    suffixes=('''', ''_ad''))
+
+
+    # Merge Clicks with Documents_meta to get the source_id of the ad document
+
+    Clicks = Clicks.merge(Documents_meta[[''document_id'', ''source_id'']], left_on=''document_id_ad'',
+    right_on=''document_id'', how=''left'', suffixes=('''', ''_ad_right''))
+
+
+    # Merge Pageviews with Documents_meta to get the source_id of the viewed documents
+
+    Pageviews = Pageviews.merge(Documents_meta[[''document_id'', ''source_id'']],
+    on=''document_id'', how=''left'')
+
+
+    # Create a flag for past interaction with the same source
+
+    Pageviews[''user_past_source_interaction''] = Pageviews.duplicated(subset=[''uuid'',
+    ''source_id''], keep=False).astype(int)
+
+
+    # Aggregate the flag to get the maximum value per user and source
+
+    user_source_interaction = Pageviews.groupby([''uuid'', ''source_id''])[''user_past_source_interaction''].max().reset_index()
+
+
+    # Merge the aggregated flag back to the Clicks table
+
+    Clicks = Clicks.merge(user_source_interaction, on=[''uuid'', ''source_id''], how=''left'')
+
+
+    # Fill NaN values with 0 (no past interaction)
+
+    Clicks[''user_past_source_interaction''] = Clicks[''user_past_source_interaction'']
+
+    '
+  user_past_topic_interaction: "\n# Merge Clicks with Events to get user and document\
+    \ information\nclicks_events = Clicks.merge(Events, on='display_id', suffixes=('',\
+    \ '_event'))\n\n# Merge with Promoted to get the document_id of the ad\nclicks_events_promoted\
+    \ = clicks_events.merge(Promoted, on='ad_id')\n\n# Merge with Documents_topics\
+    \ to get the topics of the ad documents\nclicks_events_promoted_topics = clicks_events_promoted.merge(Documents_topics,\
+    \ left_on='document_id_y', right_on='document_id')\n\n# Merge with Pageviews to\
+    \ get past interactions of the user\nuser_past_interactions = Pageviews.merge(Documents_topics,\
+    \ on='document_id')\n\n# Create a flag for past topic interaction\nuser_past_interactions['user_past_topic_interaction']\
+    \ = 1\n\n# Merge the past interactions with the clicks_events_promoted_topics\
+    \ to check for past interactions\nclicks_with_past_interactions = clicks_events_promoted_topics.merge(\n\
+    \    user_past_interactions[['uuid', 'topic_id', 'user_past_topic_interaction']],\n\
+    \    left_on=['uuid', 'topic_id'],\n    right_on=['uuid', 'topic_id'],\n    how='left'\n\
+    )\n\n# Fill NaN values with 0 (no past interaction)\nclicks_with_past_interactions['user_past_topic_interaction']\
+    \ = clicks_with_past_interactions['user_past_topic_interaction']\n\n# Add the\
+    \ new feature to the Clicks table\nClicks['user_past_topic_interaction'] = clicks_with_past_interactions['user_past_topic_interaction']\n\
+    \n# Drop intermediate DataFrame to free up memory\ndel clicks_events, clicks_events_promoted,\
+    \ clicks_events_promoted_topics, user_past_interactions, clicks_with_past_interactions\n"
+  user_viewed_same_publisher: .nan
+  user_viewed_same_source: '
+
+    # Merge Clicks with Promoted to get document_id for each ad
+
+    clicks_promoted = Clicks.merge(Promoted, on=''ad_id'', how=''left'')
+
+
+    # Merge with Events to get uuid for each display_id
+
+    clicks_promoted_events = clicks_promoted.merge(Events[[''display_id'', ''uuid'']],
+    on=''display_id'', how=''left'')
+
+
+    # Merge with Documents_meta to get source_id for each document
+
+    clicks_promoted_meta = clicks_promoted_events.merge(Documents_meta[[''document_id'',
+    ''source_id'']], on=''document_id'', how=''left'')
+
+
+    # Merge Pageviews with Documents_meta to get source_id for each document in page
+    views
+
+    pageviews_meta = Pageviews.merge(Documents_meta[[''document_id'', ''source_id'']],
+    on=''document_id'', how=''left'')
+
+
+    # Create a flag for each user if they have viewed documents from the same source
+
+    user_source_views = pageviews_meta.groupby([''uuid'', ''source_id'']).size().reset_index(name=''view_count'')
+
+    user_source_views[''user_viewed_same_source''] = user_source_views[''view_count'']
+    > 1
+
+
+    # Merge the flag back to the Clicks table
+
+    clicks_promoted_meta = clicks_promoted_meta.merge(user_source_views[[''uuid'',
+    ''source_id'', ''user_viewed_same_source'']], on=[''uuid'', ''source_id''], how=''left'')
+
+
+    # Fill NaN values with False (user did not view the same source)
+
+    clicks_promoted_meta[''user_viewed_same_source''] = clicks_promoted_meta[''user_viewed_same_source'']
+
+
+    # Add the new feature to the Clicks table
+
+    Clicks[''user_viewed_same_source''] = clicks_promoted_meta[''user_viewed_same_source'']
+
+    '
+  user_viewed_similar_category: .nan
+  user_viewed_similar_topic: .nan
+  weekday_hour_interaction: '
+
+    import pandas as pd
+
+
+    # Convert timestamp to datetime in Events table
+
+    Events[''datetime''] = pd.to_datetime(Events[''timestamp''], unit=''ns'')
+
+
+    # Extract weekday and hour from datetime
+
+    Events[''weekday''] = Events[''datetime''].dt.weekday
+
+    Events[''hour''] = Events[''datetime''].dt.hour
+
+
+    # Create the interaction feature
+
+    Events[''weekday_hour_interaction''] = Events[''weekday''].astype(str) + ''_''
+    + Events[''hour''].astype(str)
+
+
+    # Merge the interaction feature into Clicks table
+
+    Clicks = Clicks.merge(Events[[''display_id'', ''weekday_hour_interaction'']],
+    on=''display_id'', how=''left'')
+
+    '
+  xgb_leaf_for_ffm_feature: .nan
+metric: ruc_auc
+name: outbrain
+table_path: data/outbrain-downsample
+table_schemas:
+- columns:
+  - description: Unique identifier for the display context
+    dtype: primary_key
+    name: display_id
+  - description: Unique identifier for the document
+    dtype: foreign_key
+    link_to: Documents_meta.document_id
+    name: document_id
+  - description: Geographical location of the user
+    dtype: category
+    name: geo_location
+  - description: Platform of the event
+    dtype: category
+    name: platform
+  - description: Timestamp of the event
+    dtype: datetime
+    name: timestamp
+  - description: Unique identifier for the user
+    dtype: foreign_key
+    link_to: User.id
+    name: uuid
+  name: Events
+  time_column: null
+- columns:
+  - description: Unique identifier for the document (web page)
+    dtype: foreign_key
+    link_to: Documents_meta.document_id
+    name: document_id
+  - description: Geographical location of the user (country>state>DMA)
+    dtype: category
+    name: geo_location
+  - description: Platform of the page view (desktop = 1, mobile = 2, tablet = 3)
+    dtype: category
+    name: platform
+  - description: Timestamp of the page view (ms since 1970-01-01 - 1465876799998)
+    dtype: datetime
+    name: timestamp
+  - description: Source of the traffic (internal = 1, search = 2, social = 3)
+    dtype: category
+    name: traffic_source
+  - description: Unique identifier for the user
+    dtype: foreign_key
+    link_to: User.id
+    name: uuid
+  name: Pageviews
+  time_column: null
+- columns:
+  - description: Unique identifier for the ad
+    dtype: foreign_key
+    link_to: AdsInfo.AdID
+    name: ad_id
+  - description: Indicates if the ad was clicked (1 if clicked, 0 otherwise)
+    dtype: bool
+    name: clicked
+  - description: Unique identifier for the display context
+    dtype: foreign_key
+    link_to: Events.display_id
+    name: display_id
+  name: Clicks
+  time_column: null
+- columns:
+  - description: Unique identifier for the ad
+    dtype: primary_key
+    name: ad_id
+  - description: Unique identifier for the advertiser
+    dtype: category
+    name: advertiser_id
+  - description: Unique identifier for the campaign
+    dtype: category
+    name: campaign_id
+  - description: Unique identifier for the document
+    dtype: foreign_key
+    link_to: Documents_meta.document_id
+    name: document_id
+  name: Promoted
+  time_column: null
+- columns:
+  - description: Unique identifier for the document
+    dtype: primary_key
+    name: document_id
+  - description: Timestamp of the document publication
+    dtype: datetime
+    name: publish_time
+  - description: Publisher identifier
+    dtype: category
+    name: publisher_id
+  - description: Source identifier where the document is displayed
+    dtype: category
+    name: source_id
+  name: Documents_meta
+  time_column: null
+- columns:
+  - description: Confidence level of the topic in the document
+    dtype: float
+    name: confidence_level
+  - description: Unique identifier for the document
+    dtype: foreign_key
+    link_to: Documents_meta.document_id
+    name: document_id
+  - description: Unique identifier for the topic
+    dtype: category
+    name: topic_id
+  name: Documents_topics
+  time_column: null
+- columns:
+  - description: Unique identifier for the category
+    dtype: category
+    name: category_id
+  - description: Confidence level of the category in the document
+    dtype: float
+    name: confidence_level
+  - description: Unique identifier for the document
+    dtype: foreign_key
+    link_to: Documents_meta.document_id
+    name: document_id
+  name: Documents_categories
+  time_column: null
+- columns:
+  - description: Confidence level of the entity in the document
+    dtype: float
+    name: confidence_level
+  - description: Unique identifier for the document
+    dtype: foreign_key
+    link_to: Documents_meta.document_id
+    name: document_id
+  - description: Unique identifier for the entity
+    dtype: category
+    name: entity_id
+  name: Documents_entities
+  time_column: null
+target_column: clicked
+target_table: Clicks
+task_split: null

@@ -1,0 +1,620 @@
+,feature_description,code
+0,UserSearchCount - Count of searches made by the user (UserID) up to the current search event.,"
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID', 'SearchDate']], on='SearchID', how='left')
+SearchStream = SearchStream.sort_values(by=['UserID', 'SearchDate'])
+SearchStream['UserSearchCount'] = SearchStream.groupby('UserID').cumcount()
+SearchStream = SearchStream.drop(columns=['UserID', 'SearchDate'])
+"
+1,UserClickCount - Count of clicks made by the user (UserID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get UserID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+
+# Sort by SearchID to ensure chronological order
+SearchStream = SearchStream.sort_values(by='SearchID')
+
+# Calculate UserClickCount
+SearchStream['UserClickCount'] = SearchStream.groupby('UserID')['IsClick'].cumsum().shift(fill_value=0)
+"
+2,UserCTR - Click-through rate of the user (UserID) up to the current search event (UserClickCount / UserSearchCount).,"
+# Merge SearchStream with SearchInfo to get UserID for each SearchID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+
+# Filter only contextual ads (ObjectType == 3)
+contextual_ads = SearchStream[SearchStream['ObjectType'] == 3]
+
+# Calculate UserClickCount and UserSearchCount
+user_click_count = contextual_ads.groupby('UserID')['IsClick'].sum().reset_index().rename(columns={'IsClick': 'UserClickCount'})
+user_search_count = contextual_ads.groupby('UserID')['SearchID'].count().reset_index().rename(columns={'SearchID': 'UserSearchCount'})
+
+# Merge counts back to the SearchStream
+SearchStream = SearchStream.merge(user_click_count, on='UserID', how='left')
+SearchStream = SearchStream.merge(user_search_count, on='UserID', how='left')
+
+# Calculate UserCTR
+SearchStream['UserCTR'] = SearchStream['UserClickCount'] / SearchStream['UserSearchCount']
+
+# Fill NaN values with 0 (for users with no clicks or searches)
+SearchStream['UserCTR'] = SearchStream['UserCTR'].fillna(0)
+
+# Drop intermediate columns
+SearchStream = SearchStream.drop(columns=['UserClickCount', 'UserSearchCount'])
+"
+3,AdSearchCount - Count of times the ad (AdID) has appeared in search results up to the current search event.,"
+SearchStream['AdSearchCount'] = SearchStream.groupby('AdID').cumcount()
+"
+4,AdClickCount - Count of clicks on the ad (AdID) up to the current search event.,"
+SearchStream['AdClickCount'] = SearchStream.groupby('AdID')['IsClick'].cumsum().shift(fill_value=0)
+"
+5,AdCTR - Click-through rate of the ad (AdID) up to the current search event (AdClickCount / AdSearchCount).,"
+# Merge SearchStream with SearchInfo to get the SearchDate
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+
+# Sort SearchStream by AdID and SearchDate to ensure chronological order
+SearchStream = SearchStream.sort_values(by=['AdID', 'SearchDate'])
+
+# Calculate cumulative counts of clicks and searches for each AdID
+SearchStream['AdClickCount'] = SearchStream.groupby('AdID')['IsClick'].cumsum().shift(fill_value=0)
+SearchStream['AdSearchCount'] = SearchStream.groupby('AdID').cumcount()
+
+# Calculate AdCTR
+SearchStream['AdCTR'] = SearchStream['AdClickCount'] / SearchStream['AdSearchCount'].replace(0, 1)
+
+# Drop the intermediate columns
+SearchStream = SearchStream.drop(columns=['AdClickCount', 'AdSearchCount'])
+
+# Drop the SearchDate column as it was only needed for sorting
+SearchStream = SearchStream.drop(columns=['SearchDate'])
+"
+6,PositionCTR - Click-through rate for the specific ad position (Position) up to the current search event.,"
+SearchStream['PositionCTR'] = SearchStream.groupby('Position')['IsClick'].transform(lambda x: x.expanding().mean())
+"
+7,"UserAdInteractionCount - Count of interactions (views, clicks) between the user (UserID) and the ad (AdID) up to the current search event.","
+# Merge SearchStream with SearchInfo to get UserID and SearchDate
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID', 'SearchDate']], on='SearchID', how='left')
+
+# Combine VisitsStream and PhoneRequestsStream to get all interactions
+VisitsStream['InteractionDate'] = VisitsStream['ViewDate']
+PhoneRequestsStream['InteractionDate'] = PhoneRequestsStream['PhoneRequestDate']
+Interactions = pd.concat([VisitsStream[['UserID', 'AdID', 'InteractionDate']], 
+                          PhoneRequestsStream[['UserID', 'AdID', 'InteractionDate']]])
+
+# Convert dates to datetime
+SearchStream['SearchDate'] = pd.to_datetime(SearchStream['SearchDate'])
+Interactions['InteractionDate'] = pd.to_datetime(Interactions['InteractionDate'])
+
+# Sort interactions by date
+Interactions = Interactions.sort_values(by='InteractionDate')
+
+# Initialize the new feature column
+SearchStream['UserAdInteractionCount'] = 0
+
+# Iterate over each row in SearchStream to count interactions up to the search date
+for idx, row in SearchStream.iterrows():
+    user_id = row['UserID']
+    ad_id = row['AdID']
+    search_date = row['SearchDate']
+    
+    # Count interactions before the search date
+    interaction_count = Interactions[(Interactions['UserID'] == user_id) & 
+                                     (Interactions['AdID'] == ad_id) & 
+                                     (Interactions['InteractionDate'] < search_date)].shape[0]
+    
+    # Update the feature column
+    SearchStream.at[idx, 'UserAdInteractionCount'] = interaction_count
+
+# Drop the temporary columns
+SearchStream = SearchStream.drop(columns=['UserID', 'SearchDate'])
+"
+8,UserAdCTR - Click-through rate for interactions between the user (UserID) and the ad (AdID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get UserID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+
+# Calculate UserAdCTR
+clicks = SearchStream.groupby(['UserID', 'AdID'])['IsClick'].sum().reset_index(name='TotalClicks')
+impressions = SearchStream.groupby(['UserID', 'AdID'])['IsClick'].count().reset_index(name='TotalImpressions')
+user_ad_ctr = clicks.merge(impressions, on=['UserID', 'AdID'])
+user_ad_ctr['UserAdCTR'] = user_ad_ctr['TotalClicks'] / user_ad_ctr['TotalImpressions']
+
+# Merge UserAdCTR back to SearchStream
+SearchStream = SearchStream.merge(user_ad_ctr[['UserID', 'AdID', 'UserAdCTR']], on=['UserID', 'AdID'], how='left')
+
+# Fill NaN values with 0 (for cases where there are no previous interactions)
+SearchStream['UserAdCTR'] = SearchStream['UserAdCTR'].fillna(0)
+"
+9,UserCategorySearchCount - Count of searches made by the user (UserID) in the same category (SearchCategoryID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get SearchCategoryID and UserID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID', 'SearchCategoryID', 'SearchDate']], on='SearchID', how='left')
+
+# Sort by UserID and SearchDate to ensure proper cumulative count
+SearchStream = SearchStream.sort_values(by=['UserID', 'SearchDate'])
+
+# Calculate the cumulative count of searches by UserID and SearchCategoryID
+SearchStream['UserCategorySearchCount'] = SearchStream.groupby(['UserID', 'SearchCategoryID']).cumcount()
+
+# Drop the merged columns to revert to the original structure with the new feature added
+SearchStream = SearchStream.drop(columns=['UserID', 'SearchCategoryID', 'SearchDate'])
+"
+10,UserCategoryClickCount - Count of clicks made by the user (UserID) in the same category (SearchCategoryID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get UserID and SearchCategoryID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID', 'SearchCategoryID', 'SearchDate']], on='SearchID', how='left')
+
+# Filter only contextual ads (ObjectType == 3)
+contextual_ads = SearchStream[SearchStream['ObjectType'] == 3]
+
+# Sort by UserID and SearchDate to ensure chronological order
+contextual_ads = contextual_ads.sort_values(by=['UserID', 'SearchDate'])
+
+# Compute cumulative sum of clicks per user and category
+contextual_ads['UserCategoryClickCount'] = contextual_ads.groupby(['UserID', 'SearchCategoryID'])['IsClick'].cumsum().shift(fill_value=0)
+
+# Merge the computed feature back to the original SearchStream
+SearchStream = SearchStream.merge(contextual_ads[['SearchID', 'UserCategoryClickCount']], on='SearchID', how='left')
+
+# Fill NaN values with 0 for non-contextual ads
+SearchStream['UserCategoryClickCount'] = SearchStream['UserCategoryClickCount'].fillna(0)
+"
+11,UserCategoryCTR - Click-through rate of the user (UserID) in the same category (SearchCategoryID) up to the current search event (UserCategoryClickCount / UserCategorySearchCount).,"
+# Merge SearchStream with SearchInfo to get UserID and SearchCategoryID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID', 'SearchCategoryID']], on='SearchID', how='left')
+
+# Initialize dictionaries to keep track of click counts and search counts
+user_category_click_count = {}
+user_category_search_count = {}
+
+# Initialize a list to store the UserCategoryCTR values
+user_category_ctr = []
+
+# Iterate over the rows of the SearchStream DataFrame
+for index, row in SearchStream.iterrows():
+    user_id = row['UserID']
+    category_id = row['SearchCategoryID']
+    is_click = row['IsClick']
+    
+    # Initialize the nested dictionaries if they don't exist
+    if user_id not in user_category_click_count:
+        user_category_click_count[user_id] = {}
+        user_category_search_count[user_id] = {}
+    
+    if category_id not in user_category_click_count[user_id]:
+        user_category_click_count[user_id][category_id] = 0
+        user_category_search_count[user_id][category_id] = 0
+    
+    # Calculate the UserCategoryCTR before updating the counts
+    if user_category_search_count[user_id][category_id] > 0:
+        ctr = user_category_click_count[user_id][category_id] / user_category_search_count[user_id][category_id]
+    else:
+        ctr = 0
+    
+    user_category_ctr.append(ctr)
+    
+    # Update the counts
+    user_category_search_count[user_id][category_id] += 1
+    if is_click == 1:
+        user_category_click_count[user_id][category_id] += 1
+
+# Add the UserCategoryCTR as a new column to the SearchStream DataFrame
+SearchStream['UserCategoryCTR'] = user_category_ctr
+"
+12,AdCategorySearchCount - Count of times the ad (AdID) has appeared in search results within the same category (SearchCategoryID) up to the current search event.,"
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchCategoryID']], on='SearchID', how='left')
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'CategoryID']], on='AdID', how='left')
+
+SearchStream['AdCategorySearchCount'] = SearchStream.groupby(['AdID', 'SearchCategoryID']).cumcount()
+
+SearchStream.drop(columns=['SearchCategoryID', 'CategoryID'], inplace=True)
+"
+13,AdCategoryClickCount - Count of clicks on the ad (AdID) within the same category (SearchCategoryID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get SearchCategoryID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchCategoryID']], on='SearchID', how='left')
+
+# Merge SearchStream with AdsInfo to get CategoryID
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'CategoryID']], on='AdID', how='left')
+
+# Filter only contextual ads (ObjectType == 3) and clicks (IsClick == 1)
+contextual_clicks = SearchStream[(SearchStream['ObjectType'] == 3) & (SearchStream['IsClick'] == 1)]
+
+# Group by AdID and SearchCategoryID to count clicks
+click_counts = contextual_clicks.groupby(['AdID', 'SearchCategoryID']).size().reset_index(name='AdCategoryClickCount')
+
+# Merge the click counts back to the original SearchStream
+SearchStream = SearchStream.merge(click_counts, on=['AdID', 'SearchCategoryID'], how='left')
+
+# Fill NaN values with 0 (no clicks)
+SearchStream['AdCategoryClickCount'] = SearchStream['AdCategoryClickCount'].fillna(0)
+"
+14,AdCategoryCTR - Click-through rate of the ad (AdID) within the same category (SearchCategoryID) up to the current search event (AdCategoryClickCount / AdCategorySearchCount).,"
+# Merge SearchStream with SearchInfo to get SearchCategoryID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchCategoryID']], on='SearchID', how='left')
+
+# Merge SearchStream with AdsInfo to get CategoryID
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'CategoryID']], on='AdID', how='left')
+
+# Initialize columns for click count and search count
+SearchStream['AdCategoryClickCount'] = 0
+SearchStream['AdCategorySearchCount'] = 0
+
+# Group by AdID and SearchCategoryID to calculate click count and search count
+click_counts = SearchStream.groupby(['AdID', 'SearchCategoryID'])['IsClick'].sum().reset_index()
+click_counts.columns = ['AdID', 'SearchCategoryID', 'AdCategoryClickCount']
+
+search_counts = SearchStream.groupby(['AdID', 'SearchCategoryID'])['SearchID'].count().reset_index()
+search_counts.columns = ['AdID', 'SearchCategoryID', 'AdCategorySearchCount']
+
+# Merge the counts back to the SearchStream
+SearchStream = SearchStream.merge(click_counts, on=['AdID', 'SearchCategoryID'], how='left', suffixes=('', '_y'))
+SearchStream = SearchStream.merge(search_counts, on=['AdID', 'SearchCategoryID'], how='left', suffixes=('', '_y'))
+
+# Calculate AdCategoryCTR
+SearchStream['AdCategoryCTR'] = SearchStream['AdCategoryClickCount_y'] / SearchStream['AdCategorySearchCount_y']
+
+# Drop intermediate columns
+SearchStream.drop(columns=['AdCategoryClickCount_y', 'AdCategorySearchCount_y'], inplace=True)
+"
+15,UserLocationSearchCount - Count of searches made by the user (UserID) in the same location (SearchLocationID) up to the current search event.,"
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID', 'SearchLocationID', 'SearchDate']], on='SearchID', how='left')
+
+SearchStream['SearchDate'] = pd.to_datetime(SearchStream['SearchDate'])
+SearchStream = SearchStream.sort_values(by=['UserID', 'SearchLocationID', 'SearchDate'])
+
+SearchStream['UserLocationSearchCount'] = SearchStream.groupby(['UserID', 'SearchLocationID']).cumcount()
+
+SearchStream.drop(columns=['UserID', 'SearchLocationID', 'SearchDate'], inplace=True)
+"
+16,UserLocationClickCount - Count of clicks made by the user (UserID) in the same location (SearchLocationID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get UserID and SearchLocationID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID', 'SearchLocationID', 'SearchDate']], on='SearchID', how='left')
+
+# Filter contextual ads (ObjectType == 3) and clicks (IsClick == 1)
+contextual_clicks = SearchStream[(SearchStream['ObjectType'] == 3) & (SearchStream['IsClick'] == 1)]
+
+# Sort by UserID and SearchDate to ensure proper cumulative counting
+contextual_clicks = contextual_clicks.sort_values(by=['UserID', 'SearchDate'])
+
+# Compute cumulative count of clicks by UserID and SearchLocationID
+contextual_clicks['UserLocationClickCount'] = contextual_clicks.groupby(['UserID', 'SearchLocationID']).cumcount()
+
+# Merge the cumulative count back to the original SearchStream
+SearchStream = SearchStream.merge(contextual_clicks[['SearchID', 'UserLocationClickCount']], on='SearchID', how='left')
+
+# Fill NaN values with 0 (for rows where there were no previous clicks)
+SearchStream['UserLocationClickCount'] = SearchStream['UserLocationClickCount'].fillna(0)
+
+# Drop the temporary columns added during the merge
+SearchStream = SearchStream.drop(columns=['UserID', 'SearchLocationID', 'SearchDate'])
+
+# Ensure the new column is of integer type
+SearchStream['UserLocationClickCount'] = SearchStream['UserLocationClickCount'].astype(int)
+"
+17,UserLocationCTR - Click-through rate of the user (UserID) in the same location (SearchLocationID) up to the current search event (UserLocationClickCount / UserLocationSearchCount).,"
+# Merge SearchStream with SearchInfo to get UserID and SearchLocationID
+merged_df = pd.merge(SearchStream, SearchInfo[['SearchID', 'UserID', 'SearchLocationID']], on='SearchID', how='left')
+
+# Filter only contextual ads (ObjectType == 3)
+contextual_ads = merged_df[merged_df['ObjectType'] == 3]
+
+# Calculate UserLocationClickCount and UserLocationSearchCount
+contextual_ads['UserLocationClickCount'] = contextual_ads.groupby(['UserID', 'SearchLocationID'])['IsClick'].cumsum() - contextual_ads['IsClick']
+contextual_ads['UserLocationSearchCount'] = contextual_ads.groupby(['UserID', 'SearchLocationID']).cumcount()
+
+# Calculate UserLocationCTR
+contextual_ads['UserLocationCTR'] = contextual_ads['UserLocationClickCount'] / contextual_ads['UserLocationSearchCount']
+contextual_ads['UserLocationCTR'].fillna(0, inplace=True)
+
+# Merge the UserLocationCTR back to the original SearchStream
+SearchStream = pd.merge(SearchStream, contextual_ads[['SearchID', 'UserLocationCTR']], on='SearchID', how='left')
+
+# Fill NaN values with 0 for non-contextual ads
+SearchStream['UserLocationCTR'].fillna(0, inplace=True)
+"
+18,AdLocationSearchCount - Count of times the ad (AdID) has appeared in search results within the same location (SearchLocationID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get SearchLocationID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchLocationID', 'SearchDate']], on='SearchID', how='left')
+
+# Sort by AdID and SearchDate to ensure correct cumulative count
+SearchStream = SearchStream.sort_values(by=['AdID', 'SearchLocationID', 'SearchDate'])
+
+# Compute the cumulative count of AdID appearances within the same location up to the current search event
+SearchStream['AdLocationSearchCount'] = SearchStream.groupby(['AdID', 'SearchLocationID']).cumcount()
+
+# Drop the temporary columns used for merging
+SearchStream = SearchStream.drop(columns=['SearchLocationID', 'SearchDate'])
+"
+19,AdLocationClickCount - Count of clicks on the ad (AdID) within the same location (SearchLocationID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get SearchLocationID and SearchDate
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchLocationID', 'SearchDate']], on='SearchID', how='left')
+
+# Filter only the rows where IsClick is 1
+clicks = SearchStream[SearchStream['IsClick'] == 1]
+
+# Group by AdID and SearchLocationID and count the clicks
+click_counts = clicks.groupby(['AdID', 'SearchLocationID']).size().reset_index(name='AdLocationClickCount')
+
+# Merge the click counts back to the SearchStream
+SearchStream = SearchStream.merge(click_counts, on=['AdID', 'SearchLocationID'], how='left')
+
+# Fill NaN values with 0 (for ads that have no clicks in the same location)
+SearchStream['AdLocationClickCount'] = SearchStream['AdLocationClickCount'].fillna(0)
+
+# Drop the temporary columns used for merging
+SearchStream = SearchStream.drop(columns=['SearchLocationID', 'SearchDate'])
+"
+20,AdLocationCTR - Click-through rate of the ad (AdID) within the same location (SearchLocationID) up to the current search event (AdLocationClickCount / AdLocationSearchCount).,"
+# Merge SearchStream with SearchInfo to get SearchLocationID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchLocationID', 'SearchDate']], on='SearchID', how='left')
+
+# Filter contextual ads
+contextual_ads = SearchStream[SearchStream['ObjectType'] == 3]
+
+# Calculate AdLocationClickCount and AdLocationSearchCount
+contextual_ads['AdLocationClickCount'] = contextual_ads.groupby(['AdID', 'SearchLocationID'])['IsClick'].cumsum().shift(1).fillna(0)
+contextual_ads['AdLocationSearchCount'] = contextual_ads.groupby(['AdID', 'SearchLocationID']).cumcount()
+
+# Calculate AdLocationCTR
+contextual_ads['AdLocationCTR'] = contextual_ads['AdLocationClickCount'] / contextual_ads['AdLocationSearchCount']
+contextual_ads['AdLocationCTR'] = contextual_ads['AdLocationCTR'].fillna(0)
+
+# Merge back to the original SearchStream
+SearchStream = SearchStream.merge(contextual_ads[['SearchID', 'AdLocationCTR']], on='SearchID', how='left')
+
+# Fill NaN values with 0 for non-contextual ads
+SearchStream['AdLocationCTR'] = SearchStream['AdLocationCTR'].fillna(0)
+"
+21,UserDeviceSearchCount - Count of searches made by the user (UserID) using the same device (UserDeviceID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get UserID and UserDeviceID
+merged_df = pd.merge(SearchStream, SearchInfo[['SearchID', 'UserID', 'SearchDate']], on='SearchID', how='left')
+merged_df = pd.merge(merged_df, UserInfo[['UserID', 'UserDeviceID']], on='UserID', how='left')
+
+# Sort by UserID, UserDeviceID, and SearchDate to ensure correct cumulative count
+merged_df = merged_df.sort_values(by=['UserID', 'UserDeviceID', 'SearchDate'])
+
+# Compute the cumulative count of searches by the same user using the same device
+merged_df['UserDeviceSearchCount'] = merged_df.groupby(['UserID', 'UserDeviceID']).cumcount()
+
+# Merge the new feature back to the original SearchStream dataframe
+SearchStream = pd.merge(SearchStream, merged_df[['SearchID', 'UserDeviceSearchCount']], on='SearchID', how='left')
+"
+22,UserDeviceClickCount - Count of clicks made by the user (UserID) using the same device (UserDeviceID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get UserID and UserDeviceID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+SearchStream = SearchStream.merge(UserInfo[['UserID', 'UserDeviceID']], on='UserID', how='left')
+
+# Filter only contextual ads (ObjectType == 3) and clicks (IsClick == 1)
+contextual_clicks = SearchStream[(SearchStream['ObjectType'] == 3) & (SearchStream['IsClick'] == 1)]
+
+# Count clicks by UserID and UserDeviceID
+click_counts = contextual_clicks.groupby(['UserID', 'UserDeviceID']).size().reset_index(name='UserDeviceClickCount')
+
+# Merge the click counts back to the original SearchStream
+SearchStream = SearchStream.merge(click_counts, on=['UserID', 'UserDeviceID'], how='left')
+
+# Fill NaN values with 0 (for users/devices with no clicks)
+SearchStream['UserDeviceClickCount'] = SearchStream['UserDeviceClickCount'].fillna(0)
+
+# Drop the temporary columns used for merging
+SearchStream = SearchStream.drop(columns=['UserID', 'UserDeviceID'])
+
+# The SearchStream table now has the new feature
+"
+23,UserDeviceCTR - Click-through rate of the user (UserID) using the same device (UserDeviceID) up to the current search event (UserDeviceClickCount / UserDeviceSearchCount).,"
+# Merge SearchStream with SearchInfo to get UserID and UserDeviceID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+SearchStream = SearchStream.merge(UserInfo[['UserID', 'UserDeviceID']], on='UserID', how='left')
+
+# Calculate UserDeviceClickCount and UserDeviceSearchCount
+SearchStream['UserDeviceClickCount'] = SearchStream.groupby(['UserID', 'UserDeviceID'])['IsClick'].cumsum().shift(fill_value=0)
+SearchStream['UserDeviceSearchCount'] = SearchStream.groupby(['UserID', 'UserDeviceID']).cumcount()
+
+# Calculate UserDeviceCTR
+SearchStream['UserDeviceCTR'] = SearchStream['UserDeviceClickCount'] / SearchStream['UserDeviceSearchCount']
+SearchStream['UserDeviceCTR'] = SearchStream['UserDeviceCTR'].fillna(0)
+
+# Drop intermediate columns
+SearchStream = SearchStream.drop(columns=['UserDeviceClickCount', 'UserDeviceSearchCount'])
+
+# Drop merged columns to revert to original structure
+SearchStream = SearchStream.drop(columns=['UserID', 'UserDeviceID'])
+"
+24,UserAgentSearchCount - Count of searches made by the user (UserID) using the same browser (UserAgentID) up to the current search event.,"
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID', 'SearchDate']], on='SearchID', how='left')
+SearchStream = SearchStream.merge(UserInfo[['UserID', 'UserAgentID']], on='UserID', how='left')
+
+SearchStream['SearchDate'] = pd.to_datetime(SearchStream['SearchDate'])
+SearchStream = SearchStream.sort_values(by=['UserID', 'UserAgentID', 'SearchDate'])
+
+SearchStream['UserAgentSearchCount'] = SearchStream.groupby(['UserID', 'UserAgentID']).cumcount()
+
+SearchStream = SearchStream.drop(columns=['UserID', 'SearchDate', 'UserAgentID'])
+"
+25,UserAgentClickCount - Count of clicks made by the user (UserID) using the same browser (UserAgentID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get UserID and UserAgentID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+SearchStream = SearchStream.merge(UserInfo[['UserID', 'UserAgentID']], on='UserID', how='left')
+
+# Sort by SearchDate to ensure chronological order
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+SearchStream = SearchStream.sort_values(by='SearchDate')
+
+# Calculate UserAgentClickCount
+SearchStream['UserAgentClickCount'] = SearchStream.groupby(['UserID', 'UserAgentID'])['IsClick'].cumsum().shift(fill_value=0)
+
+# Drop the temporary columns used for merging
+SearchStream = SearchStream.drop(columns=['UserID', 'UserAgentID', 'SearchDate'])
+"
+26,UserAgentCTR - Click-through rate of the user (UserID) using the same browser (UserAgentID) up to the current search event (UserAgentClickCount / UserAgentSearchCount).,"
+# Merge SearchStream with SearchInfo to get UserID and UserAgentID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+SearchStream = SearchStream.merge(UserInfo[['UserID', 'UserAgentID']], on='UserID', how='left')
+
+# Filter contextual ads
+contextual_ads = SearchStream[SearchStream['ObjectType'] == 3]
+
+# Calculate UserAgentClickCount and UserAgentSearchCount
+contextual_ads['UserAgentClickCount'] = contextual_ads.groupby(['UserID', 'UserAgentID'])['IsClick'].cumsum().shift(fill_value=0)
+contextual_ads['UserAgentSearchCount'] = contextual_ads.groupby(['UserID', 'UserAgentID']).cumcount()
+
+# Calculate UserAgentCTR
+contextual_ads['UserAgentCTR'] = contextual_ads['UserAgentClickCount'] / contextual_ads['UserAgentSearchCount'].replace(0, 1)
+
+# Merge back to the original SearchStream
+SearchStream = SearchStream.merge(contextual_ads[['SearchID', 'UserAgentCTR']], on='SearchID', how='left')
+
+# Fill NaN values with 0 for non-contextual ads
+SearchStream['UserAgentCTR'] = SearchStream['UserAgentCTR'].fillna(0)
+"
+27,UserAgentFamilySearchCount - Count of searches made by the user (UserID) using the same browser family (UserAgentFamilyID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get UserID and UserAgentFamilyID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID', 'SearchDate']], on='SearchID', how='left')
+SearchStream = SearchStream.merge(UserInfo[['UserID', 'UserAgentFamilyID']], on='UserID', how='left')
+
+# Sort by UserID and SearchDate to ensure correct cumulative count
+SearchStream = SearchStream.sort_values(by=['UserID', 'SearchDate'])
+
+# Compute the cumulative count of searches by UserID and UserAgentFamilyID
+SearchStream['UserAgentFamilySearchCount'] = SearchStream.groupby(['UserID', 'UserAgentFamilyID']).cumcount()
+
+# Drop the merged columns to revert to the original structure with the new feature added
+SearchStream = SearchStream.drop(columns=['UserID', 'SearchDate', 'UserAgentFamilyID'])
+"
+28,UserAgentFamilyClickCount - Count of clicks made by the user (UserID) using the same browser family (UserAgentFamilyID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get UserID and SearchDate
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID', 'SearchDate']], on='SearchID', how='left')
+
+# Merge with UserInfo to get UserAgentFamilyID
+SearchStream = SearchStream.merge(UserInfo[['UserID', 'UserAgentFamilyID']], on='UserID', how='left')
+
+# Sort by UserID and SearchDate to ensure proper cumulative counting
+SearchStream = SearchStream.sort_values(by=['UserID', 'SearchDate'])
+
+# Create a cumulative count of clicks by UserID and UserAgentFamilyID
+SearchStream['UserAgentFamilyClickCount'] = SearchStream.groupby(['UserID', 'UserAgentFamilyID'])['IsClick'].cumsum().shift(fill_value=0)
+
+# Drop the merged columns to revert to the original structure
+SearchStream = SearchStream.drop(columns=['UserID', 'SearchDate', 'UserAgentFamilyID'])
+"
+29,UserAgentFamilyCTR - Click-through rate of the user (UserID) using the same browser family (UserAgentFamilyID) up to the current search event (UserAgentFamilyClickCount / UserAgentFamilySearchCount).,"
+# Merge SearchStream with SearchInfo to get UserID and UserAgentFamilyID
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+SearchStream = SearchStream.merge(UserInfo[['UserID', 'UserAgentFamilyID']], on='UserID', how='left')
+
+# Filter contextual ads
+contextual_ads = SearchStream[SearchStream['ObjectType'] == 3]
+
+# Calculate UserAgentFamilyClickCount and UserAgentFamilySearchCount
+contextual_ads['UserAgentFamilyClickCount'] = contextual_ads.groupby(['UserID', 'UserAgentFamilyID'])['IsClick'].cumsum().shift(1).fillna(0)
+contextual_ads['UserAgentFamilySearchCount'] = contextual_ads.groupby(['UserID', 'UserAgentFamilyID']).cumcount()
+
+# Calculate UserAgentFamilyCTR
+contextual_ads['UserAgentFamilyCTR'] = contextual_ads['UserAgentFamilyClickCount'] / contextual_ads['UserAgentFamilySearchCount'].replace(0, 1)
+
+# Merge back to the original SearchStream
+SearchStream = SearchStream.merge(contextual_ads[['SearchID', 'UserAgentFamilyCTR']], on='SearchID', how='left')
+
+# Fill NaN values with 0 for non-contextual ads
+SearchStream['UserAgentFamilyCTR'] = SearchStream['UserAgentFamilyCTR'].fillna(0)
+"
+30,UserOSSearchCount - Count of searches made by the user (UserID) using the same operating system (UserAgentOSID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get UserID and SearchDate
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID', 'SearchDate']], on='SearchID', how='left')
+
+# Merge with UserInfo to get UserAgentOSID
+SearchStream = SearchStream.merge(UserInfo[['UserID', 'UserAgentOSID']], on='UserID', how='left')
+
+# Sort by UserID and SearchDate to ensure correct cumulative count
+SearchStream = SearchStream.sort_values(by=['UserID', 'SearchDate'])
+
+# Compute the cumulative count of searches by UserID and UserAgentOSID
+SearchStream['UserOSSearchCount'] = SearchStream.groupby(['UserID', 'UserAgentOSID']).cumcount()
+
+# Increment by 1 to count the current search as well
+SearchStream['UserOSSearchCount'] += 1
+
+# Drop the temporary columns used for merging
+SearchStream = SearchStream.drop(columns=['UserID', 'SearchDate', 'UserAgentOSID'])
+"
+31,UserOSClickCount - Count of clicks made by the user (UserID) using the same operating system (UserAgentOSID) up to the current search event.,"
+# Merge SearchStream with SearchInfo to get UserID and SearchDate
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID', 'SearchDate']], on='SearchID', how='left')
+
+# Merge with UserInfo to get UserAgentOSID
+SearchStream = SearchStream.merge(UserInfo[['UserID', 'UserAgentOSID']], on='UserID', how='left')
+
+# Filter only contextual ads (ObjectType == 3) and clicks (IsClick == 1)
+contextual_clicks = SearchStream[(SearchStream['ObjectType'] == 3) & (SearchStream['IsClick'] == 1)]
+
+# Sort by UserID, UserAgentOSID, and SearchDate
+contextual_clicks = contextual_clicks.sort_values(by=['UserID', 'UserAgentOSID', 'SearchDate'])
+
+# Compute cumulative count of clicks per UserID and UserAgentOSID
+contextual_clicks['UserOSClickCount'] = contextual_clicks.groupby(['UserID', 'UserAgentOSID']).cumcount() + 1
+
+# Merge the cumulative count back to the original SearchStream
+SearchStream = SearchStream.merge(contextual_clicks[['SearchID', 'UserOSClickCount']], on='SearchID', how='left')
+
+# Fill NaN values with 0 (for non-contextual ads or no previous clicks)
+SearchStream['UserOSClickCount'] = SearchStream['UserOSClickCount'].fillna(0)
+
+# Drop the temporary columns used for merging
+SearchStream = SearchStream.drop(columns=['UserID', 'SearchDate', 'UserAgentOSID'])
+
+# Ensure the new feature is an integer
+SearchStream['UserOSClickCount'] = SearchStream['UserOSClickCount'].astype(int)
+"
+32,UserOSCTR - Click-through rate of the user (UserID) using the same operating system (UserAgentOSID) up to the current search event (UserOSClickCount / UserOSSearchCount).,"
+# Merge SearchStream with SearchInfo to get UserID and UserAgentOSID
+search_stream_merged = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID', how='left')
+search_stream_merged = search_stream_merged.merge(UserInfo[['UserID', 'UserAgentOSID']], on='UserID', how='left')
+
+# Filter only contextual ads (ObjectType == 3)
+contextual_ads = search_stream_merged[search_stream_merged['ObjectType'] == 3]
+
+# Calculate cumulative click count and search count for each UserID and UserAgentOSID
+contextual_ads['UserOSClickCount'] = contextual_ads.groupby(['UserID', 'UserAgentOSID'])['IsClick'].cumsum().shift(1).fillna(0)
+contextual_ads['UserOSSearchCount'] = contextual_ads.groupby(['UserID', 'UserAgentOSID']).cumcount()
+
+# Calculate UserOSCTR
+contextual_ads['UserOSCTR'] = contextual_ads['UserOSClickCount'] / contextual_ads['UserOSSearchCount']
+contextual_ads['UserOSCTR'] = contextual_ads['UserOSCTR'].fillna(0)
+
+# Merge the UserOSCTR back to the original SearchStream
+SearchStream = SearchStream.merge(contextual_ads[['SearchID', 'UserOSCTR']], on='SearchID', how='left')
+
+# Fill NaN values with 0 for non-contextual ads
+SearchStream['UserOSCTR'] = SearchStream['UserOSCTR'].fillna(0)
+"
+33,AdPrice - Price of the ad (AdID) from AdsInfo table.,"
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'Price']], on='AdID', how='left')
+SearchStream.rename(columns={'Price': 'AdPrice'}, inplace=True)
+"
+34,AdTitleLength - Length of the ad's title (AdID) from AdsInfo table.,"
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'Title']], on='AdID', how='left')
+SearchStream['AdTitleLength'] = SearchStream['Title'].str.len()
+SearchStream.drop(columns=['Title'], inplace=True)
+"
+35,AdTitleWordCount - Number of words in the ad's title (AdID) from AdsInfo table.,"
+AdsInfo['AdTitleWordCount'] = AdsInfo['Title'].apply(lambda x: len(str(x).split()))
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'AdTitleWordCount']], on='AdID', how='left')
+"
+36,SearchQueryLength - Length of the search query (SearchQuery) if specified.,"
+SearchInfo['SearchQueryLength'] = SearchInfo['SearchQuery'].apply(lambda x: len(x) if pd.notnull(x) else 0)
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchQueryLength']], on='SearchID', how='left')
+"
+37,SearchQueryWordCount - Number of words in the search query (SearchQuery) if specified.,"
+SearchInfo['SearchQueryWordCount'] = SearchInfo['SearchQuery'].apply(lambda x: len(str(x).split()) if pd.notnull(x) else 0)
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchQueryWordCount']], on='SearchID', how='left')
+"
+38,"IsWeekend - Whether the search event (SearchDate) occurred on a weekend (1 if yes, 0 if no).","
+SearchInfo['SearchDate'] = pd.to_datetime(SearchInfo['SearchDate'])
+SearchInfo['IsWeekend'] = SearchInfo['SearchDate'].dt.weekday >= 5
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'IsWeekend']], on='SearchID', how='left')
+"
+39,HourOfDay - Hour of the day when the search event (SearchDate) occurred.,"
+SearchInfo['SearchDate'] = pd.to_datetime(SearchInfo['SearchDate'])
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+SearchStream['HourOfDay'] = SearchStream['SearchDate'].dt.hour
+"
+40,DayOfWeek - Day of the week when the search event (SearchDate) occurred.,"
+SearchInfo['SearchDate'] = pd.to_datetime(SearchInfo['SearchDate'])
+SearchInfo['DayOfWeek'] = SearchInfo['SearchDate'].dt.dayofweek
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'DayOfWeek']], on='SearchID', how='left')
+"
+41,"IsHoliday - Whether the search event (SearchDate) occurred on a public holiday (1 if yes, 0 if no). (Note: Requires a list of public holidays for the relevant region).",

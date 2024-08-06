@@ -1,0 +1,92 @@
+,feature_description,code
+0,"AdCategory - Category of the ad, derived from AdsInfo table.","
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'CategoryID']], on='AdID')
+SearchStream = SearchStream.merge(Category[['CategoryID', 'Level']], on='CategoryID')
+SearchStream['AdCategory'] = SearchStream['Level'].astype(str)
+"
+1,"AdLocation - Location of the ad, derived from AdsInfo table.","
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'LocationID']], on='AdID')
+SearchStream = SearchStream.merge(Location[['LocationID', 'Level', 'RegionID', 'CityID']], on='LocationID')
+SearchStream['AdLocation'] = SearchStream.apply(lambda row: f""{row['Level']}_{row['RegionID']}_{row['CityID']}"", axis=1)
+"
+2,"AdPrice - Price of the ad, derived from AdsInfo table.","
+SearchStream = SearchStream.merge(AdsInfo[['AdID', 'Price']], on='AdID')
+SearchStream.rename(columns={'Price': 'AdPrice'}, inplace=True)
+"
+3,"AdTitleLength - Length of the title of the ad, derived from AdsInfo table.","
+SearchStream = SearchStream.merge(AdsInfo, on='AdID')
+SearchStream['AdTitleLength'] = SearchStream['Title'].str.len()
+"
+4,"AdTitleWordCount - Number of words in the title of the ad, derived from AdsInfo table.","
+SearchStream = SearchStream.merge(AdsInfo, on='AdID')
+SearchStream['AdTitleWordCount'] = SearchStream['Title'].apply(lambda x: len(str(x).split()))
+"
+5,"UserAgentFamily - Family of the user's browser, derived from UserInfo table.","
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID')
+SearchStream = SearchStream.merge(UserInfo[['UserID', 'UserAgentFamilyID']], on='UserID')
+SearchStream['UserAgentFamily'] = SearchStream['UserAgentFamilyID']
+"
+6,"UserAgentOS - Operating system of the user, derived from UserInfo table.","
+SearchStream = SearchStream.merge(SearchInfo, on='SearchID')
+SearchStream = SearchStream.merge(UserInfo, on='UserID')
+SearchStream['UserAgentOS'] = SearchStream['UserAgentOSID']
+"
+7,"UserDeviceType - Type of the user's device, derived from UserInfo table.","
+SearchStream = SearchStream.merge(SearchInfo, on='SearchID')
+SearchStream = SearchStream.merge(UserInfo, on='UserID')
+SearchStream['UserDeviceType'] = SearchStream['UserDeviceID']
+"
+8,"SearchLocationLevel - Level of the search location, derived from SearchInfo table.","
+SearchStream = SearchStream.merge(SearchInfo, on='SearchID')
+SearchStream = SearchStream.merge(Location, left_on='SearchLocationID', right_on='LocationID')
+SearchStream['SearchLocationLevel'] = SearchStream['Level']
+"
+9,"SearchCategoryLevel - Level of the search category, derived from SearchInfo table.","
+SearchStream = SearchStream.merge(SearchInfo, on='SearchID')
+SearchStream = SearchStream.merge(Category, left_on='SearchCategoryID', right_on='CategoryID')
+SearchStream['SearchCategoryLevel'] = SearchStream['Level']
+"
+10,"IsUserLoggedOn - Whether the user was logged on during the search event, derived from SearchInfo table.","
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'IsUserLoggedOn']], on='SearchID')
+"
+11,"SearchQueryLength - Length of the search query, derived from SearchInfo table.","
+SearchStream = SearchStream.merge(SearchInfo, on='SearchID')
+SearchStream['SearchQueryLength'] = SearchStream['SearchQuery'].str.len()
+"
+12,"SearchQueryWordCount - Number of words in the search query, derived from SearchInfo table.","
+SearchStream = SearchStream.merge(SearchInfo, on='SearchID')
+SearchStream['SearchQueryWordCount'] = SearchStream['SearchQuery'].str.count(' ') + 1
+"
+13,"AdPositionCategoryMeanHistCTR - Mean of HistCTR for ads in the same category and position, calculated from SearchStream table.","
+SearchStream['AdPositionCategoryMeanHistCTR'] = SearchStream.groupby(['Position', 'ObjectType'])['HistCTR'].transform('mean')
+"
+14,"AdPositionLocationMeanHistCTR - Mean of HistCTR for ads in the same location and position, calculated from SearchStream table.","
+SearchStream['AdPositionLocationMeanHistCTR'] = SearchStream.groupby(['Position', 'AdID'])['HistCTR'].transform('mean')
+"
+15,"AdCategoryMeanHistCTR - Mean of HistCTR for ads in the same category, calculated from SearchStream table.","
+SearchStream['AdCategoryMeanHistCTR'] = SearchStream.merge(AdsInfo, on='AdID').merge(Category, on='CategoryID').groupby('CategoryID')['HistCTR'].transform('mean')
+"
+16,"AdLocationMeanHistCTR - Mean of HistCTR for ads in the same location, calculated from SearchStream table.","
+SearchStream['AdLocationMeanHistCTR'] = SearchStream.merge(AdsInfo, on='AdID')['AdID'].map(SearchStream.groupby(AdsInfo.merge(SearchStream, on='AdID')['LocationID'])['HistCTR'].mean())
+"
+17,"UserSearchCount - Count of searches made by the user, calculated from SearchInfo table.","
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'UserID']], on='SearchID')
+SearchStream['UserSearchCount'] = SearchStream.groupby('UserID')['SearchID'].transform('count')
+"
+18,"UserAdViewCount - Count of ads viewed by the user, calculated from VisitsStream table.","
+SearchStream['UserAdViewCount'] = SearchStream.groupby('SearchID')['SearchID'].transform(lambda x: VisitsStream[VisitsStream['UserID'].isin(x.map(SearchInfo.set_index('SearchID')['UserID']))].groupby('UserID')['AdID'].count().mean())
+"
+19,"UserPhoneRequestCount - Count of phone requests made by the user, calculated from PhoneRequestsStream table.","
+phone_request_counts = PhoneRequestsStream.groupby('UserID')['AdID'].count().reset_index()
+phone_request_counts.columns = ['UserID', 'UserPhoneRequestCount']
+SearchStream = SearchStream.merge(SearchInfo, on='SearchID').merge(phone_request_counts, on='UserID')
+"
+20,"AdSearchCount - Count of searches that resulted in the ad being shown, calculated from SearchStream table.","
+SearchStream['AdSearchCount'] = SearchStream.groupby('AdID')['SearchID'].transform('count')
+"
+21,"AdViewCount - Count of views of the ad, calculated from VisitsStream table.","
+SearchStream['AdViewCount'] = SearchStream['AdID'].map(VisitsStream['AdID'].value_counts())
+"
+22,"AdPhoneRequestCount - Count of phone requests for the ad, calculated from PhoneRequestsStream table.","
+SearchStream = SearchStream.merge(PhoneRequestsStream.groupby('AdID').size().reset_index(name='AdPhoneRequestCount'), on='AdID')
+"

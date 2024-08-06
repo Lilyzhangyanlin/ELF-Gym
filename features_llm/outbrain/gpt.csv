@@ -1,0 +1,416 @@
+,feature_description,code
+0,UserPageviewsCount - Count of pageviews by the user (uuid) in the Pageviews table.,"
+user_pageviews_count = Pageviews.groupby('uuid').size().reset_index(name='UserPageviewsCount')
+Clicks = Clicks.merge(Events[['display_id', 'uuid']], on='display_id', how='left')
+Clicks = Clicks.merge(user_pageviews_count, on='uuid', how='left')
+Clicks['UserPageviewsCount'] = Clicks['UserPageviewsCount'].fillna(0)
+"
+1,UserUniqueDocumentsCount - Count of unique documents viewed by the user (uuid) in the Pageviews table.,"
+user_unique_documents_count = Pageviews.groupby('uuid')['document_id'].nunique().reset_index()
+user_unique_documents_count.columns = ['uuid', 'UserUniqueDocumentsCount']
+
+Clicks = Clicks.merge(Events[['display_id', 'uuid']], on='display_id', how='left')
+Clicks = Clicks.merge(user_unique_documents_count, on='uuid', how='left')
+Clicks.drop(columns=['uuid'], inplace=True)
+"
+2,"UserPlatformDistribution - Distribution of platforms (desktop, mobile, tablet) used by the user (uuid) in the Pageviews table.","
+# Compute the distribution of platforms used by each user (uuid) in the Pageviews table
+platform_distribution = Pageviews.groupby('uuid')['platform'].value_counts(normalize=True).unstack(fill_value=0)
+
+# Ensure all platform columns are present
+platform_distribution = platform_distribution.reindex(columns=[1, 2, 3], fill_value=0)
+
+# Rename columns for clarity
+platform_distribution.columns = ['platform_desktop', 'platform_mobile', 'platform_tablet']
+
+# Merge the platform distribution with the Events table to get the uuid for each display_id
+events_with_platform_dist = Events.merge(platform_distribution, on='uuid', how='left')
+
+# Merge the result with the Clicks table to add the platform distribution features
+Clicks = Clicks.merge(events_with_platform_dist[['display_id', 'platform_desktop', 'platform_mobile', 'platform_tablet']], on='display_id', how='left')
+
+# Fill NaN values with 0 (in case some display_ids do not have corresponding platform distribution)
+Clicks[['platform_desktop', 'platform_mobile', 'platform_tablet']] = Clicks[['platform_desktop', 'platform_mobile', 'platform_tablet']].fillna(0)
+"
+3,UserGeoLocationDistribution - Distribution of geographical locations (geo_location) of the user (uuid) in the Pageviews table.,"
+# Compute the distribution of geographical locations for each user in the Pageviews table
+user_geo_distribution = Pageviews.groupby('uuid')['geo_location'].value_counts(normalize=True).unstack(fill_value=0)
+
+# Merge the distribution back to the Clicks table via the Events table
+Clicks = Clicks.merge(Events[['display_id', 'uuid']], on='display_id', how='left')
+Clicks = Clicks.merge(user_geo_distribution, on='uuid', how='left')
+
+# Drop the uuid column as it is no longer needed
+Clicks = Clicks.drop(columns=['uuid'])
+"
+4,"UserTrafficSourceDistribution - Distribution of traffic sources (internal, search, social) for the user (uuid) in the Pageviews table.","
+# Compute the distribution of traffic sources for each user (uuid) in the Pageviews table
+traffic_source_distribution = Pageviews.groupby('uuid')['traffic_source'].value_counts(normalize=True).unstack(fill_value=0)
+
+# Ensure all possible traffic sources are represented
+for source in [1, 2, 3]:
+    if source not in traffic_source_distribution.columns:
+        traffic_source_distribution[source] = 0
+
+# Rename columns to make them more descriptive
+traffic_source_distribution = traffic_source_distribution.rename(columns={
+    1: 'traffic_source_internal',
+    2: 'traffic_source_search',
+    3: 'traffic_source_social'
+})
+
+# Merge the traffic source distribution back to the Clicks table via the Events table
+Clicks = Clicks.merge(Events[['display_id', 'uuid']], on='display_id', how='left')
+Clicks = Clicks.merge(traffic_source_distribution, on='uuid', how='left')
+
+# Fill NaN values with 0 (in case some users do not have pageviews)
+Clicks[['traffic_source_internal', 'traffic_source_search', 'traffic_source_social']] = Clicks[['traffic_source_internal', 'traffic_source_search', 'traffic_source_social']].fillna(0)
+"
+5,DocumentPageviewsCount - Count of pageviews for the document (document_id) in the Pageviews table.,"
+document_pageviews_count = Pageviews.groupby('document_id').size().reset_index(name='DocumentPageviewsCount')
+Promoted_with_pageviews = Promoted.merge(document_pageviews_count, on='document_id', how='left')
+Clicks = Clicks.merge(Promoted_with_pageviews[['ad_id', 'DocumentPageviewsCount']], on='ad_id', how='left')
+"
+6,DocumentUniqueUsersCount - Count of unique users who viewed the document (document_id) in the Pageviews table.,"
+# Compute DocumentUniqueUsersCount
+document_unique_users_count = Pageviews.groupby('document_id')['uuid'].nunique().reset_index()
+document_unique_users_count.columns = ['document_id', 'DocumentUniqueUsersCount']
+
+# Merge with Promoted to get document_id for each ad_id
+promoted_with_counts = Promoted.merge(document_unique_users_count, on='document_id', how='left')
+
+# Merge with Clicks to add the feature
+Clicks = Clicks.merge(promoted_with_counts[['ad_id', 'DocumentUniqueUsersCount']], on='ad_id', how='left')
+"
+7,"DocumentPlatformDistribution - Distribution of platforms (desktop, mobile, tablet) used to view the document (document_id) in the Pageviews table.","
+# Compute the distribution of platforms for each document in the Pageviews table
+platform_distribution = Pageviews.groupby('document_id')['platform'].value_counts(normalize=True).unstack(fill_value=0)
+
+# Rename columns to indicate platform distribution
+platform_distribution.columns = [f'platform_{col}_distribution' for col in platform_distribution.columns]
+
+# Merge the platform distribution with the Promoted table to get the document_id for each ad_id
+promoted_with_distribution = Promoted.merge(platform_distribution, on='document_id', how='left')
+
+# Merge the result with the Clicks table to add the platform distribution features
+Clicks = Clicks.merge(promoted_with_distribution[['ad_id'] + list(platform_distribution.columns)], on='ad_id', how='left')
+"
+8,DocumentGeoLocationDistribution - Distribution of geographical locations (geo_location) of users who viewed the document (document_id) in the Pageviews table.,"
+# Compute the distribution of geographical locations for each document in the Pageviews table
+geo_distribution = Pageviews.groupby('document_id')['geo_location'].value_counts(normalize=True).unstack(fill_value=0)
+
+# Merge the Promoted table with the Clicks table to get the document_id for each ad
+Clicks = Clicks.merge(Promoted[['ad_id', 'document_id']], on='ad_id', how='left')
+
+# Merge the geo_distribution with the Clicks table to add the DocumentGeoLocationDistribution feature
+Clicks = Clicks.merge(geo_distribution, on='document_id', how='left', suffixes=('', '_geo_dist'))
+
+# Fill NaN values with 0 (if any)
+Clicks.fillna(0, inplace=True)
+"
+9,"DocumentTrafficSourceDistribution - Distribution of traffic sources (internal, search, social) for the document (document_id) in the Pageviews table.","
+# Calculate the distribution of traffic sources for each document in the Pageviews table
+traffic_source_distribution = Pageviews.groupby('document_id')['traffic_source'].value_counts(normalize=True).unstack(fill_value=0)
+
+# Ensure all traffic sources are represented
+for source in [1, 2, 3]:
+    if source not in traffic_source_distribution.columns:
+        traffic_source_distribution[source] = 0
+
+# Rename columns for clarity
+traffic_source_distribution = traffic_source_distribution.rename(columns={1: 'traffic_source_internal', 2: 'traffic_source_search', 3: 'traffic_source_social'})
+
+# Merge the Promoted table with the traffic source distribution
+Promoted_with_traffic = Promoted.merge(traffic_source_distribution, on='document_id', how='left')
+
+# Merge the Clicks table with the Promoted table to add the traffic source distribution features
+Clicks = Clicks.merge(Promoted_with_traffic[['ad_id', 'traffic_source_internal', 'traffic_source_search', 'traffic_source_social']], on='ad_id', how='left')
+
+# Fill NaN values with 0 (in case some ads do not have corresponding traffic source distribution)
+Clicks[['traffic_source_internal', 'traffic_source_search', 'traffic_source_social']] = Clicks[['traffic_source_internal', 'traffic_source_search', 'traffic_source_social']].fillna(0)
+"
+10,DisplayAdCount - Count of ads displayed in the same display context (display_id) in the Clicks table.,"
+Clicks['DisplayAdCount'] = Clicks.groupby('display_id')['ad_id'].transform('count')
+"
+11,DisplayAdClickedCount - Count of ads clicked in the same display context (display_id) in the Clicks table.,"
+Clicks['DisplayAdClickedCount'] = Clicks.groupby('display_id')['clicked'].transform('sum')
+"
+12,DisplayAdClickRate - Click rate of ads in the same display context (display_id) in the Clicks table.,"
+display_ad_click_rate = Clicks.groupby('display_id')['clicked'].mean().reset_index()
+display_ad_click_rate.columns = ['display_id', 'DisplayAdClickRate']
+Clicks = Clicks.merge(display_ad_click_rate, on='display_id', how='left')
+"
+13,AdCampaignId - Campaign identifier (campaign_id) for the ad (ad_id) from the Promoted table.,"
+Clicks = Clicks.merge(Promoted[['ad_id', 'campaign_id']], on='ad_id', how='left')
+Clicks.rename(columns={'campaign_id': 'AdCampaignId'}, inplace=True)
+"
+14,AdAdvertiserId - Advertiser identifier (advertiser_id) for the ad (ad_id) from the Promoted table.,"
+Clicks = Clicks.merge(Promoted[['ad_id', 'advertiser_id']], on='ad_id', how='left')
+Clicks.rename(columns={'advertiser_id': 'AdAdvertiserId'}, inplace=True)
+"
+15,AdDocumentId - Document identifier (document_id) for the ad (ad_id) from the Promoted table.,"
+Clicks = Clicks.merge(Promoted[['ad_id', 'document_id']], on='ad_id', how='left')
+Clicks.rename(columns={'document_id': 'AdDocumentId'}, inplace=True)
+"
+16,AdDocumentSourceId - Source identifier (source_id) for the document (document_id) from the Documents_meta table.,"
+# Merge Promoted with Documents_meta to get the source_id for each ad
+promoted_with_meta = pd.merge(Promoted, Documents_meta, on='document_id', how='left')
+
+# Select only the necessary columns
+promoted_with_meta = promoted_with_meta[['ad_id', 'source_id']]
+
+# Merge the result with Clicks to add the AdDocumentSourceId feature
+Clicks = pd.merge(Clicks, promoted_with_meta, on='ad_id', how='left')
+
+# Rename the column to AdDocumentSourceId
+Clicks.rename(columns={'source_id': 'AdDocumentSourceId'}, inplace=True)
+"
+17,AdDocumentPublisherId - Publisher identifier (publisher_id) for the document (document_id) from the Documents_meta table.,"
+Clicks = Clicks.merge(Promoted[['ad_id', 'document_id']], on='ad_id', how='left')
+Clicks = Clicks.merge(Documents_meta[['document_id', 'publisher_id']], on='document_id', how='left')
+Clicks.rename(columns={'publisher_id': 'AdDocumentPublisherId'}, inplace=True)
+"
+18,AdDocumentPublishTime - Publish time (publish_time) for the document (document_id) from the Documents_meta table.,"
+Clicks = Clicks.merge(Promoted[['ad_id', 'document_id']], on='ad_id', how='left')
+Clicks = Clicks.merge(Documents_meta[['document_id', 'publish_time']], on='document_id', how='left')
+Clicks.rename(columns={'publish_time': 'AdDocumentPublishTime'}, inplace=True)
+"
+19,AdDocumentTopicCount - Count of topics associated with the document (document_id) from the Documents_topics table.,"
+# Merge Clicks with Promoted to get the document_id for each ad
+Clicks = Clicks.merge(Promoted[['ad_id', 'document_id']], on='ad_id', how='left')
+
+# Count the number of topics for each document_id in Documents_topics
+topic_counts = Documents_topics.groupby('document_id').size().reset_index(name='AdDocumentTopicCount')
+
+# Merge the topic counts with the Clicks table
+Clicks = Clicks.merge(topic_counts, on='document_id', how='left')
+
+# Fill NaN values with 0 (in case some documents have no topics)
+Clicks['AdDocumentTopicCount'] = Clicks['AdDocumentTopicCount'].fillna(0)
+"
+20,AdDocumentEntityCount - Count of entities associated with the document (document_id) from the Documents_entities table.,"
+ad_document_entities_count = Documents_entities.groupby('document_id').size().reset_index(name='AdDocumentEntityCount')
+Promoted = Promoted.merge(ad_document_entities_count, on='document_id', how='left')
+Clicks = Clicks.merge(Promoted[['ad_id', 'AdDocumentEntityCount']], on='ad_id', how='left')
+"
+21,AdDocumentCategoryCount - Count of categories associated with the document (document_id) from the Documents_categories table.,"
+ad_document_ids = Promoted[['ad_id', 'document_id']]
+category_counts = Documents_categories.groupby('document_id').size().reset_index(name='AdDocumentCategoryCount')
+ad_category_counts = ad_document_ids.merge(category_counts, on='document_id', how='left').fillna(0)
+Clicks = Clicks.merge(ad_category_counts[['ad_id', 'AdDocumentCategoryCount']], on='ad_id', how='left').fillna(0)
+"
+22,AdDocumentTopicConfidenceSum - Sum of confidence levels of topics associated with the document (document_id) from the Documents_topics table.,"
+# Merge Promoted with Documents_topics to get the document_id and topic confidence levels for each ad
+promoted_topics = pd.merge(Promoted, Documents_topics, on='document_id', how='left')
+
+# Group by ad_id and sum the confidence levels of topics
+ad_topic_confidence_sum = promoted_topics.groupby('ad_id')['confidence_level'].sum().reset_index()
+
+# Rename the column to AdDocumentTopicConfidenceSum
+ad_topic_confidence_sum.rename(columns={'confidence_level': 'AdDocumentTopicConfidenceSum'}, inplace=True)
+
+# Merge the summed confidence levels back to the Clicks table
+Clicks = pd.merge(Clicks, ad_topic_confidence_sum, on='ad_id', how='left')
+
+# Fill NaN values with 0 (in case some ads do not have associated topics)
+Clicks['AdDocumentTopicConfidenceSum'].fillna(0, inplace=True)
+"
+23,AdDocumentEntityConfidenceSum - Sum of confidence levels of entities associated with the document (document_id) from the Documents_entities table.,"
+ad_document_entities = Promoted.merge(Documents_entities, on='document_id', how='left')
+ad_document_entities_sum = ad_document_entities.groupby('ad_id')['confidence_level'].sum().reset_index()
+ad_document_entities_sum.columns = ['ad_id', 'AdDocumentEntityConfidenceSum']
+Clicks = Clicks.merge(ad_document_entities_sum, on='ad_id', how='left')
+"
+24,AdDocumentCategoryConfidenceSum - Sum of confidence levels of categories associated with the document (document_id) from the Documents_categories table.,"
+ad_document_categories = Promoted.merge(Documents_categories, on='document_id', how='left')
+ad_document_category_confidence_sum = ad_document_categories.groupby('ad_id')['confidence_level'].sum().reset_index()
+ad_document_category_confidence_sum.columns = ['ad_id', 'AdDocumentCategoryConfidenceSum']
+Clicks = Clicks.merge(ad_document_category_confidence_sum, on='ad_id', how='left')
+"
+25,AdDocumentTopicConfidenceMean - Mean of confidence levels of topics associated with the document (document_id) from the Documents_topics table.,"
+# Merge Clicks with Promoted to get the document_id associated with each ad_id
+ad_document_ids = Clicks.merge(Promoted, on='ad_id', how='left')[['ad_id', 'document_id']]
+
+# Compute the mean confidence level of topics for each document_id
+topic_confidence_mean = Documents_topics.groupby('document_id')['confidence_level'].mean().reset_index()
+topic_confidence_mean.columns = ['document_id', 'AdDocumentTopicConfidenceMean']
+
+# Merge the mean confidence levels back to the Clicks table
+Clicks = Clicks.merge(ad_document_ids, on='ad_id', how='left')
+Clicks = Clicks.merge(topic_confidence_mean, on='document_id', how='left')
+
+# Drop the document_id column as it is no longer needed
+Clicks.drop(columns=['document_id'], inplace=True)
+"
+26,AdDocumentEntityConfidenceMean - Mean of confidence levels of entities associated with the document (document_id) from the Documents_entities table.,"
+ad_document_ids = Promoted[['ad_id', 'document_id']]
+document_entity_confidence = Documents_entities.groupby('document_id')['confidence_level'].mean().reset_index()
+document_entity_confidence.columns = ['document_id', 'AdDocumentEntityConfidenceMean']
+ad_document_entity_confidence = ad_document_ids.merge(document_entity_confidence, on='document_id', how='left')
+Clicks = Clicks.merge(ad_document_entity_confidence[['ad_id', 'AdDocumentEntityConfidenceMean']], on='ad_id', how='left')
+"
+27,AdDocumentCategoryConfidenceMean - Mean of confidence levels of categories associated with the document (document_id) from the Documents_categories table.,"
+ad_document_ids = Clicks.merge(Promoted, on='ad_id', how='left')[['ad_id', 'document_id']]
+category_confidence_mean = Documents_categories.groupby('document_id')['confidence_level'].mean().reset_index()
+category_confidence_mean.columns = ['document_id', 'AdDocumentCategoryConfidenceMean']
+Clicks = Clicks.merge(ad_document_ids, on='ad_id', how='left').merge(category_confidence_mean, on='document_id', how='left')
+Clicks.drop(columns=['document_id'], inplace=True)
+"
+28,UserAdClickCount - Count of times the user (uuid) clicked on any ad in the Clicks table.,"
+# Merge Clicks with Events to get the uuid for each click
+Clicks = Clicks.merge(Events[['display_id', 'uuid']], on='display_id', how='left')
+
+# Compute the UserAdClickCount
+user_ad_click_count = Clicks.groupby('uuid')['clicked'].sum().reset_index()
+user_ad_click_count.columns = ['uuid', 'UserAdClickCount']
+
+# Merge the UserAdClickCount back to the Clicks table
+Clicks = Clicks.merge(user_ad_click_count, on='uuid', how='left')
+
+# Drop the uuid column as it was only needed for the merge
+Clicks = Clicks.drop(columns=['uuid'])
+"
+29,UserAdClickRate - Click rate of the user (uuid) on any ad in the Clicks table.,"
+# Merge Clicks with Events to get the uuid for each click
+Clicks = Clicks.merge(Events[['display_id', 'uuid']], on='display_id', how='left')
+
+# Calculate the UserAdClickRate
+user_click_rate = Clicks.groupby('uuid')['clicked'].mean().reset_index()
+user_click_rate.columns = ['uuid', 'UserAdClickRate']
+
+# Merge the UserAdClickRate back into the Clicks table
+Clicks = Clicks.merge(user_click_rate, on='uuid', how='left')
+"
+30,UserAdDisplayCount - Count of times the user (uuid) was shown any ad in the Clicks table.,"
+user_ad_display_count = Events['uuid'].value_counts().rename('UserAdDisplayCount')
+Clicks = Clicks.merge(Events[['display_id', 'uuid']], on='display_id', how='left')
+Clicks = Clicks.merge(user_ad_display_count, on='uuid', how='left')
+Clicks['UserAdDisplayCount'] = Clicks['UserAdDisplayCount'].fillna(0).astype(int)
+Clicks.drop(columns=['uuid'], inplace=True)
+"
+31,UserAdDisplayClickRate - Click rate of the user (uuid) on ads displayed to them in the Clicks table.,"
+# Merge Clicks with Events to get the uuid for each display_id
+clicks_events = Clicks.merge(Events[['display_id', 'uuid']], on='display_id', how='left')
+
+# Calculate the click rate for each user (uuid)
+user_click_rate = clicks_events.groupby('uuid')['clicked'].mean().reset_index()
+user_click_rate.columns = ['uuid', 'UserAdDisplayClickRate']
+
+# Merge the click rate back to the Clicks table
+Clicks = Clicks.merge(clicks_events[['display_id', 'uuid']], on='display_id', how='left')
+Clicks = Clicks.merge(user_click_rate, on='uuid', how='left')
+
+# Drop the temporary uuid column
+Clicks = Clicks.drop(columns=['uuid'])
+"
+32,UserAdCampaignClickCount - Count of times the user (uuid) clicked on ads from the same campaign (campaign_id) in the Clicks table.,"
+# Merge Clicks with Events to get the uuid
+Clicks = Clicks.merge(Events[['display_id', 'uuid']], on='display_id', how='left')
+
+# Merge Clicks with Promoted to get the campaign_id
+Clicks = Clicks.merge(Promoted[['ad_id', 'campaign_id']], on='ad_id', how='left')
+
+# Group by uuid and campaign_id to count the clicks
+user_ad_campaign_click_count = Clicks[Clicks['clicked'] == 1].groupby(['uuid', 'campaign_id']).size().reset_index(name='UserAdCampaignClickCount')
+
+# Merge the count back to the Clicks table
+Clicks = Clicks.merge(user_ad_campaign_click_count, on=['uuid', 'campaign_id'], how='left')
+
+# Fill NaN values with 0 (users who have not clicked any ads from the same campaign)
+Clicks['UserAdCampaignClickCount'] = Clicks['UserAdCampaignClickCount'].fillna(0)
+"
+33,UserAdCampaignClickRate - Click rate of the user (uuid) on ads from the same campaign (campaign_id) in the Clicks table.,"
+# Merge Clicks with Promoted to get campaign_id
+clicks_promoted = Clicks.merge(Promoted, on='ad_id', how='left')
+
+# Merge with Events to get uuid
+clicks_promoted_events = clicks_promoted.merge(Events[['display_id', 'uuid']], on='display_id', how='left')
+
+# Calculate UserAdCampaignClickRate
+user_campaign_clicks = clicks_promoted_events.groupby(['uuid', 'campaign_id']).agg({'clicked': ['sum', 'count']})
+user_campaign_clicks.columns = ['user_campaign_clicks', 'user_campaign_views']
+user_campaign_clicks['UserAdCampaignClickRate'] = user_campaign_clicks['user_campaign_clicks'] / user_campaign_clicks['user_campaign_views']
+user_campaign_clicks = user_campaign_clicks.reset_index()
+
+# Merge back to Clicks table
+clicks_promoted_events = clicks_promoted_events.merge(user_campaign_clicks[['uuid', 'campaign_id', 'UserAdCampaignClickRate']], on=['uuid', 'campaign_id'], how='left')
+
+# Add the new feature to Clicks table
+Clicks['UserAdCampaignClickRate'] = clicks_promoted_events['UserAdCampaignClickRate']
+"
+34,UserAdAdvertiserClickCount - Count of times the user (uuid) clicked on ads from the same advertiser (advertiser_id) in the Clicks table.,"
+# Merge Clicks with Events to get the uuid
+Clicks = Clicks.merge(Events[['display_id', 'uuid']], on='display_id', how='left')
+
+# Merge Clicks with Promoted to get the advertiser_id
+Clicks = Clicks.merge(Promoted[['ad_id', 'advertiser_id']], on='ad_id', how='left')
+
+# Calculate UserAdAdvertiserClickCount
+user_advertiser_click_count = Clicks[Clicks['clicked'] == 1].groupby(['uuid', 'advertiser_id']).size().reset_index(name='UserAdAdvertiserClickCount')
+
+# Merge the count back to the Clicks table
+Clicks = Clicks.merge(user_advertiser_click_count, on=['uuid', 'advertiser_id'], how='left')
+
+# Fill NaN values with 0 (users who have not clicked any ads from the advertiser)
+Clicks['UserAdAdvertiserClickCount'] = Clicks['UserAdAdvertiserClickCount'].fillna(0)
+"
+35,UserAdAdvertiserClickRate - Click rate of the user (uuid) on ads from the same advertiser (advertiser_id) in the Clicks table.,"
+# Merge Clicks with Events to get uuid
+Clicks = Clicks.merge(Events[['display_id', 'uuid']], on='display_id', how='left')
+
+# Merge Clicks with Promoted to get advertiser_id
+Clicks = Clicks.merge(Promoted[['ad_id', 'advertiser_id']], on='ad_id', how='left')
+
+# Calculate UserAdAdvertiserClickRate
+user_advertiser_clicks = Clicks.groupby(['uuid', 'advertiser_id'])['clicked'].sum().reset_index()
+user_advertiser_clicks.rename(columns={'clicked': 'total_clicks'}, inplace=True)
+
+user_advertiser_impressions = Clicks.groupby(['uuid', 'advertiser_id'])['clicked'].count().reset_index()
+user_advertiser_impressions.rename(columns={'clicked': 'total_impressions'}, inplace=True)
+
+user_advertiser_click_rate = user_advertiser_clicks.merge(user_advertiser_impressions, on=['uuid', 'advertiser_id'])
+user_advertiser_click_rate['UserAdAdvertiserClickRate'] = user_advertiser_click_rate['total_clicks'] / user_advertiser_click_rate['total_impressions']
+
+# Merge the click rate back to the Clicks table
+Clicks = Clicks.merge(user_advertiser_click_rate[['uuid', 'advertiser_id', 'UserAdAdvertiserClickRate']], on=['uuid', 'advertiser_id'], how='left')
+
+# Drop intermediate columns
+Clicks = Clicks.drop(columns=['uuid', 'advertiser_id'])
+"
+36,UserAdDocumentClickCount - Count of times the user (uuid) clicked on ads associated with the same document (document_id) in the Clicks table.,"
+# Merge Clicks with Events to get the uuid and document_id for each click
+clicks_with_events = Clicks.merge(Events[['display_id', 'uuid', 'document_id']], on='display_id', how='left')
+
+# Merge with Promoted to get the document_id associated with each ad
+clicks_with_events = clicks_with_events.merge(Promoted[['ad_id', 'document_id']], on='ad_id', how='left', suffixes=('', '_ad'))
+
+# Group by uuid and document_id_ad to count the number of clicks
+user_ad_document_click_count = clicks_with_events.groupby(['uuid', 'document_id_ad']).size().reset_index(name='UserAdDocumentClickCount')
+
+# Merge the count back to the original Clicks table
+Clicks = Clicks.merge(clicks_with_events[['display_id', 'uuid', 'document_id_ad']], on='display_id', how='left')
+Clicks = Clicks.merge(user_ad_document_click_count, left_on=['uuid', 'document_id_ad'], right_on=['uuid', 'document_id_ad'], how='left')
+
+# Fill NaN values with 0 (in case there are users who have not clicked any ads)
+Clicks['UserAdDocumentClickCount'] = Clicks['UserAdDocumentClickCount'].fillna(0)
+
+# Drop the temporary columns used for merging
+Clicks = Clicks.drop(columns=['uuid', 'document_id_ad'])
+"
+37,UserAdDocumentClickRate - Click rate of the user (uuid) on ads associated with the same document (document_id) in the Clicks table.,"
+# Merge Clicks with Promoted to get document_id for each ad
+Clicks = Clicks.merge(Promoted[['ad_id', 'document_id']], on='ad_id', how='left')
+
+# Merge Clicks with Events to get uuid for each display_id
+Clicks = Clicks.merge(Events[['display_id', 'uuid']], on='display_id', how='left')
+
+# Calculate UserAdDocumentClickRate
+user_ad_doc_click_rate = Clicks.groupby(['uuid', 'document_id'])['clicked'].mean().reset_index()
+user_ad_doc_click_rate.columns = ['uuid', 'document_id', 'UserAdDocumentClickRate']
+
+# Merge the calculated click rate back to the Clicks table
+Clicks = Clicks.merge(user_ad_doc_click_rate, on=['uuid', 'document_id'], how='left')
+
+# Drop the intermediate document_id and uuid columns if not needed
+Clicks = Clicks.drop(columns=['document_id', 'uuid'])
+"

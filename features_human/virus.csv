@@ -1,0 +1,303 @@
+,feature_description,code
+0,`TmaxSt1Smth02` - Station 1 maximum temperature smoothed with local polynomial regression fitting with a span of 0.4 within the year,
+1,`TminSt1Smth02` - Station 1 minimum temperature smoothed with local polynomial regression fitting with a span of 0.4 within the year,
+2,`TavgSt1Smth02` - Station 1 average temperature smoothed with local polynomial regression fitting with a span of 0.4 within the year,"
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
+
+def add_smoothed_temperature(Virus, Weather):
+    # Filter weather data for Station 1
+    weather_station1 = Weather[Weather['Station'] == 1]
+
+    # Convert Date to datetime
+    weather_station1['Date'] = pd.to_datetime(weather_station1['Date'])
+    Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+    # Sort by Date
+    weather_station1 = weather_station1.sort_values('Date')
+
+    # Extract the year from the date
+    weather_station1['Year'] = weather_station1['Date'].dt.year
+
+    # Apply polynomial regression smoothing within each year
+    def smooth_tavg(group):
+        X = np.arange(len(group)).reshape(-1, 1)
+        y = group['Tavg'].values
+        y_idx = ~group['Tavg'].isna().values
+        y_notnan = y[y_idx]
+        X_notnan = X[y_idx]
+        poly = PolynomialFeatures(degree=2)
+        X_poly_notnan = poly.fit_transform(X_notnan)
+        model = LinearRegression()
+        model.fit(X_poly_notnan, y_notnan)
+        X_poly = poly.transform(X)
+        y_smooth = model.predict(X_poly)
+        return pd.Series(y_smooth, index=group.index)
+
+    weather_station1['TavgSt1Smth02'] = weather_station1.groupby('Year').apply(smooth_tavg).reset_index(level=0, drop=True)
+
+    # Merge the smoothed values with the Virus table
+    Virus = Virus.merge(weather_station1[['Date', 'TavgSt1Smth02']], on='Date', how='left')
+
+    return Virus
+
+# Example usage:
+# Virus = pd.read_csv('Virus.csv')
+# Weather = pd.read_csv('Weather.csv')
+Virus = add_smoothed_temperature(Virus, Weather)
+# print(Virus.head())
+"
+3,`DepartSt1Smth02` - Station 1 temperature departure from normal smoothed with local polynomial regression fitting with a span of 0.4 within the year,"
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
+
+# Filter for Station 1 and sort by date
+weather_station1 = Weather[Weather['Station'] == 1].sort_values('Date')
+
+# Encode the date to numeric values for regression
+weather_station1['Date'] = pd.to_datetime(weather_station1['Date'])
+weather_station1['Date_ordinal'] = weather_station1['Date'].map(pd.Timestamp.toordinal)
+
+# Check if there are any rows in the filtered weather data
+if not weather_station1.empty:
+    # Prepare the data for polynomial regression
+    X = weather_station1[['Date_ordinal']]
+    y = weather_station1['Depart']
+
+    # Apply polynomial regression with degree 2
+    poly = PolynomialFeatures(degree=2)
+    X_poly = poly.fit_transform(X)
+    poly_reg_model = LinearRegression()
+    poly_reg_model.fit(X_poly, y)
+
+    # Predict smoothed values
+    weather_station1['DepartSt1Smth02'] = poly_reg_model.predict(X_poly)
+else:
+    weather_station1['DepartSt1Smth02'] = np.nan
+
+# Merge the smoothed feature with the Virus table
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Virus = Virus.merge(weather_station1[['Date', 'DepartSt1Smth02']], on='Date', how='left')
+"
+4,`DewPointSt1Smth02` - Station 1 dew point temperature smoothed with local polynomial regression fitting with a span of 0.4 within the year,"
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+
+# Filter Weather data for Station 1
+weather_station1 = Weather[Weather['Station'] == 1]
+
+# Sort by date
+weather_station1 = weather_station1.sort_values('Date')
+
+# Convert Date to ordinal for regression
+weather_station1['DateOrdinal'] = pd.to_datetime(weather_station1['Date']).apply(lambda x: x.toordinal())
+
+# Apply local polynomial regression fitting (using a simple linear regression as an approximation)
+span = 0.4
+n = len(weather_station1)
+half_window = int(span * n / 2)
+
+smoothed_dewpoint = []
+
+for i in range(n):
+    start = max(0, i - half_window)
+    end = min(n, i + half_window + 1)
+    window = weather_station1.iloc[start:end]
+    
+    X = window['DateOrdinal'].values.reshape(-1, 1)
+    y = window['DewPoint'].values
+    
+    model = LinearRegression()
+    model.fit(X, y)
+    
+    smoothed_value = model.predict([[weather_station1.iloc[i]['DateOrdinal']]])[0]
+    smoothed_dewpoint.append(smoothed_value)
+
+weather_station1['DewPointSt1Smth02'] = smoothed_dewpoint
+
+# Merge the smoothed DewPoint with the Virus table
+Virus = Virus.merge(weather_station1[['Date', 'DewPointSt1Smth02']], on='Date', how='left')
+"
+5,`HeatSt1Smth02` - Station 1 heating degree days smoothed with local polynomial regression fitting with a span of 0.4 within the year,
+6,`CoolSt1Smth02` - Station 1 cooling degree days smoothed with local polynomial regression fitting with a span of 0.4 within the year,
+7,`PrecipTotalSt1Smth02` - Station 1 total precipitation smoothed with local polynomial regression fitting with a span of 0.4 within the year,
+8,`SnowFallSt1Smth02` - Station 1 snowfall amount smoothed with local polynomial regression fitting with a span of 0.4 within the year,
+9,`ResultDirSt1Smth02` - Station 1 resultant wind direction smoothed with local polynomial regression fitting with a span of 0.4 within the year,
+10,`TmaxSt2Smth02` - Station 2 maximum temperature smoothed with local polynomial regression fitting with a span of 0.4 within the year,
+11,`TminSt2Smth02` - Station 2 minimum temperature smoothed with local polynomial regression fitting with a span of 0.4 within the year,
+12,`TavgSt2Smth02` - Station 2 average temperature smoothed with local polynomial regression fitting with a span of 0.4 within the year,
+13,`DewPointSt2Smth02` - Station 2 dew point temperature smoothed with local polynomial regression fitting with a span of 0.4 within the year,
+14,`PrecipTotalSt2Smth02` - Station 2 total precipitation smoothed with local polynomial regression fitting with a span of 0.4 within the year,"
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression
+
+# Assuming Virus, Spray, and Weather are already loaded as DataFrames
+
+# Filter Weather data for Station 2
+weather_station2 = Weather[Weather['Station'] == 2]
+
+# Ensure Date is in datetime format
+weather_station2['Date'] = pd.to_datetime(weather_station2['Date'])
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Sort by Date
+weather_station2 = weather_station2.sort_values(by='Date')
+
+# Extract the year from the Date
+weather_station2['Year'] = weather_station2['Date'].dt.year
+
+# Initialize a column for smoothed precipitation
+weather_station2['PrecipTotalSt2Smth02'] = np.nan
+
+# Perform local polynomial regression fitting (LOESS) on PrecipTotal for each year
+for year in weather_station2['Year'].unique():
+    yearly_data = weather_station2[weather_station2['Year'] == year]
+    if len(yearly_data) > 1:
+        X = np.arange(len(yearly_data)).reshape(-1, 1)
+        y = yearly_data['PrecipTotal'].values
+        y_idx = ~np.isnan(y)
+        y_notnan = y[y_idx]
+        X_notnan = X[y_idx]
+        
+        # Polynomial regression with degree 2
+        poly = PolynomialFeatures(degree=2)
+        X_poly_notnan = poly.fit_transform(X_notnan)
+        
+        model = LinearRegression()
+        model.fit(X_poly_notnan, y_notnan)
+
+        X_poly = poly.transform(X)
+        smoothed_precip = model.predict(X_poly)
+        weather_station2.loc[weather_station2['Year'] == year, 'PrecipTotalSt2Smth02'] = smoothed_precip
+
+# Merge the smoothed precipitation data with the Virus DataFrame
+Virus = Virus.merge(weather_station2[['Date', 'PrecipTotalSt2Smth02']], on='Date', how='left')
+"
+15,`ResultDirSt2Smth02` - Station 2 resultant wind direction smoothed with local polynomial regression fitting with a span of 0.4 within the year,
+16,`Trap_code` -  traps coded as ordinal sorted by average WnvPresent inside each Trap,"
+# Calculate the average WnvPresent for each Trap
+trap_avg_wnv = Virus.groupby('Trap')['WnvPresent'].mean().sort_values().reset_index()
+
+# Create a mapping from Trap to ordinal code based on the sorted average WnvPresent
+trap_avg_wnv['Trap_code'] = range(1, len(trap_avg_wnv) + 1)
+trap_code_mapping = trap_avg_wnv.set_index('Trap')['Trap_code'].to_dict()
+
+# Map the Trap to the corresponding Trap_code in the Virus table
+Virus['Trap_code'] = Virus['Trap'].map(trap_code_mapping)
+"
+17,`TS` - Binary feature indicating the presence of a thunderstorm,"
+Virus['TS'] = Virus['Date'].isin(Weather[Weather['CodeSum'].str.contains('TS')]['Date']).astype(int)
+"
+18,`FG` - Binary feature indicating the presence of fog,"
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Merge Virus with Weather on Date
+merged_df = pd.merge(Virus, Weather, on='Date', how='left')
+
+# Create the FG feature based on CodeSum, handling NaN values
+merged_df['FG'] = merged_df['CodeSum'].fillna('').apply(lambda x: 1 if 'FG' in x else 0)
+
+# Add the FG feature back to the Virus table
+Virus['FG'] = merged_df['FG']
+"
+19,`DewPoint` - Dew point temperature,"
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+Weather['Date'] = pd.to_datetime(Weather['Date'])
+
+# Assuming the weather data is averaged from different stations.
+# We might need additional logic to select the appropriate station
+
+# Merge Virus with Weather on Date
+Virus = Virus.merge(Weather.groupby('Date')['DewPoint'].mean().reset_index(), on='Date', how='left')
+"
+20,`TrapCount` - Number of mosquito batches for a given （Trap; Date and Species）,"
+Virus['TrapCount'] = Virus.groupby(['Trap', 'Date', 'Species'])['NumMosquitos'].transform('count')
+"
+21,`TrapCountPrevAge` - Number of days since TrapCount was last non-zero. Capped at 90 days,"
+import pandas as pd
+
+# Ensure the Date column is in datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Sort the Virus DataFrame by Trap and Date
+Virus = Virus.sort_values(by=['Trap', 'Date'])
+
+# Initialize the new column with default value 90
+Virus['TrapCountPrevAge'] = 90
+
+# Iterate over each trap
+for trap in Virus['Trap'].unique():
+    trap_data = Virus[Virus['Trap'] == trap]
+    last_non_zero_date = None
+    
+    for idx, row in trap_data.iterrows():
+        if row['NumMosquitos'] > 0:
+            last_non_zero_date = row['Date']
+        if last_non_zero_date is not None:
+            days_since_last_non_zero = (row['Date'] - last_non_zero_date).days
+            Virus.at[idx, 'TrapCountPrevAge'] = min(days_since_last_non_zero, 90)
+
+# Reset the index to maintain the original order
+Virus = Virus.reset_index(drop=True)
+"
+22,`TrapCountPrev` - TrapCount value from the previous instance when TrapCount was non-zero,"
+Virus = Virus.sort_values(by=['Trap', 'Date'])
+Virus['TrapCountPrev'] = Virus.groupby('Trap')['NumMosquitos'].shift()
+"
+23,`NumBatchesPrevious30Sum` - Sum of NumBatches for the same Trap and Species over the previous 30 days,"
+import pandas as pd
+
+# Ensure Date is in datetime format
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Sort the Virus DataFrame by Trap, Species, and Date
+Virus = Virus.sort_values(by=['Trap', 'Species', 'Date'])
+
+# Create a new column for the sum of NumMosquitos over the previous 30 days
+Virus['NumBatchesPrevious30Sum'] = Virus.groupby(['Trap', 'Species']).apply(
+    lambda group: group.set_index('Date')['NumMosquitos'].rolling('30D').sum().shift(1)
+).reset_index(level=['Trap', 'Species', 'Date'], drop=True)
+
+# Fill NaN values with 0 (if needed)
+Virus['NumBatchesPrevious30Sum'] = Virus['NumBatchesPrevious30Sum']
+"
+24,`NumBatchesPrevious30Max` - Maximum of NumBatches for the same Trap and Species over the previous 30 days,"
+import pandas as pd
+from datetime import timedelta
+
+# Convert Date columns to datetime
+Virus['Date'] = pd.to_datetime(Virus['Date'])
+
+# Initialize the new feature column with NaN values
+Virus['NumBatchesPrevious30Max'] = float('nan')
+
+# Iterate over each row to calculate the feature
+for idx, row in Virus.iterrows():
+    # Define the date range
+    start_date = row['Date'] - timedelta(days=30)
+    end_date = row['Date']
+    
+    # Filter the Virus DataFrame for the same Trap and Species within the date range
+    mask = (Virus['Trap'] == row['Trap']) & (Virus['Species'] == row['Species']) & (Virus['Date'] >= start_date) & (Virus['Date'] < end_date)
+    filtered_df = Virus[mask]
+    
+    # Calculate the maximum NumMosquitos in the filtered DataFrame
+    if not filtered_df.empty:
+        max_num_batches = filtered_df['NumMosquitos'].max()
+    else:
+        max_num_batches = 0
+    
+    # Assign the calculated value to the new feature column
+    Virus.at[idx, 'NumBatchesPrevious30Max'] = max_num_batches
+
+# Display the updated Virus DataFrame
+print(Virus.head())
+"

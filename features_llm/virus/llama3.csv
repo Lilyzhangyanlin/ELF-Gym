@@ -1,0 +1,80 @@
+,feature_description,code
+0,NumSpraysNearby - Count of sprays within a certain distance (e.g. 1km) and time window (e.g. 1 week) of the trap location,
+1,AvgWeatherTmax - Average maximum temperature of nearby weather stations (e.g. within 5km) on the date of the WNV test,"
+Virus['AvgWeatherTmax'] = 0
+for i, row in Virus.iterrows():
+    weather_data = Weather[Weather['Date'] == row['Date']]
+    if len(weather_data) > 0:
+        Virus.loc[i, 'AvgWeatherTmax'] = weather_data['Tmax'].mean()
+"
+2,AvgWeatherTmin - Average minimum temperature of nearby weather stations (e.g. within 5km) on the date of the WNV test,"
+Virus['AvgWeatherTmin'] = 0
+for i, row in Virus.iterrows():
+    weather_data = Weather[Weather['Date'] == row['Date']]
+    if len(weather_data) > 0:
+        Virus.loc[i, 'AvgWeatherTmin'] = weather_data['Tmin'].mean()
+"
+3,AvgWeatherTavg - Average average temperature of nearby weather stations (e.g. within 5km) on the date of the WNV test,
+4,AvgWeatherPrecipTotal - Average total precipitation of nearby weather stations (e.g. within 5km) on the date of the WNV test,"
+Virus['AvgWeatherPrecipTotal'] = 0
+for i, row in Virus.iterrows():
+    nearby_weather = Weather[Weather['Date'] == row['Date']]
+    if not nearby_weather.empty:
+        Virus.loc[i, 'AvgWeatherPrecipTotal'] = nearby_weather['PrecipTotal'].mean()
+"
+5,AvgWeatherResultSpeed - Average resultant wind speed of nearby weather stations (e.g. within 5km) on the date of the WNV test,
+6,AvgWeatherResultDir - Average resultant wind direction of nearby weather stations (e.g. within 5km) on the date of the WNV test,
+7,NumMosquitosPerTrap - Number of mosquitoes caught in the same trap in the past (e.g. 1 week),"
+Virus['NumMosquitosPerTrap'] = Virus.groupby('Trap')['NumMosquitos'].transform(lambda x: x.rolling(7, min_periods=1).sum().shift(1).fillna(0))
+"
+8,WnvPresentInNearbyTraps - Whether WNV was present in nearby traps (e.g. within 1km) in the past (e.g. 1 week),"
+import numpy as np
+from math import radians, sin, cos, sqrt, atan2
+
+def compute_distance(lat1, lon1, lat2, lon2):
+    R = 6371  # radius of the Earth in kilometers
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    return R * c * 1000  # convert to meters
+
+def wnv_present_in_nearby_traps(row):
+    nearby_traps = Virus[(Virus['Date'] > row['Date'] - pd.Timedelta(days=7)) &
+                         (Virus['Date'] <= row['Date'])]
+    for index, nearby_trap in nearby_traps.iterrows():
+        if compute_distance(row['Latitude'], row['Longitude'], nearby_trap['Latitude'], nearby_trap['Longitude']) < 1000:
+            if nearby_trap['WnvPresent'] == 1:
+                return 1
+    return 0
+
+Virus['WnvPresentInNearbyTraps'] = Virus.apply(lambda row: wnv_present_in_nearby_traps(row), axis=1)
+"
+9,SpeciesCount - Count of the same species of mosquitoes caught in the same trap in the past (e.g. 1 week),"
+Virus['SpeciesCount'] = Virus.groupby(['Trap', 'Species']).cumcount()
+"
+10,AddressLatitudeBucket - Bucketized latitude of the trap address (e.g. into 10 buckets),"
+Virus['AddressLatitudeBucket'] = pd.cut(Virus['Latitude'], bins=10, labels=False)
+"
+11,AddressLongitudeBucket - Bucketized longitude of the trap address (e.g. into 10 buckets),"
+Virus['AddressLongitudeBucket'] = pd.cut(Virus['Longitude'], bins=10, labels=False)
+"
+12,BlockStreetCount - Count of traps in the same block and street,"
+Virus['BlockStreetCount'] = Virus.groupby(['Block', 'Street'])['Trap'].transform('count')
+"
+13,TrapCount - Count of traps in the same location (i.e. same latitude and longitude),"
+Virus['TrapCount'] = Virus.groupby(['Latitude', 'Longitude'])['Trap'].transform('count')
+"
+14,DateDayOfWeek - Day of the week of the WNV test date,"
+Virus[""DateDayOfWeek""] = Virus[""Date""].dt.dayofweek
+"
+15,DateMonth - Month of the WNV test date,"
+Virus[""DateMonth""] = Virus[""Date""].dt.month
+"
+16,DateYear - Year of the WNV test date,"
+Virus[""DateYear""] = Virus[""Date""].dt.year
+"
+17,AddressAccuracyBucket - Bucketized address accuracy (e.g. into 5 buckets),"
+Virus['AddressAccuracyBucket'] = pd.cut(Virus['AddressAccuracy'], bins=5, labels=False)
+"

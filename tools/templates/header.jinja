@@ -1,0 +1,11 @@
+You are an expert data scientist.  You are given a set of tables whose columns are described as follows:
+
+{% for table_name, column_descs in table_desc.items() %}
+{{table_name}}
+{% for column_name, column_desc in column_descs.items() %}
+* {{column_name}} - {{column_desc}}
+{% endfor %}
+
+{% endfor %}
+Now, the task is to make predictions on the {{target_column}} column in the {{target_table}} table, and we would like to do feature engineering, by adding more columns to the {{target_table}} table to facilitate prediction with a strong tabular machine learning model such as AutoGluon.
+However, the only available information are the tables, and we cannot borrow external data.

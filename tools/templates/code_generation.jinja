@@ -1,0 +1,24 @@
+{% include 'header.jinja' %}
+
+Someone has proposed to add the following feature to the SearchStream table:
+
+   {{new_feature_desc}}
+
+We have already loaded the table contents as Pandas DataFrames:
+
+```python
+import pandas as pd
+
+{% for table_name in table_desc.keys() %}
+{{table_name}} = pd.read_csv('{{table_name}}.csv')
+{% endfor %}
+```
+
+Can you write the Python code to compute the feature above?
+If not, simply answer "None".
+If so, please directly write the Python code that adds the said feature as a new column {{target_table}} table, without any additional information.  You are free to use any Python packages available online.
+Example (note that the actual answer in this particular example may not make sense):
+
+```python
+{{target_table}}["NewFeature"] = 0
+```

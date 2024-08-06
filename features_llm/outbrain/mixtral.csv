@@ -1,0 +1,147 @@
+,feature_description,code
+0,display_id_platform - The platform of the display context,
+1,display_id_geo_location - The geographical location of the display context,
+2,display_id_traffic_source - The traffic source of the display context,
+3,ad_id_platform - The platform of the ad,"
+# Check if 'platform' column exists in Promoted DataFrame
+if 'platform' in Promoted.columns:
+    # Merge Clicks and Promoted DataFrames on ad_id
+    Clicks = pd.merge(Clicks, Promoted[['ad_id', 'platform']], on='ad_id', how='left')
+    # Fill Na values with a default platform value (e.g., 0)
+    Clicks['platform'].fillna(0, inplace=True)
+    # Rename the platform column to ad_id_platform
+    Clicks = Clicks.rename(columns={'platform': 'ad_id_platform'})
+else:
+    print(""'platform' column not found in Promoted DataFrame."")
+"
+4,ad_id_geo_location - The geographical location of the ad,
+5,ad_id_traffic_source - The traffic source of the ad,"
+# Check if 'traffic_source' column exists in Promoted DataFrame
+if 'traffic_source' not in Promoted.columns:
+    Promoted['traffic_source'] = 0
+
+# Merge Clicks and Promoted tables on ad_id
+Clicks = Clicks.merge(Promoted[['ad_id', 'traffic_source']], on='ad_id', how='left')
+
+# Create the new feature
+Clicks['ad_id_traffic_source'] = Clicks['ad_id'].astype(str) + '_' + Clicks['traffic_source'].astype(str)
+"
+6,"clicked_previous - Indicates if the user has clicked on any ad before this one (1 if clicked, 0 otherwise)","
+# First, compute the cumulative number of clicks for each user
+Clicks['has_clicked_before'] = Clicks.groupby('display_id')['clicked'].cumsum()
+
+# The feature 'has_clicked_before' is 1 if the user has clicked before, and 0 otherwise
+Clicks['has_clicked_before'] = Clicks['has_clicked_before'].apply(lambda x: 1 if x > 0 else 0)
+"
+7,"clicked_same_display - Indicates if the user has clicked on any ad in the same display context before (1 if clicked, 0 otherwise)",
+8,"clicked_same_document - Indicates if the user has clicked on any ad in the same document before (1 if clicked, 0 otherwise)",
+9,document_popularity - The number of pageviews the document has received,"
+# First, merge the Pageviews and Documents_meta DataFrames on document_id
+Pageviews_meta = pd.merge(Pageviews, Documents_meta, on='document_id')
+
+# Then, compute the document_popularity as the count of unique uuid for each document_id
+document_popularity = Pageviews_meta.groupby('document_id')['uuid'].nunique()
+
+# Reset the index to convert it to a DataFrame
+document_popularity = document_popularity.reset_index()
+
+# Rename the columns
+document_popularity = document_popularity.rename(columns={'document_id': 'ad_id', 'uuid': 'document_popularity'})
+
+# Merge the computed document_popularity DataFrame with the Clicks DataFrame on ad_id
+Clicks = pd.merge(Clicks, document_popularity, on='ad_id')
+"
+10,document_age - The time since the document was published,
+11,campaign_id_advertiser_id - The combination of campaign_id and advertiser_id,"
+Clicks[""campaign_id_advertiser_id""] = Promoted[""campaign_id""].astype(str) + ""_"" + Promoted[""advertiser_id""].astype(str)
+"
+12,source_id_publisher_id - The combination of source_id and publisher_id,"
+# Check if 'display_id' exists in both 'Clicks' and 'Documents_meta' DataFrames
+if 'display_id' in Clicks.columns and 'display_id' in Documents_meta.columns:
+    # Merge 'Clicks' DataFrame with 'Documents_meta' DataFrame on 'document_id'
+    Pageviews = Pageviews.merge(Clicks[['document_id', 'display_id']], on='document_id', how='left')
+
+    # Create the new feature 'source_id_publisher_id' as a combination of 'source_id' and 'publisher_id'
+    Documents_meta['source_id_publisher_id'] = Documents_meta['source_id'].astype(str) + '_' + Documents_meta['publisher_id'].astype(str)
+
+    # Merge 'Documents_meta' DataFrame with 'Pageviews' DataFrame on 'display_id'
+    Pageviews = Pageviews.merge(Documents_meta[['display_id', 'source_id_publisher_id']], on='display_id', how='left')
+
+    # Merge 'Pageviews' DataFrame with 'Clicks' DataFrame on 'document_id'
+    Clicks = Clicks.merge(Pageviews[['document_id', 'source_id_publisher_id']], on='document_id', how='left')
+
+    # Drop the 'document_id' column if it is not needed
+    Clicks.drop(['document_id'], axis=1, inplace=True)
+else:
+    print(""'display_id' not found in both 'Clicks' and 'Documents_meta' DataFrames."")"
+13,document_topic_confidence - The average confidence level of the document's topics,
+14,document_entity_confidence - The average confidence level of the document's entities,
+15,document_category_confidence - The average confidence level of the document's categories,
+16,document_topic_count - The number of topics the document has,
+17,document_entity_count - The number of entities the document has,"
+# Merge Clicks and Documents_meta tables to get document_id
+Clicks = pd.merge(Clicks, Documents_meta, left_on='ad_id', right_on='document_id', how='left')
+
+# Merge Documents_entities and Documents_meta tables to get document_id and entity_count
+document_entities = pd.merge(Documents_entities, Documents_meta, on='document_id')
+
+# Group by document_id and count the number of entities
+document_entity_count = document_entities.groupby('document_id')['entity_id'].count().reset_index(name='document_entity_count')
+
+# Merge the new table with the Clicks table
+Clicks = pd.merge(Clicks, document_entity_count, left_on='document_id', right_on='document_id', how='left')
+"
+18,document_category_count - The number of categories the document has,"
+# Merge Documents_categories and Documents_meta tables on document_id
+Documents_categories_meta = pd.merge(Documents_categories, Documents_meta, on='document_id')
+
+# Group by document_id and count the number of unique categories
+document_category_count = Documents_categories_meta.groupby('document_id')['category_id'].nunique().reset_index()
+
+# Rename the columns
+document_category_count = document_category_count.rename(columns={'document_id': 'ad_id', 'category_id': 'document_category_count'})
+
+# Merge the new table with the Clicks table on ad_id
+Clicks = pd.merge(Clicks, document_category_count, on='ad_id', how='left')
+
+# Fill the NaN values with 0
+Clicks['document_category_count'].fillna(0, inplace=True)
+"
+19,hour_of_day - The hour of the day when the page view occurred,"
+# Convert timestamp to datetime
+Pageviews['timestamp'] = pd.to_datetime(Pageviews['timestamp'], unit='ms')
+
+# Extract hour of the day
+Pageviews['hour_of_day'] = Pageviews['timestamp'].dt.hour
+"
+20,day_of_week - The day of the week when the page view occurred,"
+import pandas as pd
+import numpy as np
+
+# Check if 'timestamp' column exists in Clicks DataFrame
+if 'timestamp' in Clicks.columns:
+    # Convert timestamp to datetime
+    Clicks['timestamp'] = pd.to_datetime(Clicks['timestamp'], unit='ms')
+
+    # Extract day of the week
+    Clicks['day_of_week'] = Clicks['timestamp'].dt.dayofweek
+
+    # Map the day of the week to a more understandable format
+    day_map = {0:'Monday', 1:'Tuesday', 2:'Wednesday', 3:'Thursday', 4:'Friday', 5:'Saturday', 6:'Sunday'}
+    Clicks['day_of_week'] = Clicks['day_of_week'].map(day_map)
+else:
+    print(""The 'timestamp' column does not exist in the Clicks DataFrame."")
+"
+21,month_of_year - The month of the year when the page view occurred,"
+# Merge Promoted and Clicks tables on ad_id
+Clicks = Clicks.merge(Promoted[['ad_id', 'document_id']], left_on='ad_id', right_on='ad_id', how='left')
+
+# Merge Pageviews and Clicks tables on document_id
+Pageviews['month_of_year'] = Pageviews['timestamp'].dt.month
+Clicks = Clicks.merge(Pageviews[['document_id', 'month_of_year']], left_on='document_id', right_on='document_id', how='left')
+
+# Fill Na values with 0
+Clicks['month_of_year'] = Clicks['month_of_year'].fillna(0)
+"
+22,"is_weekend - Indicates if the page view occurred on a weekend (1 if it is, 0 otherwise)",
+23,"is_holiday - Indicates if the page view occurred on a holiday (1 if it is, 0 otherwise)",

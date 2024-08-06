@@ -1,0 +1,88 @@
+,feature_description,code
+0,`addr1_FE` - Frequency encoding of addr1 calculated as the count of each unique value divided by the total count,"
+addr1_counts = Transaction['addr1'].value_counts(normalize=True)
+Transaction['addr1_FE'] = Transaction['addr1'].map(addr1_counts)
+"
+1,`card1_FE` - Frequency encoding of card1 calculated as the count of each unique value divided by the total count,"
+Transaction['card1_FE'] = Transaction['card1'].map(Transaction['card1'].value_counts(normalize=True))
+"
+2,`card2_FE` - Frequency encoding of card2 calculated as the count of each unique value divided by the total count,"
+Transaction['card2_FE'] = Transaction['card2'].map(Transaction['card2'].value_counts(normalize=True))
+"
+3,`card3_FE` - Frequency encoding of card3 calculated as the count of each unique value divided by the total count,"
+Transaction['card3_FE'] = Transaction['card3'].map(Transaction['card3'].value_counts(normalize=True))
+"
+4,`P_emaildomain_FE` - Frequency encoding of P_emaildomain calculated as the count of each unique value divided by the total count,"
+Transaction[""P_emaildomain_FE""] = Transaction[""P_emaildomain""].map(Transaction[""P_emaildomain""].value_counts(normalize=True))
+"
+5,`card1_addr1` - Combined feature of card1 and addr1 created by concatenating card1 and addr1 into a single string,"
+Transaction[""card1_addr1""] = Transaction[""card1""].astype(str) + ""_"" + Transaction[""addr1""].astype(str)
+"
+6,`card1_addr1_P_emaildomain` - Combined feature of card1 addr1 and P_emaildomain created by concatenating card1 addr1 and P_emaildomain into a single string,"
+Transaction[""card1_addr1_P_emaildomain""] = Transaction[""card1""].astype(str) + ""_"" + Transaction[""addr1""].astype(str) + ""_"" + Transaction[""P_emaildomain""].astype(str)
+"
+7,`card1_addr1_FE` - Frequency encoding of combined card1 and addr1 calculated after combining the features,"
+Transaction['card1_addr1'] = Transaction['card1'].astype(str) + '_' + Transaction['addr1'].astype(str)
+card1_addr1_FE = Transaction['card1_addr1'].value_counts().to_dict()
+Transaction['card1_addr1_FE'] = Transaction['card1_addr1'].map(card1_addr1_FE)
+"
+8,`card1_addr1_P_emaildomain_FE` - Frequency encoding of combined card1 addr1 and P_emaildomain calculated after combining the features,"
+Transaction['card1_addr1_P_emaildomain'] = Transaction['card1'].astype(str) + '_' + Transaction['addr1'].astype(str) + '_' + Transaction['P_emaildomain'].astype(str)
+frequency_encoding = Transaction['card1_addr1_P_emaildomain'].value_counts().to_dict()
+Transaction['card1_addr1_P_emaildomain_FE'] = Transaction['card1_addr1_P_emaildomain'].map(frequency_encoding)
+Transaction.drop(columns=['card1_addr1_P_emaildomain'], inplace=True)
+"
+9,`TransactionAmt_card1_mean` - Mean of TransactionAmt grouped by card1 calculated using groupby and mean functions,"
+Transaction['TransactionAmt_card1_mean'] = Transaction.groupby('card1')['TransactionAmt'].transform('mean')
+"
+10,`TransactionAmt_card1_std` - Standard deviation of TransactionAmt grouped by card1 calculated using groupby and std functions,"
+Transaction['TransactionAmt_card1_std'] = Transaction.groupby('card1')['TransactionAmt'].transform('std')
+"
+11,`TransactionAmt_card1_addr1_mean` - Mean of TransactionAmt for combined card1 and addr1 calculated after combining the features and then using groupby and mean,"
+Transaction['TransactionAmt_card1_addr1_mean'] = Transaction.groupby(['card1', 'addr1'])['TransactionAmt'].transform('mean')
+"
+12,`TransactionAmt_card1_addr1_std` - Standard deviation of TransactionAmt for combined card1 and addr1 calculated after combining the features and then using groupby and std,"
+Transaction['TransactionAmt_card1_addr1_std'] = Transaction.groupby(['card1', 'addr1'])['TransactionAmt'].transform('std')
+"
+13,`TransactionAmt_card1_addr1_P_emaildomain_mean` - Mean of TransactionAmt for combined card1 addr1 and P_emaildomain calculated after combining the features and then using groupby and mean,"
+Transaction['TransactionAmt_card1_addr1_P_emaildomain_mean'] = Transaction.groupby(['card1', 'addr1', 'P_emaildomain'])['TransactionAmt'].transform('mean')
+"
+14,`TransactionAmt_card1_addr1_P_emaildomain_std` - Standard deviation of TransactionAmt for combined card1 addr1 and P_emaildomain calculated after combining the features and then using groupby and std,"
+Transaction['TransactionAmt_card1_addr1_P_emaildomain_std'] = Transaction.groupby(['card1', 'addr1', 'P_emaildomain'])['TransactionAmt'].transform('std')
+"
+15,`D9_card1_mean` - Mean of D9 grouped by card1 calculated using groupby and mean functions,"
+Transaction['D9_card1_mean'] = Transaction.groupby('card1')['D9'].transform('mean')
+"
+16,`D9_card1_std` - Standard deviation of D9 grouped by card1 calculated using groupby and std functions,"
+Transaction['D9_card1_std'] = Transaction.groupby('card1')['D9'].transform('std')
+"
+17,`D9_card1_addr1_mean` - Mean of D9 for combined card1 and addr1 calculated after combining the features and then using groupby and mean,"
+Transaction['D9_card1_addr1_mean'] = Transaction.groupby(['card1', 'addr1'])['D9'].transform('mean')
+"
+18,`D9_card1_addr1_std` - Standard deviation of D9 for combined card1 and addr1 calculated after combining the features and then using groupby and std,"
+Transaction['D9_card1_addr1_std'] = Transaction.groupby(['card1', 'addr1'])['D9'].transform('std')
+"
+19,`D9_card1_addr1_P_emaildomain_mean` - Mean of D9 for combined card1 addr1 and P_emaildomain calculated after combining the features and then using groupby and mean,"
+Transaction['D9_card1_addr1_P_emaildomain_mean'] = Transaction.groupby(['card1', 'addr1', 'P_emaildomain'])['D9'].transform('mean')
+"
+20,`D9_card1_addr1_P_emaildomain_std` - Standard deviation of D9 for combined card1 addr1 and P_emaildomain calculated after combining the features and then using groupby and std,"
+Transaction['D9_card1_addr1_P_emaildomain_std'] = Transaction.groupby(['card1', 'addr1', 'P_emaildomain'])['D9'].transform('std')
+"
+21,`D11_card1_mean` - Mean of D11 grouped by card1 calculated using groupby and mean functions,"
+Transaction['D11_card1_mean'] = Transaction.groupby('card1')['D11'].transform('mean')
+"
+22,`D11_card1_std` - Standard deviation of D11 grouped by card1 calculated using groupby and std functions,"
+Transaction['D11_card1_std'] = Transaction.groupby('card1')['D11'].transform('std')
+"
+23,`D11_card1_addr1_mean` - Mean of D11 for combined card1 and addr1 calculated after combining the features and then using groupby and mean,"
+Transaction['D11_card1_addr1_mean'] = Transaction.groupby(['card1', 'addr1'])['D11'].transform('mean')
+"
+24,`D11_card1_addr1_std` - Standard deviation of D11 for combined card1 and addr1 calculated after combining the features and then using groupby and std,"
+Transaction['D11_card1_addr1_std'] = Transaction.groupby(['card1', 'addr1'])['D11'].transform('std')
+"
+25,`D11_card1_addr1_P_emaildomain_mean` - Mean of D11 for combined card1 addr1 and P_emaildomain calculated after combining the features and then using groupby and mean,"
+Transaction['D11_card1_addr1_P_emaildomain_mean'] = Transaction.groupby(['card1', 'addr1', 'P_emaildomain'])['D11'].transform('mean')
+"
+26,`D11_card1_addr1_P_emaildomain_std` - Standard deviation of D11 for combined card1 addr1 and P_emaildomain calculated after combining the features and then using groupby and std,"
+Transaction['D11_card1_addr1_P_emaildomain_std'] = Transaction.groupby(['card1', 'addr1', 'P_emaildomain'])['D11'].transform('std')
+"

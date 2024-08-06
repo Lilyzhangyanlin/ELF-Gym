@@ -1,0 +1,8 @@
+boto3
+faker
+jinja2
+openai
+pygments
+tqdm
+pandas
+dill

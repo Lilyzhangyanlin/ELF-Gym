@@ -1,0 +1,123 @@
+,feature_description,code
+0,TransactionAmtRatio1_6 - Ratio of TransactionAmt in card1 to card6,"
+# Ensure that the TransactionID is the same in both dataframes
+Transaction = Transaction.merge(Train_identity, on='TransactionID', how='left')
+
+# Define a lambda function to convert non-numeric values to 0
+converter = lambda x: 0 if pd.isna(x) or isinstance(x, str) else x
+
+# Apply the lambda function to the card6 column
+Transaction['card6'] = Transaction['card6'].apply(converter)
+
+# Compute the ratio of TransactionAmt in card1 to card6
+Transaction['TransactionAmtRatio1_6'] = Transaction['TransactionAmt'] / Transaction['card6']
+"
+1,TransactionAmtDiff1_6 - Difference between TransactionAmt in card1 and card6,
+2,ProductCDCount - Count of each unique ProductCD in a transaction,"
+Transaction['ProductCDCount'] = Transaction.groupby('TransactionID')['ProductCD'].transform('nunique')
+"
+3,"CardInfoCombination - Combination of card1, card2, ..., card6 (considered as a new categorical feature)",
+4,AddressInfoCombination - Combination of addr1 and addr2 (considered as a new categorical feature),"
+Transaction[""AddressInfoCombination""] = Transaction.apply(lambda row: '{}-{}'.format(row['addr1'], row['addr2']), axis=1)
+"
+5,DistanceRatio - Ratio of dist1 to dist2,"
+# Check if dist1 and dist2 are not null
+Transaction['DistanceRatio'] = Transaction['dist1'].where(Transaction['dist1'].notnull(), 0) / Transaction['dist2'].where(Transaction['dist2'].notnull(), 1)
+"
+6,EmailDomainCombination - Combination of P_emaildomain and R_emaildomain (considered as a new categorical feature),"
+Transaction[""EmailDomainCombination""] = Transaction[""P_emaildomain""] + ""_"" + Transaction[""R_emaildomain""]
+"
+7,"C1Mean - Mean of C1, C2, ..., C14","
+# Select the relevant columns
+relevant_columns = Transaction.iloc[:, 12:26]
+
+# Convert the relevant columns to numeric type
+relevant_columns = relevant_columns.apply(pd.to_numeric, errors='coerce')
+
+# Compute the mean
+C1_to_C14_mean = relevant_columns.mean(axis=1)
+
+# Add the mean as a new column to the Transaction DataFrame
+Transaction[""C1Mean""] = C1_to_C14_mean
+"
+8,"D1Mean - Mean of D1, D2, ..., D15","
+# Select the relevant columns
+relevant_columns = Transaction.iloc[:, 15:30]
+
+# Convert the relevant columns to numeric type
+relevant_columns = relevant_columns.apply(pd.to_numeric, errors='coerce')
+
+# Calculate the mean of these columns
+D1_to_D15_mean = relevant_columns.mean(axis=1)
+
+# Add the mean as a new column to the Transaction DataFrame
+Transaction['D1Mean'] = D1_to_D15_mean
+"
+9,"M1Mode - Mode of M1, M2, ..., M9","
+# First, we need to concatenate the M1, M2, ..., M9 columns into a single column
+# so that we can compute the mode of this new column
+Transaction['M'] = Transaction[['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9']].mode(axis=1)[0]
+
+# Then, we can compute the mode of the new 'M' column
+Transaction['M1Mode'] = Transaction['M'].mode()[0]
+
+# Finally, we can drop the 'M' column if it's not needed
+Transaction = Transaction.drop('M', axis=1)
+"
+10,V1Sum - Sum of V1 - V339,"
+Transaction[""V1Sum""] = Transaction.iloc[:, 133:].sum(axis=1)
+"
+11,DeviceTypeCount - Count of each unique DeviceType in a transaction,"
+# Merge Train_identity DataFrame with Transaction DataFrame on TransactionID
+Transaction = Transaction.merge(Train_identity, on='TransactionID', how='left')
+
+# Group by TransactionID and count unique DeviceType
+DeviceTypeCount = Transaction.groupby('TransactionID')['DeviceType'].nunique().reset_index(name='DeviceTypeCount')
+
+# Merge DeviceTypeCount DataFrame with Transaction DataFrame on TransactionID
+Transaction = Transaction.merge(DeviceTypeCount, on='TransactionID', how='left')
+"
+12,DeviceInfoCount - Count of each unique DeviceInfo in a transaction,"
+# Merge Train_identity DataFrame with Transaction DataFrame on TransactionID
+Transaction = Transaction.merge(Train_identity, on='TransactionID', how='left')
+
+# Compute the count of each unique DeviceInfo in a transaction
+Transaction['DeviceInfoCount'] = Transaction.groupby('TransactionID')['DeviceInfo'].transform('nunique')
+
+# If you want to remove the DeviceInfo column from Transaction DataFrame, uncomment the following line
+# Transaction = Transaction.drop('DeviceInfo', axis=1)
+"
+13,"IdCombination - Combination of id1, id2, ..., id11 and id_12, id_13, ..., id38 (considered as a new categorical feature)",
+14,"IdMean - Mean of id1, id2, ..., id11 and id_12, id_13, ..., id38",
+15,"IdMode - Mode of id1, id2, ..., id11 and id_12, id_13, ..., id38","
+import itertools
+
+def compute_mode(values):
+    from collections import Counter
+    data = Counter(values)
+    return data.most_common(1)[0][0]
+
+# Concatenate id columns
+id_columns = list(itertools.chain(Train_identity.columns[2:13], Train_identity.columns[13:39]))
+id_values = Train_identity[id_columns].values.flatten()
+
+# Compute mode
+IdMode = compute_mode(id_values)
+
+# Add new column to Transaction DataFrame
+Transaction[""IdMode""] = IdMode
+"
+16,"IdSum - Sum of id1, id2, ..., id11 and id_12, id_13, ..., id38",
+17,"IdRatio - Ratio of id1, id2, ..., id11 to id_12, id_13, ..., id38.","
+# Check if 'id' columns exist in either dataframe
+id_columns_in_transaction = set(Transaction.columns).intersection('id1 id2 id3 id4 id5 id6 id7 id8 id9 id10 id11'.split())
+id_columns_in_identity = set(Train_identity.columns).intersection('id_12 id_13 id_14 id_15 id_16 id_17 id_18 id_19 id_20 id_21 id_22 id_23 id_24 id_25 id_26 id_27 id_28 id_29 id_30 id_31 id_32 id_33 id_34 id_35 id_36 id_37 id_38'.split())
+
+# If 'id' columns exist in both dataframes, merge them
+if id_columns_in_transaction and id_columns_in_identity:
+    Transaction = Transaction.merge(Train_identity, on='TransactionID', how='left')
+    # Then, compute the ratio of the sum of id1 to id11 over the sum of id_12 to id38
+    Transaction['IdRatio'] = Transaction[list(id_columns_in_transaction)].sum(axis=1) / Transaction[list(id_columns_in_identity)].sum(axis=1)
+else:
+    print(""id columns not found in both dataframes"")
+"

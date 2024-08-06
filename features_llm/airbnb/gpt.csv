@@ -1,0 +1,181 @@
+,feature_description,code
+0,AccountAgeDays - Number of days between date_account_created and the current date,"
+from datetime import datetime
+
+current_date = datetime.now()
+User[""AccountAgeDays""] = (current_date - pd.to_datetime(User[""date_account_created""])).dt.days
+"
+1,DaysToFirstBooking - Number of days between date_account_created and date_first_booking,"
+User[""DaysToFirstBooking""] = (pd.to_datetime(User[""date_first_booking""]) - pd.to_datetime(User[""date_account_created""])).dt.days
+"
+2,DaysToFirstActivity - Number of days between date_account_created and timestamp_first_active,"
+User[""DaysToFirstActivity""] = (pd.to_datetime(User[""timestamp_first_active""], format='%Y%m%d%H%M%S') - pd.to_datetime(User[""date_account_created""])).dt.days
+"
+3,"IsFirstBooking - Binary feature indicating if the user has made a booking (1 if date_first_booking is not null, 0 otherwise)","
+User[""IsFirstBooking""] = User[""date_first_booking""].notnull().astype(int)
+"
+4,"AgeBucket - Age group of the user (e.g., 0-18, 19-25, 26-35, etc.)","
+User['age'] = pd.to_numeric(User['age'], errors='coerce')
+bins = [0, 18, 25, 35, 45, 55, 65, 100]
+labels = ['0-18', '19-25', '26-35', '36-45', '46-55', '56-65', '66+']
+User['AgeBucket'] = pd.cut(User['age'], bins=bins, labels=labels, right=False)
+"
+5,SignupFlowCount - Count of users who signed up from the same signup_flow,"
+User[""SignupFlowCount""] = User.groupby('signup_flow')['signup_flow'].transform('count')
+"
+6,LanguageCount - Count of users with the same language preference,"
+User[""LanguageCount""] = User.groupby(""language"")[""language""].transform(""count"")
+"
+7,GenderCount - Count of users with the same gender,"
+User[""GenderCount""] = User.groupby(""gender"")[""id""].transform(""count"")
+"
+8,SignupMethodCount - Count of users who used the same signup_method,"
+User[""SignupMethodCount""] = User.groupby(""signup_method"")[""id""].transform(""count"")
+"
+9,SignupAppCount - Count of users who used the same signup_app,"
+User[""SignupAppCount""] = User.groupby('signup_app')['signup_app'].transform('count')
+"
+10,FirstDeviceTypeCount - Count of users who used the same first_device_type,"
+FirstDeviceTypeCount = User['first_device_type'].value_counts().to_dict()
+User['FirstDeviceTypeCount'] = User['first_device_type'].map(FirstDeviceTypeCount)
+"
+11,FirstBrowserCount - Count of users who used the same first_browser,"
+User[""FirstBrowserCount""] = User.groupby(""first_browser"")[""id""].transform(""count"")
+"
+12,TotalSessionTime - Total time spent in sessions by the user (sum of secs_elapsed),"
+total_session_time = Session.groupby('user_id')['secs_elapsed'].sum().reset_index()
+total_session_time.columns = ['id', 'TotalSessionTime']
+User = User.merge(total_session_time, on='id', how='left')
+User['TotalSessionTime'] = User['TotalSessionTime'].fillna(0)
+"
+13,AverageSessionTime - Average time spent per session by the user,"
+average_session_time = Session.groupby('user_id')['secs_elapsed'].mean().reset_index()
+average_session_time.columns = ['id', 'AverageSessionTime']
+User = User.merge(average_session_time, on='id', how='left')
+"
+14,SessionCount - Total number of sessions by the user,"
+SessionCount = Session.groupby('user_id').size().reset_index(name='SessionCount')
+User = User.merge(SessionCount, how='left', left_on='id', right_on='user_id').drop(columns=['user_id'])
+User['SessionCount'] = User['SessionCount'].fillna(0)
+"
+15,UniqueActionsCount - Count of unique actions performed by the user,"
+unique_actions_count = Session.groupby('user_id')['action'].nunique().reset_index()
+unique_actions_count.columns = ['id', 'UniqueActionsCount']
+User = User.merge(unique_actions_count, on='id', how='left')
+User['UniqueActionsCount'] = User['UniqueActionsCount'].fillna(0)
+"
+16,UniqueActionTypesCount - Count of unique action types performed by the user,"
+unique_action_types_count = Session.groupby('user_id')['action_type'].nunique().reset_index()
+unique_action_types_count.columns = ['id', 'UniqueActionTypesCount']
+User = User.merge(unique_action_types_count, on='id', how='left')
+User['UniqueActionTypesCount'] = User['UniqueActionTypesCount'].fillna(0)
+"
+17,UniqueActionDetailsCount - Count of unique action details performed by the user,"
+unique_action_details_count = Session.groupby('user_id')['action_detail'].nunique().reset_index()
+unique_action_details_count.columns = ['id', 'UniqueActionDetailsCount']
+User = User.merge(unique_action_details_count, on='id', how='left')
+User['UniqueActionDetailsCount'] = User['UniqueActionDetailsCount'].fillna(0)
+"
+18,UniqueDeviceTypesCount - Count of unique device types used by the user,"
+unique_device_types = Session.groupby('user_id')['device_type'].nunique().reset_index()
+unique_device_types.columns = ['id', 'UniqueDeviceTypesCount']
+User = User.merge(unique_device_types, on='id', how='left')
+User['UniqueDeviceTypesCount'] = User['UniqueDeviceTypesCount'].fillna(0)
+"
+19,MostFrequentAction - Most frequently performed action by the user,"
+MostFrequentAction = Session.groupby('user_id')['action'].agg(lambda x: x.value_counts().idxmax()).reset_index()
+MostFrequentAction.columns = ['id', 'MostFrequentAction']
+User = User.merge(MostFrequentAction, on='id', how='left')
+"
+20,MostFrequentActionType - Most frequently performed action type by the user,"
+most_frequent_action_type = Session.groupby('user_id')['action_type'].agg(lambda x: x.value_counts().idxmax()).reset_index()
+most_frequent_action_type.columns = ['id', 'MostFrequentActionType']
+User = User.merge(most_frequent_action_type, on='id', how='left')
+"
+21,MostFrequentActionDetail - Most frequently performed action detail by the user,"
+most_frequent_action_detail = Session.groupby('user_id')['action_detail'].agg(lambda x: x.value_counts().idxmax()).reset_index()
+most_frequent_action_detail.columns = ['id', 'MostFrequentActionDetail']
+User = User.merge(most_frequent_action_detail, on='id', how='left')
+"
+22,MostFrequentDeviceType - Most frequently used device type by the user,"
+MostFrequentDeviceType = Session.groupby('user_id')['device_type'].agg(lambda x: x.value_counts().idxmax()).reset_index()
+MostFrequentDeviceType.columns = ['id', 'MostFrequentDeviceType']
+User = User.merge(MostFrequentDeviceType, on='id', how='left')
+"
+23,DistanceToDestination - Distance to the destination country in kilometers,"
+import numpy as np
+
+# Merge User table with Country table to get the distance_km for each user's destination country
+User = User.merge(Country[['country_destination', 'distance_km']], on='country_destination', how='left')
+
+# Rename the column to DistanceToDestination
+User.rename(columns={'distance_km': 'DistanceToDestination'}, inplace=True)
+"
+24,DestinationArea - Area of the destination country in square kilometers,"
+User = User.merge(Country[['country_destination', 'destination_km2']], on='country_destination', how='left')
+User.rename(columns={'destination_km2': 'DestinationArea'}, inplace=True)
+"
+25,DestinationLanguage - Language spoken in the destination country,"
+User = User.merge(Country[['country_destination', 'destination_language']], on='country_destination', how='left')
+"
+26,LanguageLevenshteinDistance - Levenshtein distance between the user's language and the destination language,"
+User = User.merge(Country[['country_destination', 'language_levenshtein_distance']], on='country_destination', how='left')
+"
+27,PopulationInAgeBucket - Population of users in the same age bucket and destination country,"
+# Convert age to numeric, forcing errors to NaN
+User['age'] = pd.to_numeric(User['age'], errors='coerce')
+
+# Define age buckets
+age_bins = [0, 18, 25, 35, 45, 55, 65, 75, 85, 100]
+age_labels = ['0-18', '19-25', '26-35', '36-45', '46-55', '56-65', '66-75', '76-85', '86-100']
+
+# Create age_bucket column
+User['age_bucket'] = pd.cut(User['age'], bins=age_bins, labels=age_labels)
+
+# Merge User with Population to get the population in the same age bucket and destination country
+User = User.merge(Population[['age_bucket', 'country_destination', 'population_in_thousands']], 
+                  how='left', 
+                  left_on=['age_bucket', 'country_destination'], 
+                  right_on=['age_bucket', 'country_destination'])
+
+# Rename the column to PopulationInAgeBucket
+User.rename(columns={'population_in_thousands': 'PopulationInAgeBucket'}, inplace=True)
+"
+28,PopulationInGender - Population of users with the same gender and destination country,"
+# Merge Population data with User data to get PopulationInGender
+User = User.merge(Population[['country_destination', 'gender', 'population_in_thousands']], 
+                  left_on=['country_destination', 'gender'], 
+                  right_on=['country_destination', 'gender'], 
+                  how='left')
+
+# Rename the column to PopulationInGender
+User.rename(columns={'population_in_thousands': 'PopulationInGender'}, inplace=True)
+"
+29,"PopulationInAgeGender - Population of users in the same age bucket, gender, and destination country",
+30,"UserLanguageDestinationLanguageMatch - Binary feature indicating if the user's language matches the destination language (1 if match, 0 otherwise)","
+User = User.merge(Country[['country_destination', 'destination_language']], on='country_destination', how='left')
+User['UserLanguageDestinationLanguageMatch'] = (User['language'] == User['destination_language']).astype(int)
+User.drop(columns=['destination_language'], inplace=True)
+"
+31,"UserDeviceDestinationDeviceMatch - Binary feature indicating if the user's first device type matches the most frequent device type used in the destination country (1 if match, 0 otherwise)","
+# Compute the most frequent device type used in each destination country
+most_frequent_device_per_country = (
+    Session.groupby(['user_id', 'device_type'])
+    .size()
+    .reset_index(name='count')
+    .merge(User[['id', 'country_destination']], left_on='user_id', right_on='id')
+    .groupby('country_destination')['device_type']
+    .agg(lambda x: x.value_counts().idxmax())
+    .reset_index()
+    .rename(columns={'device_type': 'most_frequent_device_type'})
+)
+
+# Merge the most frequent device type with the User table
+User = User.merge(most_frequent_device_per_country, on='country_destination', how='left')
+
+# Create the UserDeviceDestinationDeviceMatch feature
+User['UserDeviceDestinationDeviceMatch'] = (User['first_device_type'] == User['most_frequent_device_type']).astype(int)
+
+# Drop the auxiliary column
+User = User.drop(columns=['most_frequent_device_type'])
+"

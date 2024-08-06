@@ -1,0 +1,287 @@
+,feature_description,code
+0,EventCount - Count of events associated with the device.,"
+event_counts = Events.groupby('device_id').size().reset_index(name='EventCount')
+Gender_age = Gender_age.merge(event_counts, on='device_id', how='left').fillna(0)
+"
+1,FirstEventTimestamp - Timestamp of the first event associated with the device.,"
+first_event_timestamp = Events.groupby('device_id')['timestamp'].min().reset_index()
+first_event_timestamp.columns = ['device_id', 'FirstEventTimestamp']
+Gender_age = Gender_age.merge(first_event_timestamp, on='device_id', how='left')
+"
+2,LastEventTimestamp - Timestamp of the last event associated with the device.,"
+last_event_timestamp = Events.groupby('device_id')['timestamp'].max().reset_index()
+last_event_timestamp.columns = ['device_id', 'LastEventTimestamp']
+Gender_age = Gender_age.merge(last_event_timestamp, on='device_id', how='left')
+"
+3,EventDuration - Duration between the first and last event timestamps.,"
+Events['timestamp'] = pd.to_datetime(Events['timestamp'])
+event_duration = Events.groupby('device_id')['timestamp'].agg(lambda x: (x.max() - x.min()).total_seconds()).reset_index()
+event_duration.columns = ['device_id', 'EventDuration']
+Gender_age = Gender_age.merge(event_duration, on='device_id', how='left')
+"
+4,AverageLongitude - Average longitude of events associated with the device.,"
+average_longitude = Events.groupby('device_id')['longitude'].mean().reset_index()
+average_longitude.columns = ['device_id', 'AverageLongitude']
+Gender_age = Gender_age.merge(average_longitude, on='device_id', how='left')
+"
+5,AverageLatitude - Average latitude of events associated with the device.,"
+average_latitude = Events.groupby('device_id')['latitude'].mean().reset_index()
+average_latitude.columns = ['device_id', 'AverageLatitude']
+Gender_age = Gender_age.merge(average_latitude, on='device_id', how='left')
+"
+6,"UniqueLocationsCount - Count of unique (longitude, latitude) pairs associated with the device.","
+unique_locations = Events.groupby('device_id')[['longitude', 'latitude']].nunique().sum(axis=1).reset_index(name='UniqueLocationsCount')
+Gender_age = Gender_age.merge(unique_locations, on='device_id', how='left')
+"
+7,AppEventCount - Count of app events associated with the device.,"
+AppEventCount = App_events.groupby('event_id').size().reset_index(name='AppEventCount')
+Events_with_count = Events.merge(AppEventCount, on='event_id', how='left').fillna(0)
+DeviceEventCount = Events_with_count.groupby('device_id')['AppEventCount'].sum().reset_index()
+Gender_age = Gender_age.merge(DeviceEventCount, on='device_id', how='left').fillna(0)
+"
+8,ActiveAppCount - Count of active app events (is_active = 1) associated with the device.,"
+active_app_counts = App_events[App_events['is_active'] == 1].groupby('event_id').size().reset_index(name='ActiveAppCount')
+events_with_active_counts = Events.merge(active_app_counts, on='event_id', how='left').fillna(0)
+device_active_app_counts = events_with_active_counts.groupby('device_id')['ActiveAppCount'].sum().reset_index()
+Gender_age = Gender_age.merge(device_active_app_counts, on='device_id', how='left').fillna(0)
+"
+9,InactiveAppCount - Count of inactive app events (is_active = 0) associated with the device.,"
+inactive_app_counts = App_events[App_events['is_active'] == 0].groupby('event_id').size()
+inactive_app_counts = inactive_app_counts.reset_index(name='InactiveAppCount')
+events_with_inactive_counts = Events.merge(inactive_app_counts, on='event_id', how='left').fillna(0)
+device_inactive_counts = events_with_inactive_counts.groupby('device_id')['InactiveAppCount'].sum().reset_index()
+Gender_age = Gender_age.merge(device_inactive_counts, on='device_id', how='left').fillna(0)
+"
+10,UniqueAppCount - Count of unique apps used by the device.,"
+unique_apps_per_device = App_events.groupby('event_id')['app_id'].nunique().reset_index()
+unique_apps_per_device = unique_apps_per_device.merge(Events[['event_id', 'device_id']], on='event_id')
+unique_apps_per_device = unique_apps_per_device.groupby('device_id')['app_id'].sum().reset_index()
+unique_apps_per_device.columns = ['device_id', 'UniqueAppCount']
+
+Gender_age = Gender_age.merge(unique_apps_per_device, on='device_id', how='left')
+Gender_age['UniqueAppCount'] = Gender_age['UniqueAppCount'].fillna(0)
+"
+11,UniqueLabelCount - Count of unique labels associated with the device's apps.,"
+# Merge App_labels with App_events to get labels for each event
+app_event_labels = pd.merge(App_events, App_labels, on='app_id', how='left')
+
+# Merge the result with Events to get device_id for each label
+event_device_labels = pd.merge(app_event_labels, Events[['event_id', 'device_id']], on='event_id', how='left')
+
+# Group by device_id and count unique labels
+unique_label_count = event_device_labels.groupby('device_id')['label_id'].nunique().reset_index()
+unique_label_count.columns = ['device_id', 'UniqueLabelCount']
+
+# Merge the unique label count with Gender_age
+Gender_age = pd.merge(Gender_age, unique_label_count, on='device_id', how='left')
+
+# Fill NaN values with 0 (in case some devices have no labels)
+Gender_age['UniqueLabelCount'] = Gender_age['UniqueLabelCount'].fillna(0)
+"
+12,UniqueCategoryCount - Count of unique categories associated with the device's apps.,"
+# Merge App_labels with Label_categories to get the category for each app
+app_label_categories = pd.merge(App_labels, Label_categories, on='label_id', how='left')
+
+# Merge App_events with app_label_categories to get the category for each event
+app_event_categories = pd.merge(App_events, app_label_categories, on='app_id', how='left')
+
+# Merge app_event_categories with Events to get the device_id for each event
+event_device_categories = pd.merge(app_event_categories, Events, on='event_id', how='left')
+
+# Group by device_id and count unique categories
+unique_category_count = event_device_categories.groupby('device_id')['category'].nunique().reset_index()
+unique_category_count.columns = ['device_id', 'UniqueCategoryCount']
+
+# Merge the unique category count with Gender_age
+Gender_age = pd.merge(Gender_age, unique_category_count, on='device_id', how='left')
+
+# Fill NaN values with 0 (if any device_id in Gender_age has no corresponding events)
+Gender_age['UniqueCategoryCount'] = Gender_age['UniqueCategoryCount'].fillna(0)
+"
+13,MostFrequentLabel - The most frequent label associated with the device's apps.,"
+# Merge App_labels with App_events to get event_id and label_id
+app_event_labels = pd.merge(App_events, App_labels, on='app_id', how='left')
+
+# Merge the above result with Events to get device_id
+event_device_labels = pd.merge(app_event_labels, Events[['event_id', 'device_id']], on='event_id', how='left')
+
+# Count the frequency of each label per device
+label_counts = event_device_labels.groupby(['device_id', 'label_id']).size().reset_index(name='count')
+
+# Find the most frequent label for each device
+most_frequent_label = label_counts.loc[label_counts.groupby('device_id')['count'].idxmax()]
+
+# Merge the most frequent label with Gender_age
+Gender_age = pd.merge(Gender_age, most_frequent_label[['device_id', 'label_id']], on='device_id', how='left')
+
+# Rename the column to MostFrequentLabel
+Gender_age.rename(columns={'label_id': 'MostFrequentLabel'}, inplace=True)
+"
+14,MostFrequentCategory - The most frequent category associated with the device's apps.,"
+# Merge App_labels with Label_categories to get the category for each app
+app_label_categories = pd.merge(App_labels, Label_categories, on='label_id', how='left')
+
+# Merge App_events with the above result to get the category for each event
+app_event_categories = pd.merge(App_events, app_label_categories[['app_id', 'category']], on='app_id', how='left')
+
+# Merge Events with the above result to get the category for each device
+event_categories = pd.merge(Events, app_event_categories[['event_id', 'category']], on='event_id', how='left')
+
+# Group by device_id and category to count the occurrences of each category per device
+category_counts = event_categories.groupby(['device_id', 'category']).size().reset_index(name='count')
+
+# Find the most frequent category for each device
+most_frequent_category = category_counts.loc[category_counts.groupby('device_id')['count'].idxmax()]
+
+# Merge the most frequent category back to the Gender_age table
+Gender_age = pd.merge(Gender_age, most_frequent_category[['device_id', 'category']], on='device_id', how='left')
+
+# Rename the column to MostFrequentCategory
+Gender_age.rename(columns={'category': 'MostFrequentCategory'}, inplace=True)
+"
+15,PhoneBrand - The brand of the phone associated with the device.,"
+Gender_age = Gender_age.merge(Brand[['device_id', 'phone_brand']], on='device_id', how='left')
+"
+16,DeviceModel - The model of the phone associated with the device.,"
+Gender_age = Gender_age.merge(Brand[['device_id', 'device_model']], on='device_id', how='left')
+Gender_age.rename(columns={'device_model': 'DeviceModel'}, inplace=True)
+"
+17,AverageEventsPerDay - Average number of events per day for the device.,"
+Events['date'] = pd.to_datetime(Events['timestamp']).dt.date
+average_events_per_day = Events.groupby('device_id').size().div(Events.groupby('device_id')['date'].nunique()).reset_index(name='AverageEventsPerDay')
+Gender_age = Gender_age.merge(average_events_per_day, on='device_id', how='left')
+"
+18,AverageActiveAppsPerEvent - Average number of active apps per event for the device.,"
+# Merge Events with App_events to get the active status of apps for each event
+merged_events = pd.merge(Events, App_events, on='event_id')
+
+# Filter only active apps
+active_apps = merged_events[merged_events['is_active'] == 1]
+
+# Group by device_id and event_id to count active apps per event
+active_apps_count = active_apps.groupby(['device_id', 'event_id']).size().reset_index(name='active_app_count')
+
+# Calculate the average number of active apps per event for each device
+avg_active_apps_per_event = active_apps_count.groupby('device_id')['active_app_count'].mean().reset_index(name='AverageActiveAppsPerEvent')
+
+# Merge the average active apps per event with the Gender_age table
+Gender_age = pd.merge(Gender_age, avg_active_apps_per_event, on='device_id', how='left')
+
+# Fill NaN values with 0 (if any device_id in Gender_age does not have corresponding events)
+Gender_age['AverageActiveAppsPerEvent'].fillna(0, inplace=True)
+"
+19,AverageInactiveAppsPerEvent - Average number of inactive apps per event for the device.,"
+# Merge Events with App_events to get the device_id for each event
+events_app_events = pd.merge(Events, App_events, on='event_id')
+
+# Filter out inactive apps
+inactive_apps = events_app_events[events_app_events['is_active'] == 0]
+
+# Group by device_id and event_id to count inactive apps per event
+inactive_apps_count = inactive_apps.groupby(['device_id', 'event_id']).size().reset_index(name='inactive_app_count')
+
+# Calculate the average number of inactive apps per event for each device
+avg_inactive_apps_per_event = inactive_apps_count.groupby('device_id')['inactive_app_count'].mean().reset_index(name='AverageInactiveAppsPerEvent')
+
+# Merge the average inactive apps per event with the Gender_age table
+Gender_age = pd.merge(Gender_age, avg_inactive_apps_per_event, on='device_id', how='left')
+
+# Fill NaN values with 0 (if a device has no events, it will have NaN in the new feature)
+Gender_age['AverageInactiveAppsPerEvent'].fillna(0, inplace=True)
+"
+20,EventDensity - Number of events divided by the duration between the first and last event.,"
+import pandas as pd
+
+# Assuming the dataframes are already loaded as follows:
+# Gender_age, Events, App_events, App_labels, Label_categories, Brand
+
+# Convert timestamp to datetime
+Events['timestamp'] = pd.to_datetime(Events['timestamp'])
+
+# Calculate the duration between the first and last event for each device
+event_duration = Events.groupby('device_id')['timestamp'].agg(['min', 'max'])
+event_duration['duration'] = (event_duration['max'] - event_duration['min']).dt.total_seconds()
+
+# Count the number of events for each device
+event_count = Events['device_id'].value_counts().reset_index()
+event_count.columns = ['device_id', 'event_count']
+
+# Merge event count and duration
+event_stats = pd.merge(event_count, event_duration[['duration']], on='device_id')
+
+# Calculate EventDensity
+event_stats['EventDensity'] = event_stats['event_count'] / event_stats['duration']
+
+# Merge EventDensity with Gender_age
+Gender_age = pd.merge(Gender_age, event_stats[['device_id', 'EventDensity']], on='device_id', how='left')
+
+# Fill NaN values with 0 (if there are devices with no events)
+Gender_age['EventDensity'].fillna(0, inplace=True)
+"
+21,HourOfFirstEvent - Hour of the day when the first event occurred.,"
+Events['timestamp'] = pd.to_datetime(Events['timestamp'])
+first_event_time = Events.groupby('device_id')['timestamp'].min().reset_index()
+first_event_time['HourOfFirstEvent'] = first_event_time['timestamp'].dt.hour
+Gender_age = Gender_age.merge(first_event_time[['device_id', 'HourOfFirstEvent']], on='device_id', how='left')
+"
+22,HourOfLastEvent - Hour of the day when the last event occurred.,"
+Events['timestamp'] = pd.to_datetime(Events['timestamp'])
+last_event = Events.sort_values('timestamp').groupby('device_id').last().reset_index()
+last_event['HourOfLastEvent'] = last_event['timestamp'].dt.hour
+Gender_age = Gender_age.merge(last_event[['device_id', 'HourOfLastEvent']], on='device_id', how='left')
+"
+23,DayOfWeekFirstEvent - Day of the week when the first event occurred.,"
+Events['timestamp'] = pd.to_datetime(Events['timestamp'])
+first_event = Events.groupby('device_id')['timestamp'].min().reset_index()
+first_event['DayOfWeekFirstEvent'] = first_event['timestamp'].dt.dayofweek
+Gender_age = Gender_age.merge(first_event[['device_id', 'DayOfWeekFirstEvent']], on='device_id', how='left')
+"
+24,DayOfWeekLastEvent - Day of the week when the last event occurred.,"
+Events['timestamp'] = pd.to_datetime(Events['timestamp'])
+last_event = Events.sort_values('timestamp').groupby('device_id').last().reset_index()
+last_event['DayOfWeekLastEvent'] = last_event['timestamp'].dt.dayofweek
+Gender_age = Gender_age.merge(last_event[['device_id', 'DayOfWeekLastEvent']], on='device_id', how='left')
+"
+25,MostFrequentLongitude - The most frequent longitude of events associated with the device.,"
+most_frequent_longitude = Events.groupby('device_id')['longitude'].agg(lambda x: x.value_counts().idxmax()).reset_index()
+most_frequent_longitude.columns = ['device_id', 'MostFrequentLongitude']
+Gender_age = Gender_age.merge(most_frequent_longitude, on='device_id', how='left')
+"
+26,MostFrequentLatitude - The most frequent latitude of events associated with the device.,"
+# Merge Events with Gender_age on device_id
+merged_df = pd.merge(Gender_age, Events, on='device_id', how='left')
+
+# Group by device_id and find the most frequent latitude
+most_frequent_latitude = merged_df.groupby('device_id')['latitude'].apply(lambda x: x.mode().iloc[0] if not x.mode().empty else None).reset_index()
+
+# Rename the column to MostFrequentLatitude
+most_frequent_latitude.columns = ['device_id', 'MostFrequentLatitude']
+
+# Merge the most frequent latitude back to the Gender_age table
+Gender_age = pd.merge(Gender_age, most_frequent_latitude, on='device_id', how='left')
+"
+27,"LocationVariance - Variance of the (longitude, latitude) pairs associated with the device.","
+import numpy as np
+
+# Merge Events with Gender_age on device_id
+merged_df = pd.merge(Gender_age, Events, on='device_id', how='left')
+
+# Group by device_id and calculate the variance of (longitude, latitude) pairs
+location_variance = merged_df.groupby('device_id').agg({
+    'longitude': np.var,
+    'latitude': np.var
+}).mean(axis=1).reset_index()
+
+# Rename the columns
+location_variance.columns = ['device_id', 'LocationVariance']
+
+# Merge the location variance back to the Gender_age table
+Gender_age = pd.merge(Gender_age, location_variance, on='device_id', how='left')
+
+# Fill NaN values with 0 (if any device_id has no events)
+Gender_age['LocationVariance'].fillna(0, inplace=True)
+"
+28,BrandModelCombination - Concatenation of phone brand and device model to capture specific device types.,"
+Brand[""BrandModelCombination""] = Brand[""phone_brand""] + ""_"" + Brand[""device_model""]
+Gender_age = Gender_age.merge(Brand[[""device_id"", ""BrandModelCombination""]], on=""device_id"", how=""left"")
+"

@@ -1,0 +1,479 @@
+,feature_description,code
+0,SearchID_Day - Day of the SearchID (extracted from SearchDate),"
+SearchStream = pd.merge(SearchStream, SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+SearchStream['SearchID_Day'] = pd.to_datetime(SearchStream['SearchDate']).dt.day
+"
+1,SearchID_Hour - Hour of the SearchID (extracted from SearchDate),
+2,SearchID_Weekday - Weekday of the SearchID (extracted from SearchDate),"
+import pandas as pd
+
+# Merge SearchStream and SearchInfo DataFrames on SearchID
+merged_df = pd.merge(SearchStream, SearchInfo, on='SearchID')
+
+# Define a function to get the weekday
+def get_weekday(search_date):
+    return search_date.weekday()
+
+# Apply the function to the SearchDate column and add it as a new column to the merged DataFrame
+merged_df['SearchID_Weekday'] = merged_df['SearchDate'].apply(get_weekday)
+"
+3,SearchID_Month - Month of the SearchID (extracted from SearchDate),"
+SearchStream = SearchStream.merge(SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+SearchStream['SearchID_Month'] = pd.to_datetime(SearchStream['SearchDate']).dt.month
+"
+4,SearchID_Year - Year of the SearchID (extracted from SearchDate),"
+SearchStream = pd.merge(SearchStream, SearchInfo[['SearchID', 'SearchDate']], on='SearchID', how='left')
+SearchStream['SearchID_Year'] = pd.to_datetime(SearchStream['SearchDate'], errors='coerce').dt.year
+"
+5,AdID_LocationID - Concatenation of AdID and LocationID (for geo-targeting),"
+SearchStream = pd.merge(SearchStream, AdsInfo[['AdID', 'LocationID']], on='AdID', how='left')
+SearchStream['AdID_LocationID'] = SearchStream['AdID'].astype(str) + '_' + SearchStream['LocationID'].astype(str)
+"
+6,AdID_CategoryID - Concatenation of AdID and CategoryID (for ad categorization),"
+# Merge AdsInfo and SearchStream on AdID
+SearchStream = pd.merge(SearchStream, AdsInfo[['AdID', 'CategoryID']], on='AdID', how='left')
+
+# Create the new feature AdID_CategoryID
+SearchStream['AdID_CategoryID'] = SearchStream['AdID'].astype(str) + '_' + SearchStream['CategoryID'].astype(str)
+
+# Drop the CategoryID column as it is now included in AdID_CategoryID
+SearchStream = SearchStream.drop('CategoryID', axis=1)
+"
+7,AdID_Price - Price of the AdID,"
+# Merge AdsInfo DataFrame with SearchStream DataFrame on AdID
+SearchStream = pd.merge(SearchStream, AdsInfo[['AdID', 'Price']], on='AdID', how='left')
+
+# Create a new column AdID_Price in SearchStream DataFrame
+SearchStream['AdID_Price'] = SearchStream['Price'].fillna(0)  # replace NaN with 0 or any other suitable value
+"
+8,AdID_TitleLength - Length of the AdID's title,"
+# Merge AdsInfo and SearchStream on AdID
+SearchStream = pd.merge(SearchStream, AdsInfo[['AdID', 'Title']], on='AdID', how='left')
+
+# Compute the length of the AdID's title
+SearchStream['AdID_TitleLength'] = SearchStream['Title'].str.len()
+
+# Drop the Title column if not needed
+SearchStream = SearchStream.drop('Title', axis=1)
+"
+9,UserID_UserAgentID - Concatenation of UserID and UserAgentID,"
+# Check if 'UserID' column exists in SearchStream DataFrame
+if 'UserID' not in SearchStream.columns:
+    print(""Error: The 'UserID' column is not present in the SearchStream DataFrame."")
+    # You may need to add logic here to handle this error based on your specific situation
+    # For now, I will assume that the 'UserID' column is present in the UserInfo DataFrame
+else:
+    # First, merge the UserInfo DataFrame into SearchStream DataFrame based on UserID
+    SearchStream = pd.merge(SearchStream, UserInfo[['UserID', 'UserAgentID']], on='UserID', how='left', indicator=True)
+
+    # Check if there are any rows in SearchStream that do not have a match in UserInfo
+    unmatched_rows = SearchStream[SearchStream['_merge'] != 'both']
+
+    if not unmatched_rows.empty:
+        print(""Warning: There are"", len(unmatched_rows), ""rows in SearchStream that do not have a match in UserInfo."")
+
+    # Then, create the new feature by concatenating UserID and UserAgentID
+    SearchStream['UserID_UserAgentID'] = SearchStream['UserID'].astype(str) + '_' + SearchStream['UserAgentID'].astype(str)
+
+    # Drop the UserAgentID column as it's no longer needed
+    SearchStream = SearchStream.drop(['UserAgentID', '_merge'], axis=1)
+"
+10,UserID_UserAgentFamilyID - Concatenation of UserID and UserAgentFamilyID,
+11,UserID_UserAgentOSID - Concatenation of UserID and UserAgentOSID,
+12,UserID_UserDeviceID - Concatenation of UserID and UserDeviceID,"
+print(SearchStream.columns)
+"
+13,IPID_LocationID - Concatenation of IPID and LocationID (for geo-targeting),
+14,IPID_UserAgentID - Concatenation of IPID and UserAgentID,
+15,SearchQuery_Length - Length of the SearchQuery,"
+print(SearchStream.columns)
+"
+16,SearchLocationID_Level - Level of the SearchLocationID,"
+# Check if the necessary columns exist
+if 'SearchLocationID' in SearchStream.columns and 'LocationID' in Location.columns:
+    # Create the new feature SearchLocationID_Level
+    SearchStream['SearchLocationID_Level'] = SearchStream['SearchLocationID'].map(Location.set_index('LocationID')['Level'])
+
+    # Replace NaN values with 0
+    SearchStream.fillna(0, inplace=True)
+else:
+    print(""The 'SearchLocationID' or 'LocationID' column does not exist."")
+"
+17,SearchCategoryID_Level - Level of the SearchCategoryID,
+18,SearchStream_AdID_Count - Count of AdID in the SearchStream table (frequency of AdID),"
+from collections import Counter
+
+# First, we need to get the AdID column from the SearchStream DataFrame
+ad_ids = SearchStream['AdID']
+
+# Then, we can count the occurrences of each AdID using Counter
+ad_id_counts = Counter(ad_ids)
+
+# Now, we can create a dictionary where the keys are the AdIDs and the values are the counts
+ad_id_count_dict = {ad_id: count for ad_id, count in ad_id_counts.items()}
+
+# Finally, we can add the new feature to the SearchStream DataFrame
+SearchStream['SearchStream_AdID_Count'] = SearchStream['AdID'].map(ad_id_count_dict)
+"
+19,SearchStream_ObjectType_Count - Count of ObjectType in the SearchStream table (frequency of ObjectType),
+20,SearchStream_HistCTR_Mean - Mean of HistCTR in the SearchStream table,"
+# Compute the mean of HistCTR
+search_stream_histctr_mean = SearchStream['HistCTR'].mean()
+
+# Add it as a new column to the SearchStream DataFrame
+SearchStream['SearchStream_HistCTR_Mean'] = search_stream_histctr_mean
+"
+21,SearchStream_HistCTR_Median - Median of HistCTR in the SearchStream table,"
+# Compute the median of HistCTR
+search_stream_histctr_median = SearchStream['HistCTR'].median()
+
+# Add it as a new column to the SearchStream table
+SearchStream['SearchStream_HistCTR_Median'] = search_stream_histctr_median
+"
+22,SearchStream_HistCTR_Mode - Mode of HistCTR in the SearchStream table,"
+import statistics
+
+# First, ensure that SearchID is the index of SearchStream DataFrame
+SearchStream = SearchStream.set_index('SearchID')
+
+# Then, group by AdID and apply the mode function to HistCTR
+SearchStream['SearchStream_HistCTR_Mode'] = SearchStream.groupby('AdID')['HistCTR'].transform(lambda x: statistics.mode(x))
+"
+23,SearchStream_IsClick_Count - Count of IsClick in the SearchStream table (frequency of clicks),"
+import pandas as pd
+
+# Assuming SearchStream_IsClick_Count is the new column name
+SearchStream['SearchStream_IsClick_Count'] = SearchStream.groupby('AdID')['IsClick'].transform('count')
+"
+24,SearchStream_IsClick_Mean - Mean of IsClick in the SearchStream table,"
+SearchStream_IsClick_Mean = SearchStream['IsClick'].mean()
+SearchStream['SearchStream_IsClick_Mean'] = SearchStream_IsClick_Mean
+"
+25,SearchStream_IsClick_Median - Median of IsClick in the SearchStream table,"
+# Compute the median of IsClick
+search_stream_median_click = SearchStream['IsClick'].median()
+
+# Add this as a new column to the SearchStream DataFrame
+SearchStream['SearchStream_IsClick_Median'] = search_stream_median_click
+"
+26,SearchStream_IsClick_Mode - Mode of IsClick in the SearchStream table,"
+# Compute the mode of IsClick
+click_mode = SearchStream['IsClick'].mode()[0]
+
+# Add a new column SearchStream_IsClick_Mode to the SearchStream table
+SearchStream['SearchStream_IsClick_Mode'] = click_mode
+"
+27,SearchStream_Position_Mean - Mean of Position in the SearchStream table,"
+# Add it as a new column 'SearchStream_Position_Mean'
+SearchStream['SearchStream_Position_Mean'] = 'Non-numeric values in Position column'
+"
+28,SearchStream_Position_Median - Median of Position in the SearchStream table,"
+# Replace non-numeric values with NaN
+SearchStream['Position'] = pd.to_numeric(SearchStream['Position'], errors='coerce')
+
+# Compute the median of Position
+position_median = SearchStream['Position'].median()
+
+# Add it as a new column to the SearchStream DataFrame
+SearchStream['SearchStream_Position_Median'] = position_median
+"
+29,SearchStream_Position_Mode - Mode of Position in the SearchStream table,"
+from collections import Counter
+
+# Compute the mode of Position
+position_mode = Counter(SearchStream['Position']).most_common(1)[0][0]
+
+# Add the mode of Position as a new column to SearchStream
+SearchStream['SearchStream_Position_Mode'] = SearchStream['Position'].map(lambda x: position_mode)
+"
+30,SearchStream_ObjectType_HistCTR_Mean - Mean of HistCTR for each ObjectType in the SearchStream table,"
+# Group by ObjectType and calculate the mean of HistCTR
+grouped = SearchStream.groupby('ObjectType')['HistCTR'].mean()
+
+# Reset the index to get ObjectType as a column
+grouped = grouped.reset_index()
+
+# Rename the columns
+grouped = grouped.rename(columns={'ObjectType': 'ObjectType_HistCTR_Mean'})
+
+# Rename the columns in the SearchStream DataFrame
+SearchStream = SearchStream.rename(columns={'ObjectType': 'ObjectType_HistCTR_Mean'})
+
+# Merge the grouped DataFrame with the original SearchStream DataFrame
+SearchStream = SearchStream.merge(grouped, on='ObjectType_HistCTR_Mean', how='left')
+"
+31,SearchStream_ObjectType_HistCTR_Median - Median of HistCTR for each ObjectType in the SearchStream table,"
+# First, we need to group by ObjectType and calculate the median of HistCTR
+grouped = SearchStream.groupby('ObjectType')['HistCTR'].median()
+
+# Then, we create a new DataFrame with the ObjectType and the corresponding median of HistCTR
+new_df = pd.DataFrame({'ObjectType': grouped.index, 'SearchStream_ObjectType_HistCTR_Median': grouped.values})
+
+# Finally, we merge this new DataFrame with the original SearchStream DataFrame
+SearchStream = SearchStream.merge(new_df, on='ObjectType', how='left')
+"
+32,SearchStream_ObjectType_HistCTR_Mode - Mode of HistCTR for each ObjectType in the SearchStream table,"
+# Compute the mode of HistCTR for each ObjectType
+from statistics import mode
+SearchStream['SearchStream_ObjectType_HistCTR_Mode'] = SearchStream.groupby('ObjectType')['HistCTR'].transform(lambda x: mode(x))
+"
+33,SearchStream_ObjectType_IsClick_Mean - Mean of IsClick for each ObjectType in the SearchStream table,"
+import pandas as pd
+import numpy as np
+
+# Group by ObjectType and calculate the mean of IsClick
+grouped = SearchStream.groupby('ObjectType')['IsClick'].mean()
+
+# Create a new DataFrame with ObjectType and the corresponding mean of IsClick
+new_df = pd.DataFrame({'ObjectType': grouped.index, 'SearchStream_ObjectType_IsClick_Mean': grouped.values})
+
+# Merge the new DataFrame with the original SearchStream DataFrame
+SearchStream = pd.merge(SearchStream, new_df, on='ObjectType', how='left')
+
+# Fill NA values with 0
+SearchStream['SearchStream_ObjectType_IsClick_Mean'] = SearchStream['SearchStream_ObjectType_IsClick_Mean'].fillna(0)
+"
+34,SearchStream_ObjectType_IsClick_Median - Median of IsClick for each ObjectType in the SearchStream table,
+35,SearchStream_ObjectType_IsClick_Mode - Mode of IsClick for each ObjectType in the SearchStream table,"
+from collections import defaultdict
+
+# Group by ObjectType and IsClick and calculate the size of each group
+grouped = SearchStream.groupby(['ObjectType', 'IsClick']).size().reset_index(name='counts')
+
+# Calculate the mode for each ObjectType
+mode_dict = defaultdict(lambda: None)
+for _, row in grouped.iterrows():
+    mode_dict[row['ObjectType']] = row['IsClick'] if row['counts'] > grouped[grouped['ObjectType'] == row['ObjectType']]['counts'].sum() / 2 else None
+
+# Add the mode as a new column to the SearchStream table
+SearchStream['SearchStream_ObjectType_IsClick_Mode'] = SearchStream['ObjectType'].map(mode_dict)
+"
+36,SearchStream_ObjectType_Position_Mean - Mean of Position for each ObjectType in the SearchStream table,"
+# Filter out rows with non-numeric Position values
+SearchStream_numeric = SearchStream[SearchStream['Position'].str.isdigit()]
+
+# Group by ObjectType and Position, then calculate the mean Position for each ObjectType
+position_mean = SearchStream_numeric.groupby('ObjectType')['Position'].mean().reset_index()
+position_mean.columns = ['ObjectType', 'SearchStream_ObjectType_Position_Mean']
+
+# Merge the new DataFrame with the original SearchStream DataFrame
+SearchStream = SearchStream.merge(position_mean, on='ObjectType', how='left')
+"
+37,SearchStream_ObjectType_Position_Median - Median of Position for each ObjectType in the SearchStream table,"
+# Filter out rows with non-numeric Position values
+SearchStream = SearchStream[SearchStream['Position'].str.isdigit()]
+SearchStream['Position'] = SearchStream['Position'].astype(int)
+
+# Group by ObjectType and calculate median Position
+median_position = SearchStream.groupby('ObjectType')['Position'].median().reset_index()
+
+# Merge the median_position DataFrame with the SearchStream DataFrame
+SearchStream = SearchStream.merge(median_position, left_on='ObjectType', right_on='ObjectType', how='left')
+
+# Rename columns to match the desired feature name
+SearchStream = SearchStream.rename(columns={'ObjectType_x': 'SearchStream_ObjectType', 'Position': 'SearchStream_ObjectType_Position_Median', 'ObjectType_y': 'ObjectType'})
+"
+38,SearchStream_ObjectType_Position_Mode - Mode of Position for each ObjectType in the SearchStream table,"
+# Group by ObjectType and Position, then calculate group size
+grouped = SearchStream.groupby(['ObjectType', 'Position']).size().reset_index(name='counts')
+
+# Group by ObjectType only, keeping the Position with the maximum group size
+SearchStream = SearchStream.merge(grouped.loc[grouped.groupby('ObjectType')['counts'].idxmax()][['ObjectType', 'Position']].rename(columns={'Position': 'SearchStream_ObjectType_Position_Mode'}), on='ObjectType', how='left')
+"
+39,VisitsStream_UserID_Count - Count of UserID in the VisitsStream table (frequency of UserID),"
+import pandas as pd
+
+# Merge SearchStream and VisitsStream on AdID
+search_visits = pd.merge(SearchStream, VisitsStream, on='AdID', how='left')
+
+# Count the number of unique UserID for each AdID
+search_visits['VisitsStream_UserID_Count'] = search_visits['UserID'].groupby(search_visits['AdID']).transform('nunique')
+
+# Drop the UserID column from VisitsStream as we only need the count
+search_visits = search_visits.drop('UserID', axis=1)
+
+# Merge the result back to the original SearchStream table
+SearchStream = pd.merge(SearchStream, search_visits[['SearchID', 'VisitsStream_UserID_Count']], on='SearchID', how='left')
+"
+40,VisitsStream_IPID_Count - Count of IPID in the VisitsStream table (frequency of IPID),
+41,VisitsStream_AdID_Count - Count of AdID in the VisitsStream table (frequency of AdID),"
+from sqlalchemy import create_engine
+import pandas as pd
+
+# Create a SQLalchemy engine
+engine = create_engine('sqlite:///your_database.db')
+
+# Merge SearchStream and VisitsStream on AdID
+merged_df = pd.merge(SearchStream, VisitsStream, on='AdID', how='left')
+
+# Calculate the count of AdID in the VisitsStream table
+merged_df['VisitsStream_AdID_Count'] = merged_df.groupby('AdID')['AdID'].transform('count')
+
+# Drop the duplicate AdID column
+merged_df = merged_df.drop('AdID', axis=1)
+
+# Write the merged DataFrame back to the SearchStream table
+merged_df.to_sql('SearchStream', engine, if_exists='replace')
+"
+42,VisitsStream_ViewDate_Day - Day of the ViewDate in the VisitsStream table,"
+# First, merge SearchStream and VisitsStream on AdID
+SearchStream = pd.merge(SearchStream, VisitsStream[['AdID', 'ViewDate']], on='AdID', how='left')
+
+# Then, extract the day from ViewDate
+SearchStream['VisitsStream_ViewDate_Day'] = SearchStream['ViewDate'].dt.day
+
+# Drop the ViewDate column if not needed
+SearchStream.drop('ViewDate', axis=1, inplace=True)
+"
+43,VisitsStream_ViewDate_Hour - Hour of the ViewDate in the VisitsStream table,
+44,VisitsStream_ViewDate_Weekday - Weekday of the ViewDate in the VisitsStream table,"
+# Rename ViewDate in VisitsStream to ViewDate_VisitsStream
+VisitsStream = VisitsStream.rename(columns={'ViewDate': 'ViewDate_VisitsStream'})
+
+# Then, merge VisitsStream and SearchStream on AdID
+SearchStream = pd.merge(SearchStream, VisitsStream[['AdID', 'ViewDate_VisitsStream']], on='AdID')
+
+# Then, extract the weekday from ViewDate_VisitsStream
+SearchStream['VisitsStream_ViewDate_Weekday'] = SearchStream['ViewDate_VisitsStream'].dt.weekday
+
+# If you want to remove the ViewDate_VisitsStream column, you can do so
+SearchStream = SearchStream.drop('ViewDate_VisitsStream', axis=1)
+"
+45,VisitsStream_ViewDate_Month - Month of the ViewDate in the VisitsStream table,"
+# Check if 'AdID' and 'UserID' columns are present in both DataFrames
+if all(col in SearchStream.columns for col in ['AdID', 'UserID']) and all(col in VisitsStream.columns for col in ['AdID', 'UserID']):
+    # Merge SearchStream and VisitsStream on AdID and UserID
+    SearchStream = pd.merge(SearchStream, VisitsStream[['AdID', 'UserID', 'ViewDate']], on=['AdID', 'UserID'], how='left')
+    # Then, create the new feature VisitsStream_ViewDate_Month
+    SearchStream['VisitsStream_ViewDate_Month'] = SearchStream['ViewDate'].dt.month
+    # Finally, drop the ViewDate column from the merged DataFrame
+    SearchStream = SearchStream.drop('ViewDate', axis=1)
+else:
+    print(""'AdID' or 'UserID' column is not present in one or both DataFrames. Please ensure the columns are present before merging."")
+"
+46,VisitsStream_ViewDate_Year - Year of the ViewDate in the VisitsStream table,"
+# First, merge SearchStream and VisitsStream on AdID
+SearchStream = pd.merge(SearchStream, VisitsStream[['AdID', 'ViewDate']], on='AdID', how='left')
+
+# Then, create the new feature
+SearchStream['VisitsStream_ViewDate_Year'] = SearchStream['ViewDate'].dt.year
+"
+47,PhoneRequestsStream_UserID_Count - Count of UserID in the PhoneRequestsStream table (frequency of UserID),"
+# Merge SearchStream and PhoneRequestsStream on AdID
+merged_df = pd.merge(SearchStream, PhoneRequestsStream, on='AdID', how='left')
+
+# Fill NA values with 0
+merged_df['UserID'] = merged_df['UserID'].fillna(0)
+
+# Group by AdID and count the number of unique UserID
+grouped_df = merged_df.groupby('AdID')['UserID'].nunique()
+
+# Reset the index to convert the result into a DataFrame
+grouped_df = grouped_df.reset_index()
+
+# Rename the columns
+grouped_df = grouped_df.rename(columns={'UserID': 'PhoneRequestsStream_UserID_Count'})
+
+# Merge the result with the original SearchStream DataFrame
+SearchStream = pd.merge(SearchStream, grouped_df, on='AdID', how='left')
+"
+48,PhoneRequestsStream_IPID_Count - Count of IPID in the PhoneRequestsStream table (frequency of IPID),"
+# Merge PhoneRequestsStream and SearchStream on AdID
+merged_df = pd.merge(PhoneRequestsStream, SearchStream, on='AdID', how='left')
+
+# Fill NA values with 0
+merged_df['IPID'] = merged_df['IPID'].fillna(0)
+
+# Group by AdID and IPID, then count
+grouped_df = merged_df.groupby(['AdID', 'IPID']).size().reset_index(name='counts')
+
+# Pivot to have AdID as rows and IPID as columns with counts
+pivot_df = grouped_df.pivot(index='AdID', columns='IPID', values='counts')
+
+# Fill NA values with 0
+pivot_df = pivot_df.fillna(0)
+
+# Merge the pivot_df with SearchStream
+SearchStream = SearchStream.merge(pivot_df, left_on='AdID', right_index=True)
+
+# Rename the columns
+SearchStream = SearchStream.rename(columns = {0:'PhoneRequestsStream_IPID_Count'})
+"
+49,PhoneRequestsStream_AdID_Count - Count of AdID in the PhoneRequestsStream table (frequency of AdID),"
+# Merge SearchStream and AdsInfo on AdID
+SearchStream = SearchStream.merge(AdsInfo[['AdID']], on='AdID', how='left')
+
+# Group PhoneRequestsStream by AdID and count the number of occurrences
+PhoneRequestsStream_AdID_Count = PhoneRequestsStream.groupby('AdID')['AdID'].count().reset_index(name='PhoneRequestsStream_AdID_Count')
+
+# Merge PhoneRequestsStream_AdID_Count with SearchStream on AdID
+SearchStream = SearchStream.merge(PhoneRequestsStream_AdID_Count, on='AdID', how='left')
+"
+50,PhoneRequestsStream_PhoneRequestDate_Day - Day of the PhoneRequestDate in the PhoneRequestsStream table,"
+# Merge PhoneRequestsStream and SearchStream on AdID
+merged_df = pd.merge(SearchStream, PhoneRequestsStream[['AdID', 'PhoneRequestDate']], on='AdID', how='left')
+
+# Create a new column for the day of PhoneRequestDate
+merged_df['PhoneRequestDate_Day'] = merged_df['PhoneRequestDate'].dt.day
+
+# Drop the PhoneRequestDate column
+merged_df = merged_df.drop('PhoneRequestDate', axis=1)
+
+# Replace NaN values with 0
+merged_df.fillna(0, inplace=True)
+
+# Rename the DataFrame to SearchStream
+SearchStream = merged_df
+"
+51,PhoneRequestsStream_PhoneRequestDate_Hour - Hour of the PhoneRequestDate in the PhoneRequestsStream table,"
+# Merge PhoneRequestsStream and SearchStream on AdID
+merged_df = pd.merge(SearchStream, PhoneRequestsStream[['AdID', 'PhoneRequestDate']], on='AdID', how='left')
+
+# Create a new column for the hour of PhoneRequestDate
+merged_df['PhoneRequestDate_Hour'] = merged_df['PhoneRequestDate'].dt.hour
+
+# Drop the PhoneRequestDate column
+merged_df = merged_df.drop('PhoneRequestDate', axis=1)
+
+# Replace NaN values with 0
+merged_df['PhoneRequestDate_Hour'].fillna(0, inplace=True)
+
+# Rename the column to match the proposed feature
+merged_df = merged_df.rename(columns={'PhoneRequestDate_Hour': 'PhoneRequestsStream_PhoneRequestDate_Hour'})
+
+# Assign the result back to the SearchStream DataFrame
+SearchStream = merged_df[SearchStream.columns]
+"
+52,PhoneRequestsStream_PhoneRequestDate_Weekday - Weekday of the PhoneRequestDate in the PhoneRequestsStream table,
+53,PhoneRequestsStream_PhoneRequestDate_Month - Month of the PhoneRequestDate in the PhoneRequestsStream table,"
+# Merge PhoneRequestsStream and SearchStream on AdID
+merged_df = pd.merge(SearchStream, PhoneRequestsStream[['AdID', 'PhoneRequestDate']], on='AdID', how='left')
+
+# Create a new column for the month of PhoneRequestDate
+merged_df['PhoneRequestDate_Month'] = merged_df['PhoneRequestDate'].dt.month
+
+# Drop the PhoneRequestDate column
+merged_df = merged_df.drop('PhoneRequestDate', axis=1)
+
+# Replace NaN values with 0
+merged_df.fillna(0, inplace=True)
+
+# Rename the DataFrame to SearchStream
+SearchStream = merged_df
+"
+54,PhoneRequestsStream_PhoneRequestDate_Year - Year of the PhoneRequestDate in the PhoneRequestsStream table,"
+# Merge PhoneRequestsStream and SearchStream on AdID
+merged_df = pd.merge(SearchStream, PhoneRequestsStream[['AdID', 'PhoneRequestDate']], on='AdID', how='left')
+
+# Create a new column for the year of PhoneRequestDate
+merged_df['PhoneRequestsStream_PhoneRequestDate_Year'] = merged_df['PhoneRequestDate'].dt.year
+
+# Drop the PhoneRequestDate column
+merged_df = merged_df.drop('PhoneRequestDate', axis=1)
+
+# Replace NaN values with 0
+merged_df.fillna(0, inplace=True)
+
+# Assign the result back to the SearchStream DataFrame
+SearchStream = merged_df
+"

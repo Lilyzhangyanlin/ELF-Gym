@@ -1,0 +1,290 @@
+,feature_description,code
+0,"Age_group - Categorical feature representing age groups (e.g., 0-18, 19-25, 26-35, 36-45, 46-55, 56+)","
+import pandas as pd
+import numpy as np
+
+# Convert 'age' column to numeric
+Gender_age['age'] = pd.to_numeric(Gender_age['age'], errors='coerce')
+
+# Define the age group bins
+age_bins = [0, 18, 25, 35, 45, 55, 120]
+age_labels = ['0-18', '19-25', '26-35', '36-45', '46-55', '56+']
+
+# Create the Age_group column
+Gender_age['Age_group'] = pd.cut(Gender_age['age'].fillna(-1), bins=age_bins, labels=age_labels, right=False, include_lowest=True)
+
+# Replace -1 with NaN for missing values
+Gender_age['Age_group'] = Gender_age['Age_group'].replace(-1, np.nan)
+"
+1,Event_count - Number of events associated with the device_id,"
+# Count the number of events for each device_id
+event_counts = Events.groupby('device_id').size().reset_index(name='Event_count')
+
+# Merge the event_counts with the Gender_age DataFrame
+Gender_age = Gender_age.merge(event_counts, on='device_id', how='left')
+"
+2,Active_app_count - Number of active apps associated with the device_id,"
+import pandas as pd
+
+# Merge the necessary tables
+merged = Events.merge(App_events, on='event_id', how='inner')
+merged = merged.merge(App_labels, on='app_id', how='inner')
+
+# Count the number of active apps per device_id
+active_app_count = merged.loc[merged['is_active'], ['device_id', 'app_id']].groupby('device_id')['app_id'].nunique().reset_index()
+active_app_count.columns = ['device_id', 'Active_app_count']
+
+# Merge the count with the Gender_age table
+Gender_age = Gender_age.merge(active_app_count, on='device_id', how='left')
+"
+3,"App_category_counts - A set of columns representing the count of apps in each category (e.g., Games_count, Social_count, Productivity_count, etc.)","
+import pandas as pd
+
+# Join Events, App_events, App_labels, and Label_categories tables
+events_apps_labels = Events.merge(App_events, on='event_id', how='left')
+events_apps_labels = events_apps_labels.merge(App_labels, on='app_id', how='left')
+events_apps_labels = events_apps_labels.merge(Label_categories, on='label_id', how='left')
+
+# Group by device_id and category, and count the occurrences
+app_category_counts = events_apps_labels.groupby(['device_id', 'category']).size().reset_index(name='count')
+
+# Pivot the table to create columns for each category
+app_category_counts = app_category_counts.pivot_table(index='device_id', columns='category', values='count', fill_value=0)
+
+# Reset the index to make device_id a column
+app_category_counts = app_category_counts.reset_index()
+
+# Merge the app_category_counts with the Gender_age table
+Gender_age = Gender_age.merge(app_category_counts, on='device_id', how='left')
+"
+4,"Brand_category - Categorical feature representing the brand of the device (e.g., Apple, Samsung, Huawei, etc.)","
+# Merge Gender_age and Brand tables on device_id
+merged_df = pd.merge(Gender_age, Brand, on='device_id', how='left')
+
+# Create a new column 'Brand_category' in the merged DataFrame
+merged_df['Brand_category'] = merged_df['phone_brand']
+
+# Update the Gender_age DataFrame with the new column
+Gender_age = merged_df[['group', 'age', 'gender', 'device_id', 'Brand_category']]
+"
+5,"Location_cluster - Categorical feature representing a cluster of locations based on latitude and longitude (e.g., urban, suburban, rural)","
+import pandas as pd
+from sklearn.cluster import KMeans
+
+# Merge Events and Gender_age tables to get latitude and longitude
+merged_df = pd.merge(Gender_age, Events[['device_id', 'latitude', 'longitude']], on='device_id', how='left')
+
+# Fill missing values with a constant (e.g., 0)
+merged_df['latitude'] = merged_df['latitude'].fillna(0)
+merged_df['longitude'] = merged_df['longitude'].fillna(0)
+
+# Create a feature matrix with latitude and longitude
+X = merged_df[['latitude', 'longitude']].values
+
+# Perform K-Means clustering (you may need to tune the number of clusters)
+kmeans = KMeans(n_clusters=3, random_state=42).fit(X)
+
+# Add the cluster labels as a new column
+merged_df['Location_cluster'] = kmeans.labels_
+
+# Update the original Gender_age table with the new feature
+Gender_age['Location_cluster'] = merged_df['Location_cluster']
+"
+6,"Event_time_features - A set of columns representing the time of day, day of week, and month when events occurred (e.g., Morning_events, Weekend_events, Summer_events)","
+import pandas as pd
+
+# Merge Events and App_events to get app_id for each event
+events_with_app = pd.merge(Events, App_events, on='event_id', how='left')
+
+# Convert timestamp to datetime
+events_with_app['timestamp'] = pd.to_datetime(events_with_app['timestamp'])
+
+# Extract time-related features
+events_with_app['hour'] = events_with_app['timestamp'].dt.hour
+events_with_app['day_of_week'] = events_with_app['timestamp'].dt.day_of_week
+events_with_app['month'] = events_with_app['timestamp'].dt.month
+
+# Group by device_id and time-related features, and count occurrences
+event_time_features = events_with_app.groupby(['device_id', 'hour', 'day_of_week', 'month']).size().reset_index(name='event_count')
+
+# Pivot the event_time_features DataFrame to create separate columns for each time feature
+event_time_features = event_time_features.pivot_table(index='device_id', columns=['hour', 'day_of_week', 'month'], values='event_count', fill_value=0)
+event_time_features.columns = ['_'.join(map(str, col)).strip('_') for col in event_time_features.columns.values]
+event_time_features.reset_index(inplace=True)
+
+# Merge event_time_features with Gender_age
+Gender_age = pd.merge(Gender_age, event_time_features, on='device_id', how='left')
+"
+7,Session_length - Average duration between consecutive events for a device_id (proxy for user engagement),"
+import pandas as pd
+
+# Group by device_id and sort by timestamp
+grouped = Events.sort_values(['device_id', 'timestamp']).groupby('device_id')
+
+# Calculate time difference between consecutive events
+time_diffs = grouped['timestamp'].diff().dt.total_seconds().dropna()
+
+# Compute average time difference (Session_length) for each device_id
+Session_length = time_diffs.groupby(level=0).mean()
+
+# Merge Session_length with Gender_age
+Gender_age = Gender_age.merge(Session_length.to_frame('Session_length'), left_on='device_id', right_index=True, how='left')
+"
+8,App_install_recency - Time since the most recent app installation for a device_id,"
+import pandas as pd
+from datetime import datetime
+
+# Assuming you have already loaded the necessary DataFrames
+# Gender_age, Events, App_events, App_labels, Label_categories, Brand
+
+# Convert the 'timestamp' column to datetime format
+Events['timestamp'] = pd.to_datetime(Events['timestamp'])
+
+# Find the most recent timestamp for each device_id
+most_recent_timestamp = Events.groupby('device_id')['timestamp'].max().reset_index()
+most_recent_timestamp.columns = ['device_id', 'most_recent_timestamp']
+
+# Merge the most recent timestamp with the Events table
+Events = Events.merge(most_recent_timestamp, on='device_id', how='left')
+
+# Calculate the time difference between the current timestamp and the most recent timestamp
+Events['App_install_recency'] = Events['most_recent_timestamp'] - Events['timestamp']
+
+# Convert the time difference to a numeric value (e.g., seconds)
+Events['App_install_recency'] = Events['App_install_recency'].dt.total_seconds()
+
+# Group by device_id and take the minimum value (most recent app installation)
+App_install_recency = Events.groupby('device_id')['App_install_recency'].min().reset_index()
+
+# Merge the App_install_recency feature with the Gender_age table
+Gender_age = Gender_age.merge(App_install_recency, on='device_id', how='left')
+"
+9,App_usage_frequency - Average frequency of app usage events for a device_id,"
+import pandas as pd
+
+# Merge Events and App_events to get app_id for each event
+events_apps = pd.merge(Events, App_events, on='event_id', how='left')
+
+# Group by device_id and app_id, and count events
+event_counts = events_apps.groupby(['device_id', 'app_id']).size().reset_index(name='event_count')
+
+# Calculate time range in seconds
+time_range_seconds = (events_apps['timestamp'].max() - events_apps['timestamp'].min()).total_seconds()
+
+# Calculate frequency for each device_id and app_id
+event_counts['frequency'] = event_counts['event_count'] / time_range_seconds
+
+# Calculate average frequency for each device_id
+avg_freq = event_counts.groupby('device_id')['frequency'].mean().reset_index()
+
+# Rename the column
+avg_freq.columns = ['device_id', 'App_usage_frequency']
+
+# Join with Gender_age table
+Gender_age = pd.merge(Gender_age, avg_freq, on='device_id', how='left')
+"
+10,Location_entropy - Measure of the diversity of locations visited by a device_id (proxy for user mobility),"
+import pandas as pd
+import numpy as np
+
+# Merge Events and Brand tables
+events_with_brand = pd.merge(Events, Brand, on='device_id', how='left')
+
+# Count unique locations for each device_id
+location_counts = events_with_brand.groupby('device_id')[['longitude', 'latitude']].nunique().reset_index()
+location_counts['total_locations'] = location_counts[['longitude', 'latitude']].sum(axis=1)
+
+# Calculate location entropy
+location_counts['location_entropy'] = location_counts['total_locations'].apply(lambda x: -np.sum(np.log(x / x)))
+
+# Merge location entropy into Gender_age table
+Gender_age = pd.merge(Gender_age, location_counts[['device_id', 'location_entropy']], on='device_id', how='left')
+"
+11,"Brand_model_category - Categorical feature representing the device model category (e.g., flagship, mid-range, budget)","
+import pandas as pd
+
+# Convert data types
+Brand['device_model'] = Brand['device_model'].astype(str)
+Label_categories['label_id'] = Label_categories['label_id'].astype(str)
+
+# Merge Brand and Label_categories tables
+brand_category = pd.merge(Brand, Label_categories, left_on='device_model', right_on='label_id', how='left')
+
+# Define a mapping dictionary for device model categories
+model_category_map = {
+    'Flagship': ['iPhone', 'Galaxy', 'Mate', 'P', 'Mi', 'OnePlus', 'Pixel'],
+    'Mid-range': ['Redmi', 'Reno', 'Nova', 'K', 'A', 'Realme', 'Oppo', 'Vivo'],
+    'Budget': ['Y', 'C', 'Go', 'Play', 'Lite', 'Note']
+}
+
+# Create a function to categorize device models
+def categorize_model(model):
+    for category, keywords in model_category_map.items():
+        for keyword in keywords:
+            if keyword.lower() in model.lower():
+                return category
+    return 'Other'
+
+# Apply the categorization function to the device_model column
+brand_category['Brand_model_category'] = brand_category['device_model'].apply(categorize_model)
+
+# Merge the brand_category DataFrame with Gender_age
+Gender_age = pd.merge(Gender_age, brand_category[['device_id', 'Brand_model_category']], on='device_id', how='left')
+"
+12,"App_price_range - Categorical feature representing the price range of the apps used (e.g., free, paid, premium)","
+import pandas as pd
+
+# Join the tables
+merged = pd.merge(Gender_age, Events[['device_id', 'event_id']], on='device_id', how='left')
+merged = pd.merge(merged, App_events[['event_id', 'app_id', 'is_active']], on='event_id', how='left')
+merged = pd.merge(merged, App_labels[['app_id', 'label_id']], on='app_id', how='left')
+merged = pd.merge(merged, Label_categories[['label_id', 'category']], on='label_id', how='left')
+
+# Define a function to categorize apps based on their labels and categories
+def categorize_app(categories):
+    if 'GAME' in categories:
+        return 'premium'
+    elif 'PAID' in categories:
+        return 'paid'
+    else:
+        return 'free'
+
+# Create the App_price_range feature
+merged['App_price_range'] = merged.groupby('device_id')['category'].apply(lambda x: x.dropna().unique().tolist()).apply(categorize_app)
+
+# Add the new feature to the Gender_age table
+Gender_age = pd.merge(Gender_age, merged[['device_id', 'App_price_range']], on='device_id', how='left')
+"
+13,App_rating_average - Average rating of the apps used by a device_id,"
+import pandas as pd
+
+# Assume a rating mapping for categories
+category_rating_map = {
+    'Games': 4.5,
+    'Entertainment': 3.8,
+    'Education': 4.2,
+    # Add more category-rating mappings as needed
+}
+
+# Merge Events and App_events to get app_id for each event
+events_apps = pd.merge(Events, App_events, on='event_id', how='left')
+
+# Merge with App_labels to get label_id for each event
+events_apps_labels = pd.merge(events_apps, App_labels, on='app_id', how='left')
+
+# Merge with Label_categories to get category for each event
+events_apps_labels_categories = pd.merge(events_apps_labels, Label_categories, on='label_id', how='left')
+
+# Map category strings to numerical ratings
+events_apps_labels_categories['category_rating'] = events_apps_labels_categories['category'].map(category_rating_map)
+
+# Group by device_id and compute the mean category_rating
+app_rating_average = events_apps_labels_categories.groupby('device_id')['category_rating'].mean().reset_index()
+
+# Rename the 'category_rating' column to 'App_rating_average'
+app_rating_average.columns = ['device_id', 'App_rating_average']
+
+# Merge the app_rating_average with Gender_age
+Gender_age = pd.merge(Gender_age, app_rating_average, on='device_id', how='left')
+"
+14,App_size_total - Total size of the apps installed on a device_id,

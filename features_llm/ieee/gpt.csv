@@ -1,0 +1,330 @@
+,feature_description,code
+0,`TransactionAmt_log` - Logarithm of the transaction amount to reduce skewness.,"
+import numpy as np
+
+Transaction[""TransactionAmt_log""] = np.log1p(Transaction[""TransactionAmt""])
+"
+1,`TransactionAmt_to_mean_card1` - Ratio of `TransactionAmt` to the mean `TransactionAmt` for the same `card1`.,"
+Transaction['TransactionAmt_to_mean_card1'] = Transaction['TransactionAmt'] / Transaction.groupby('card1')['TransactionAmt'].transform('mean')
+"
+2,`TransactionAmt_to_std_card1` - Ratio of `TransactionAmt` to the standard deviation of `TransactionAmt` for the same `card1`.,"
+Transaction['TransactionAmt_to_std_card1'] = Transaction.groupby('card1')['TransactionAmt'].transform(lambda x: x / x.std())
+"
+3,`TransactionAmt_to_mean_card4` - Ratio of `TransactionAmt` to the mean `TransactionAmt` for the same `card4`.,"
+Transaction['TransactionAmt_to_mean_card4'] = Transaction['TransactionAmt'] / Transaction.groupby('card4')['TransactionAmt'].transform('mean')
+"
+4,`TransactionAmt_to_std_card4` - Ratio of `TransactionAmt` to the standard deviation of `TransactionAmt` for the same `card4`.,"
+Transaction['TransactionAmt_to_std_card4'] = Transaction['TransactionAmt'] / Transaction.groupby('card4')['TransactionAmt'].transform('std')
+"
+5,`TransactionAmt_to_mean_addr1` - Ratio of `TransactionAmt` to the mean `TransactionAmt` for the same `addr1`.,"
+Transaction['TransactionAmt_to_mean_addr1'] = Transaction['TransactionAmt'] / Transaction.groupby('addr1')['TransactionAmt'].transform('mean')
+"
+6,`TransactionAmt_to_std_addr1` - Ratio of `TransactionAmt` to the standard deviation of `TransactionAmt` for the same `addr1`.,"
+Transaction['TransactionAmt_to_std_addr1'] = Transaction.groupby('addr1')['TransactionAmt'].transform(lambda x: x / x.std())
+"
+7,`TransactionAmt_to_mean_P_emaildomain` - Ratio of `TransactionAmt` to the mean `TransactionAmt` for the same `P_emaildomain`.,"
+Transaction['TransactionAmt_to_mean_P_emaildomain'] = Transaction['TransactionAmt'] / Transaction.groupby('P_emaildomain')['TransactionAmt'].transform('mean')
+"
+8,`TransactionAmt_to_std_P_emaildomain` - Ratio of `TransactionAmt` to the standard deviation of `TransactionAmt` for the same `P_emaildomain`.,"
+Transaction['TransactionAmt_to_std_P_emaildomain'] = Transaction.groupby('P_emaildomain')['TransactionAmt'].transform(lambda x: x / x.std())
+"
+9,`TransactionAmt_to_mean_R_emaildomain` - Ratio of `TransactionAmt` to the mean `TransactionAmt` for the same `R_emaildomain`.,"
+Transaction['TransactionAmt_to_mean_R_emaildomain'] = Transaction['TransactionAmt'] / Transaction.groupby('R_emaildomain')['TransactionAmt'].transform('mean')
+"
+10,`TransactionAmt_to_std_R_emaildomain` - Ratio of `TransactionAmt` to the standard deviation of `TransactionAmt` for the same `R_emaildomain`.,"
+Transaction['TransactionAmt_to_std_R_emaildomain'] = Transaction.groupby('R_emaildomain')['TransactionAmt'].transform(lambda x: x / x.std())
+"
+11,`TransactionDT_hour` - Extracted hour from `TransactionDT`.,"
+Transaction[""TransactionDT_hour""] = (Transaction[""TransactionDT""] // 3600) % 24
+"
+12,`TransactionDT_day` - Extracted day from `TransactionDT`.,"
+Transaction[""TransactionDT_day""] = (Transaction[""TransactionDT""] // (24 * 60 * 60)) % 7
+"
+13,`TransactionDT_weekday` - Extracted weekday from `TransactionDT`.,"
+Transaction[""TransactionDT_weekday""] = ((Transaction[""TransactionDT""] // (24 * 60 * 60)) + 4) % 7
+"
+14,`TransactionDT_month` - Extracted month from `TransactionDT`.,"
+Transaction[""TransactionDT_month""] = (Transaction[""TransactionDT""] // (30 * 24 * 60 * 60)) % 12 + 1
+"
+15,`card1_count` - Count of transactions for the same `card1`.,"
+Transaction[""card1_count""] = Transaction.groupby(""card1"")[""TransactionID""].transform(""count"")
+"
+16,`card2_count` - Count of transactions for the same `card2`.,"
+Transaction['card2_count'] = Transaction.groupby('card2')['TransactionID'].transform('count')
+"
+17,`card3_count` - Count of transactions for the same `card3`.,"
+Transaction['card3_count'] = Transaction.groupby('card3')['TransactionID'].transform('count')
+"
+18,`card4_count` - Count of transactions for the same `card4`.,"
+Transaction['card4_count'] = Transaction.groupby('card4')['TransactionID'].transform('count')
+"
+19,`card5_count` - Count of transactions for the same `card5`.,"
+Transaction['card5_count'] = Transaction.groupby('card5')['TransactionID'].transform('count')
+"
+20,`card6_count` - Count of transactions for the same `card6`.,"
+Transaction['card6_count'] = Transaction.groupby('card6')['TransactionID'].transform('count')
+"
+21,`addr1_count` - Count of transactions for the same `addr1`.,"
+Transaction[""addr1_count""] = Transaction.groupby(""addr1"")[""TransactionID""].transform(""count"")
+"
+22,`addr2_count` - Count of transactions for the same `addr2`.,"
+Transaction['addr2_count'] = Transaction.groupby('addr2')['TransactionID'].transform('count')
+"
+23,`P_emaildomain_count` - Count of transactions for the same `P_emaildomain`.,"
+Transaction['P_emaildomain_count'] = Transaction['P_emaildomain'].map(Transaction['P_emaildomain'].value_counts())
+"
+24,`R_emaildomain_count` - Count of transactions for the same `R_emaildomain`.,"
+Transaction['R_emaildomain_count'] = Transaction.groupby('R_emaildomain')['TransactionID'].transform('count')
+"
+25,`dist1_to_mean` - Ratio of `dist1` to the mean `dist1`.,"
+Transaction[""dist1_to_mean""] = Transaction[""dist1""] / Transaction[""dist1""].mean()
+"
+26,`dist2_to_mean` - Ratio of `dist2` to the mean `dist2`.,"
+Transaction[""dist2_to_mean""] = Transaction[""dist2""] / Transaction[""dist2""].mean()
+"
+27,`C1_to_mean` - Ratio of `C1` to the mean `C1`.,"
+Transaction[""C1_to_mean""] = Transaction[""C1""] / Transaction[""C1""].mean()
+"
+28,`C2_to_mean` - Ratio of `C2` to the mean `C2`.,"
+Transaction[""C2_to_mean""] = Transaction[""C2""] / Transaction[""C2""].mean()
+"
+29,`C3_to_mean` - Ratio of `C3` to the mean `C3`.,"
+Transaction[""C3_to_mean""] = Transaction[""C3""] / Transaction[""C3""].mean()
+"
+30,`C4_to_mean` - Ratio of `C4` to the mean `C4`.,"
+Transaction[""C4_to_mean""] = Transaction[""C4""] / Transaction[""C4""].mean()
+"
+31,`C5_to_mean` - Ratio of `C5` to the mean `C5`.,"
+Transaction[""C5_to_mean""] = Transaction[""C5""] / Transaction[""C5""].mean()
+"
+32,`C6_to_mean` - Ratio of `C6` to the mean `C6`.,"
+Transaction[""C6_to_mean""] = Transaction[""C6""] / Transaction[""C6""].mean()
+"
+33,`C7_to_mean` - Ratio of `C7` to the mean `C7`.,"
+Transaction[""C7_to_mean""] = Transaction[""C7""] / Transaction[""C7""].mean()
+"
+34,`C8_to_mean` - Ratio of `C8` to the mean `C8`.,"
+Transaction[""C8_to_mean""] = Transaction[""C8""] / Transaction[""C8""].mean()
+"
+35,`C9_to_mean` - Ratio of `C9` to the mean `C9`.,"
+Transaction[""C9_to_mean""] = Transaction[""C9""] / Transaction[""C9""].mean()
+"
+36,`C10_to_mean` - Ratio of `C10` to the mean `C10`.,"
+Transaction[""C10_to_mean""] = Transaction[""C10""] / Transaction[""C10""].mean()
+"
+37,`C11_to_mean` - Ratio of `C11` to the mean `C11`.,"
+Transaction[""C11_to_mean""] = Transaction[""C11""] / Transaction[""C11""].mean()
+"
+38,`C12_to_mean` - Ratio of `C12` to the mean `C12`.,"
+Transaction[""C12_to_mean""] = Transaction[""C12""] / Transaction[""C12""].mean()
+"
+39,`C13_to_mean` - Ratio of `C13` to the mean `C13`.,"
+Transaction[""C13_to_mean""] = Transaction[""C13""] / Transaction[""C13""].mean()
+"
+40,`C14_to_mean` - Ratio of `C14` to the mean `C14`.,"
+Transaction[""C14_to_mean""] = Transaction[""C14""] / Transaction[""C14""].mean()
+"
+41,`DeviceType_count` - Count of transactions for the same `DeviceType`.,"
+# Merge the Transaction and Train_identity tables on TransactionID
+merged_df = pd.merge(Transaction, Train_identity, on='TransactionID', how='left')
+
+# Compute the DeviceType_count feature
+device_type_counts = merged_df['DeviceType'].value_counts().to_dict()
+merged_df['DeviceType_count'] = merged_df['DeviceType'].map(device_type_counts)
+
+# Add the DeviceType_count feature back to the original Transaction table
+Transaction['DeviceType_count'] = merged_df['DeviceType_count']
+"
+42,`DeviceInfo_count` - Count of transactions for the same `DeviceInfo`.,"
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'DeviceInfo']], on='TransactionID', how='left')
+device_info_counts = Train_identity['DeviceInfo'].value_counts().to_dict()
+Transaction['DeviceInfo_count'] = Transaction['DeviceInfo'].map(device_info_counts)
+"
+43,`id_12_count` - Count of transactions for the same `id_12`.,"
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_12']], on='TransactionID', how='left')
+id_12_counts = Train_identity['id_12'].value_counts().to_dict()
+Transaction['id_12_count'] = Transaction['id_12'].map(id_12_counts)
+"
+44,`id_13_count` - Count of transactions for the same `id_13`.,"
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_13']], on='TransactionID', how='left')
+Transaction['id_13_count'] = Transaction.groupby('id_13')['TransactionID'].transform('count')
+"
+45,`id_14_count` - Count of transactions for the same `id_14`.,"
+id_14_count = Train_identity['id_14'].value_counts().to_dict()
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_14']], on='TransactionID', how='left')
+Transaction['id_14_count'] = Transaction['id_14'].map(id_14_count).fillna(0).astype(int)
+"
+46,`id_15_count` - Count of transactions for the same `id_15`.,"
+# Merge the Transaction and Train_identity tables on TransactionID
+merged_df = pd.merge(Transaction, Train_identity, on='TransactionID', how='left')
+
+# Compute the count of transactions for the same id_15
+id_15_counts = merged_df['id_15'].value_counts().to_dict()
+
+# Map the counts back to the Transaction table
+Transaction['id_15_count'] = merged_df['id_15'].map(id_15_counts)
+"
+47,`id_16_count` - Count of transactions for the same `id_16`.,"
+id_16_count = Train_identity.groupby('id_16')['TransactionID'].transform('count')
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_16']], on='TransactionID', how='left')
+Transaction['id_16_count'] = Transaction['id_16'].map(id_16_count)
+Transaction.drop(columns=['id_16'], inplace=True)
+"
+48,`id_17_count` - Count of transactions for the same `id_17`.,"
+id_17_count = Train_identity['id_17'].value_counts().to_dict()
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_17']], on='TransactionID', how='left')
+Transaction['id_17_count'] = Transaction['id_17'].map(id_17_count).fillna(0)
+"
+49,`id_18_count` - Count of transactions for the same `id_18`.,"
+# First, merge the Transaction and Train_identity tables on TransactionID
+merged_df = Transaction.merge(Train_identity[['TransactionID', 'id_18']], on='TransactionID', how='left')
+
+# Compute the count of transactions for each id_18
+id_18_count = merged_df['id_18'].value_counts().to_dict()
+
+# Map the counts back to the merged dataframe
+merged_df['id_18_count'] = merged_df['id_18'].map(id_18_count)
+
+# Add the new feature back to the original Transaction dataframe
+Transaction['id_18_count'] = merged_df['id_18_count']
+"
+50,`id_19_count` - Count of transactions for the same `id_19`.,"
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_19']], on='TransactionID', how='left')
+Transaction['id_19_count'] = Transaction.groupby('id_19')['TransactionID'].transform('count')
+"
+51,`id_20_count` - Count of transactions for the same `id_20`.,"
+id_20_count = Train_identity['id_20'].value_counts().to_dict()
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_20']], on='TransactionID', how='left')
+Transaction['id_20_count'] = Transaction['id_20'].map(id_20_count).fillna(0).astype(int)
+"
+52,`id_21_count` - Count of transactions for the same `id_21`.,"
+id_21_count = Train_identity['id_21'].value_counts().to_dict()
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_21']], on='TransactionID', how='left')
+Transaction['id_21_count'] = Transaction['id_21'].map(id_21_count).fillna(0).astype(int)
+"
+53,`id_22_count` - Count of transactions for the same `id_22`.,"
+# Merge the Transaction and Train_identity tables on TransactionID
+merged_df = pd.merge(Transaction, Train_identity, on='TransactionID', how='left')
+
+# Compute the count of transactions for the same id_22
+id_22_counts = merged_df['id_22'].value_counts().to_dict()
+
+# Map the counts back to the Transaction table
+Transaction['id_22_count'] = merged_df['id_22'].map(id_22_counts)
+"
+54,`id_23_count` - Count of transactions for the same `id_23`.,"
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_23']], on='TransactionID', how='left')
+id_23_count = Transaction['id_23'].value_counts().to_dict()
+Transaction['id_23_count'] = Transaction['id_23'].map(id_23_count)
+"
+55,`id_24_count` - Count of transactions for the same `id_24`.,"
+# Merge the Transaction and Train_identity tables on TransactionID
+merged_df = pd.merge(Transaction, Train_identity, on='TransactionID', how='left')
+
+# Compute the count of transactions for the same id_24
+id_24_counts = merged_df['id_24'].value_counts().to_dict()
+
+# Map the counts back to the merged dataframe
+merged_df['id_24_count'] = merged_df['id_24'].map(id_24_counts)
+
+# Add the new feature to the original Transaction table
+Transaction['id_24_count'] = merged_df['id_24_count']
+"
+56,`id_25_count` - Count of transactions for the same `id_25`.,"
+id_25_count = Train_identity['id_25'].value_counts().to_dict()
+Train_identity['id_25_count'] = Train_identity['id_25'].map(id_25_count)
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_25_count']], on='TransactionID', how='left')
+"
+57,`id_26_count` - Count of transactions for the same `id_26`.,"
+id_26_count = Train_identity['id_26'].value_counts().to_dict()
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_26']], on='TransactionID', how='left')
+Transaction['id_26_count'] = Transaction['id_26'].map(id_26_count).fillna(0)
+"
+58,`id_27_count` - Count of transactions for the same `id_27`.,"
+# Merge the Transaction and Train_identity tables on TransactionID
+merged_df = pd.merge(Transaction, Train_identity, on='TransactionID', how='left')
+
+# Compute the count of transactions for the same id_27
+id_27_counts = merged_df['id_27'].value_counts().to_dict()
+
+# Map the counts back to the Transaction table
+Transaction['id_27_count'] = merged_df['id_27'].map(id_27_counts)
+"
+59,`id_28_count` - Count of transactions for the same `id_28`.,"
+id_28_count = Train_identity['id_28'].value_counts().to_dict()
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_28']], on='TransactionID', how='left')
+Transaction['id_28_count'] = Transaction['id_28'].map(id_28_count).fillna(0)
+"
+60,`id_29_count` - Count of transactions for the same `id_29`.,"
+# Merge the Transaction and Train_identity tables on TransactionID
+merged_df = pd.merge(Transaction, Train_identity, on='TransactionID', how='left')
+
+# Compute the count of transactions for the same id_29
+id_29_counts = merged_df['id_29'].value_counts().to_dict()
+
+# Map the counts back to the Transaction table
+Transaction['id_29_count'] = merged_df['id_29'].map(id_29_counts)
+"
+61,`id_30_count` - Count of transactions for the same `id_30`.,"
+# Merge the Transaction and Train_identity tables on TransactionID
+merged_df = pd.merge(Transaction, Train_identity, on='TransactionID', how='left')
+
+# Compute the count of transactions for the same id_30
+id_30_counts = merged_df['id_30'].value_counts().to_dict()
+
+# Map the counts back to the Transaction table
+Transaction['id_30_count'] = merged_df['id_30'].map(id_30_counts)
+"
+62,`id_31_count` - Count of transactions for the same `id_31`.,"
+id_31_count = Train_identity['id_31'].value_counts().to_dict()
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_31']], on='TransactionID', how='left')
+Transaction['id_31_count'] = Transaction['id_31'].map(id_31_count).fillna(0)
+"
+63,`id_32_count` - Count of transactions for the same `id_32`.,"
+# Merge the Transaction and Train_identity tables on TransactionID
+merged_df = pd.merge(Transaction, Train_identity, on='TransactionID', how='left')
+
+# Compute the count of transactions for the same id_32
+id_32_counts = merged_df['id_32'].value_counts().to_dict()
+
+# Map the counts back to the Transaction table
+Transaction['id_32_count'] = merged_df['id_32'].map(id_32_counts)
+"
+64,`id_33_count` - Count of transactions for the same `id_33`.,"
+id_33_count = Train_identity['id_33'].value_counts().to_dict()
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_33']], on='TransactionID', how='left')
+Transaction['id_33_count'] = Transaction['id_33'].map(id_33_count).fillna(0)
+Transaction.drop(columns=['id_33'], inplace=True)
+"
+65,`id_34_count` - Count of transactions for the same `id_34`.,"
+id_34_count = Train_identity.groupby('id_34')['TransactionID'].transform('count')
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_34']], on='TransactionID', how='left')
+Transaction['id_34_count'] = Transaction['id_34'].map(id_34_count)
+Transaction.drop(columns=['id_34'], inplace=True)
+"
+66,`id_35_count` - Count of transactions for the same `id_35`.,"
+id_35_count = Train_identity.groupby('id_35')['TransactionID'].transform('count')
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_35']], on='TransactionID', how='left')
+Transaction['id_35_count'] = Transaction['id_35'].map(id_35_count)
+Transaction.drop(columns=['id_35'], inplace=True)
+"
+67,`id_36_count` - Count of transactions for the same `id_36`.,"
+id_36_count = Train_identity['id_36'].value_counts().to_dict()
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_36']], on='TransactionID', how='left')
+Transaction['id_36_count'] = Transaction['id_36'].map(id_36_count).fillna(0).astype(int)
+"
+68,`id_37_count` - Count of transactions for the same `id_37`.,"
+Transaction = Transaction.merge(Train_identity[['TransactionID', 'id_37']], on='TransactionID', how='left')
+id_37_count = Transaction['id_37'].value_counts().to_dict()
+Transaction['id_37_count'] = Transaction['id_37'].map(id_37_count)
+"
+69,`id_38_count` - Count of transactions for the same `id_38`.,"
+# Merge the Transaction and Train_identity tables on TransactionID
+merged_df = pd.merge(Transaction, Train_identity, on='TransactionID', how='left')
+
+# Compute the count of transactions for the same id_38
+id_38_counts = merged_df['id_38'].value_counts().to_dict()
+
+# Map the counts back to the Transaction table
+Transaction['id_38_count'] = merged_df['id_38'].map(id_38_counts)
+"

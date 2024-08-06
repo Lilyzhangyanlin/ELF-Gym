@@ -1,0 +1,1535 @@
+human_feature_desc:
+  D11_card1_addr1_P_emaildomain_mean: Mean of D11 for combined card1 addr1 and P_emaildomain
+    calculated after combining the features and then using groupby and mean
+  D11_card1_addr1_P_emaildomain_std: Standard deviation of D11 for combined card1
+    addr1 and P_emaildomain calculated after combining the features and then using
+    groupby and std
+  D11_card1_addr1_mean: Mean of D11 for combined card1 and addr1 calculated after
+    combining the features and then using groupby and mean
+  D11_card1_addr1_std: Standard deviation of D11 for combined card1 and addr1 calculated
+    after combining the features and then using groupby and std
+  D11_card1_mean: Mean of D11 grouped by card1 calculated using groupby and mean functions
+  D11_card1_std: Standard deviation of D11 grouped by card1 calculated using groupby
+    and std functions
+  D9_card1_addr1_P_emaildomain_mean: Mean of D9 for combined card1 addr1 and P_emaildomain
+    calculated after combining the features and then using groupby and mean
+  D9_card1_addr1_P_emaildomain_std: Standard deviation of D9 for combined card1 addr1
+    and P_emaildomain calculated after combining the features and then using groupby
+    and std
+  D9_card1_addr1_mean: Mean of D9 for combined card1 and addr1 calculated after combining
+    the features and then using groupby and mean
+  D9_card1_addr1_std: Standard deviation of D9 for combined card1 and addr1 calculated
+    after combining the features and then using groupby and std
+  D9_card1_mean: Mean of D9 grouped by card1 calculated using groupby and mean functions
+  D9_card1_std: Standard deviation of D9 grouped by card1 calculated using groupby
+    and std functions
+  P_emaildomain_FE: Frequency encoding of P_emaildomain calculated as the count of
+    each unique value divided by the total count
+  TransactionAmt_card1_addr1_P_emaildomain_mean: Mean of TransactionAmt for combined
+    card1 addr1 and P_emaildomain calculated after combining the features and then
+    using groupby and mean
+  TransactionAmt_card1_addr1_P_emaildomain_std: Standard deviation of TransactionAmt
+    for combined card1 addr1 and P_emaildomain calculated after combining the features
+    and then using groupby and std
+  TransactionAmt_card1_addr1_mean: Mean of TransactionAmt for combined card1 and addr1
+    calculated after combining the features and then using groupby and mean
+  TransactionAmt_card1_addr1_std: Standard deviation of TransactionAmt for combined
+    card1 and addr1 calculated after combining the features and then using groupby
+    and std
+  TransactionAmt_card1_mean: Mean of TransactionAmt grouped by card1 calculated using
+    groupby and mean functions
+  TransactionAmt_card1_std: Standard deviation of TransactionAmt grouped by card1
+    calculated using groupby and std functions
+  addr1_FE: Frequency encoding of addr1 calculated as the count of each unique value
+    divided by the total count
+  card1_FE: Frequency encoding of card1 calculated as the count of each unique value
+    divided by the total count
+  card1_addr1: Combined feature of card1 and addr1 created by concatenating card1
+    and addr1 into a single string
+  card1_addr1_FE: Frequency encoding of combined card1 and addr1 calculated after
+    combining the features
+  card1_addr1_P_emaildomain: Combined feature of card1 addr1 and P_emaildomain created
+    by concatenating card1 addr1 and P_emaildomain into a single string
+  card1_addr1_P_emaildomain_FE: Frequency encoding of combined card1 addr1 and P_emaildomain
+    calculated after combining the features
+  card2_FE: Frequency encoding of card2 calculated as the count of each unique value
+    divided by the total count
+  card3_FE: Frequency encoding of card3 calculated as the count of each unique value
+    divided by the total count
+human_feature_impl:
+  D11_card1_addr1_P_emaildomain_mean: '
+
+    Transaction[''D11_card1_addr1_P_emaildomain_mean''] = Transaction.groupby([''card1'',
+    ''addr1'', ''P_emaildomain''])[''D11''].transform(''mean'')
+
+    '
+  D11_card1_addr1_P_emaildomain_std: '
+
+    Transaction[''D11_card1_addr1_P_emaildomain_std''] = Transaction.groupby([''card1'',
+    ''addr1'', ''P_emaildomain''])[''D11''].transform(''std'')
+
+    '
+  D11_card1_addr1_mean: '
+
+    Transaction[''D11_card1_addr1_mean''] = Transaction.groupby([''card1'', ''addr1''])[''D11''].transform(''mean'')
+
+    '
+  D11_card1_addr1_std: '
+
+    Transaction[''D11_card1_addr1_std''] = Transaction.groupby([''card1'', ''addr1''])[''D11''].transform(''std'')
+
+    '
+  D11_card1_mean: '
+
+    Transaction[''D11_card1_mean''] = Transaction.groupby(''card1'')[''D11''].transform(''mean'')
+
+    '
+  D11_card1_std: '
+
+    Transaction[''D11_card1_std''] = Transaction.groupby(''card1'')[''D11''].transform(''std'')
+
+    '
+  D9_card1_addr1_P_emaildomain_mean: '
+
+    Transaction[''D9_card1_addr1_P_emaildomain_mean''] = Transaction.groupby([''card1'',
+    ''addr1'', ''P_emaildomain''])[''D9''].transform(''mean'')
+
+    '
+  D9_card1_addr1_P_emaildomain_std: '
+
+    Transaction[''D9_card1_addr1_P_emaildomain_std''] = Transaction.groupby([''card1'',
+    ''addr1'', ''P_emaildomain''])[''D9''].transform(''std'')
+
+    '
+  D9_card1_addr1_mean: '
+
+    Transaction[''D9_card1_addr1_mean''] = Transaction.groupby([''card1'', ''addr1''])[''D9''].transform(''mean'')
+
+    '
+  D9_card1_addr1_std: '
+
+    Transaction[''D9_card1_addr1_std''] = Transaction.groupby([''card1'', ''addr1''])[''D9''].transform(''std'')
+
+    '
+  D9_card1_mean: '
+
+    Transaction[''D9_card1_mean''] = Transaction.groupby(''card1'')[''D9''].transform(''mean'')
+
+    '
+  D9_card1_std: '
+
+    Transaction[''D9_card1_std''] = Transaction.groupby(''card1'')[''D9''].transform(''std'')
+
+    '
+  P_emaildomain_FE: '
+
+    Transaction["P_emaildomain_FE"] = Transaction["P_emaildomain"].map(Transaction["P_emaildomain"].value_counts(normalize=True))
+
+    '
+  TransactionAmt_card1_addr1_P_emaildomain_mean: '
+
+    Transaction[''TransactionAmt_card1_addr1_P_emaildomain_mean''] = Transaction.groupby([''card1'',
+    ''addr1'', ''P_emaildomain''])[''TransactionAmt''].transform(''mean'')
+
+    '
+  TransactionAmt_card1_addr1_P_emaildomain_std: '
+
+    Transaction[''TransactionAmt_card1_addr1_P_emaildomain_std''] = Transaction.groupby([''card1'',
+    ''addr1'', ''P_emaildomain''])[''TransactionAmt''].transform(''std'')
+
+    '
+  TransactionAmt_card1_addr1_mean: '
+
+    Transaction[''TransactionAmt_card1_addr1_mean''] = Transaction.groupby([''card1'',
+    ''addr1''])[''TransactionAmt''].transform(''mean'')
+
+    '
+  TransactionAmt_card1_addr1_std: '
+
+    Transaction[''TransactionAmt_card1_addr1_std''] = Transaction.groupby([''card1'',
+    ''addr1''])[''TransactionAmt''].transform(''std'')
+
+    '
+  TransactionAmt_card1_mean: '
+
+    Transaction[''TransactionAmt_card1_mean''] = Transaction.groupby(''card1'')[''TransactionAmt''].transform(''mean'')
+
+    '
+  TransactionAmt_card1_std: '
+
+    Transaction[''TransactionAmt_card1_std''] = Transaction.groupby(''card1'')[''TransactionAmt''].transform(''std'')
+
+    '
+  addr1_FE: '
+
+    addr1_counts = Transaction[''addr1''].value_counts(normalize=True)
+
+    Transaction[''addr1_FE''] = Transaction[''addr1''].map(addr1_counts)
+
+    '
+  card1_FE: '
+
+    Transaction[''card1_FE''] = Transaction[''card1''].map(Transaction[''card1''].value_counts(normalize=True))
+
+    '
+  card1_addr1: '
+
+    Transaction["card1_addr1"] = Transaction["card1"].astype(str) + "_" + Transaction["addr1"].astype(str)
+
+    '
+  card1_addr1_FE: '
+
+    Transaction[''card1_addr1''] = Transaction[''card1''].astype(str) + ''_'' + Transaction[''addr1''].astype(str)
+
+    card1_addr1_FE = Transaction[''card1_addr1''].value_counts().to_dict()
+
+    Transaction[''card1_addr1_FE''] = Transaction[''card1_addr1''].map(card1_addr1_FE)
+
+    '
+  card1_addr1_P_emaildomain: '
+
+    Transaction["card1_addr1_P_emaildomain"] = Transaction["card1"].astype(str) +
+    "_" + Transaction["addr1"].astype(str) + "_" + Transaction["P_emaildomain"].astype(str)
+
+    '
+  card1_addr1_P_emaildomain_FE: '
+
+    Transaction[''card1_addr1_P_emaildomain''] = Transaction[''card1''].astype(str)
+    + ''_'' + Transaction[''addr1''].astype(str) + ''_'' + Transaction[''P_emaildomain''].astype(str)
+
+    frequency_encoding = Transaction[''card1_addr1_P_emaildomain''].value_counts().to_dict()
+
+    Transaction[''card1_addr1_P_emaildomain_FE''] = Transaction[''card1_addr1_P_emaildomain''].map(frequency_encoding)
+
+    Transaction.drop(columns=[''card1_addr1_P_emaildomain''], inplace=True)
+
+    '
+  card2_FE: '
+
+    Transaction[''card2_FE''] = Transaction[''card2''].map(Transaction[''card2''].value_counts(normalize=True))
+
+    '
+  card3_FE: '
+
+    Transaction[''card3_FE''] = Transaction[''card3''].map(Transaction[''card3''].value_counts(normalize=True))
+
+    '
+name: ieee
+table_path: data/ieee
+table_schemas:
+- columns:
+  - description: Unique identifier for the transaction (joins with TransactionID in
+      train_transaction.csv)
+    dtype: foreign_key
+    link_to: Transaction.TransactionID
+    name: TransactionID
+  - description: Unknown float feature
+    dtype: float
+    name: id_01
+  - description: Unknown float feature
+    dtype: float
+    name: id_02
+  - description: Unknown float feature
+    dtype: float
+    name: id_03
+  - description: Unknown float feature
+    dtype: float
+    name: id_04
+  - description: Unknown float feature
+    dtype: float
+    name: id_05
+  - description: Unknown float feature
+    dtype: float
+    name: id_06
+  - description: Unknown float feature
+    dtype: float
+    name: id_07
+  - description: Unknown float feature
+    dtype: float
+    name: id_08
+  - description: Unknown float feature
+    dtype: float
+    name: id_09
+  - description: Unknown float feature
+    dtype: float
+    name: id_10
+  - description: Unknown float feature
+    dtype: float
+    name: id_11
+  - description: Categorical feature
+    dtype: category
+    name: id_12
+  - description: Categorical feature
+    dtype: category
+    name: id_13
+  - description: Categorical feature
+    dtype: category
+    name: id_14
+  - description: Categorical feature
+    dtype: category
+    name: id_15
+  - description: Categorical feature
+    dtype: category
+    name: id_16
+  - description: Categorical feature
+    dtype: category
+    name: id_17
+  - description: Categorical feature
+    dtype: category
+    name: id_18
+  - description: Categorical feature
+    dtype: category
+    name: id_19
+  - description: Categorical feature
+    dtype: category
+    name: id_20
+  - description: Categorical feature
+    dtype: category
+    name: id_21
+  - description: Categorical feature
+    dtype: category
+    name: id_22
+  - description: Categorical feature
+    dtype: category
+    name: id_23
+  - description: Categorical feature
+    dtype: category
+    name: id_24
+  - description: Categorical feature
+    dtype: category
+    name: id_25
+  - description: Categorical feature
+    dtype: category
+    name: id_26
+  - description: Categorical feature
+    dtype: category
+    name: id_27
+  - description: Categorical feature
+    dtype: category
+    name: id_28
+  - description: Categorical feature
+    dtype: category
+    name: id_29
+  - description: Categorical feature
+    dtype: category
+    name: id_30
+  - description: Categorical feature
+    dtype: category
+    name: id_31
+  - description: Categorical feature
+    dtype: category
+    name: id_32
+  - description: Categorical feature
+    dtype: category
+    name: id_33
+  - description: Categorical feature
+    dtype: category
+    name: id_34
+  - description: Categorical feature
+    dtype: category
+    name: id_35
+  - description: Categorical feature
+    dtype: category
+    name: id_36
+  - description: Categorical feature
+    dtype: category
+    name: id_37
+  - description: Categorical feature
+    dtype: category
+    name: id_38
+  - description: Categorical feature indicating the type of device used
+    dtype: category
+    name: DeviceType
+  - description: Categorical feature indicating the information about the device used
+    dtype: category
+    name: DeviceInfo
+  name: Train_identity
+  time_column: null
+- columns:
+  - description: Unique identifier for the transaction
+    dtype: primary_key
+    name: TransactionID
+  - description: Binary target indicating if the transaction is fraudulent
+    dtype: category
+    name: isFraud
+  - description: Timedelta from a given reference datetime (not an actual timestamp)
+    dtype: float
+    name: TransactionDT
+  - description: Transaction amount
+    dtype: float
+    name: TransactionAmt
+  - description: Product code, a categorical feature
+    dtype: category
+    name: ProductCD
+  - description: Card information, a categorical feature
+    dtype: category
+    name: card1
+  - description: Card information, a categorical feature
+    dtype: category
+    name: card2
+  - description: Card information, a categorical feature
+    dtype: category
+    name: card3
+  - description: Card information, a categorical feature
+    dtype: category
+    name: card4
+  - description: Card information, a categorical feature
+    dtype: category
+    name: card5
+  - description: Card information, a categorical feature
+    dtype: category
+    name: card6
+  - description: Address information, a categorical feature
+    dtype: category
+    name: addr1
+  - description: Address information, a categorical feature
+    dtype: category
+    name: addr2
+  - description: Distance information, a float feature
+    dtype: float
+    name: dist1
+  - description: Distance information, a float feature
+    dtype: float
+    name: dist2
+  - description: Purchaser email domain, a categorical feature
+    dtype: category
+    name: P_emaildomain
+  - description: Recipient email domain, a categorical feature
+    dtype: category
+    name: R_emaildomain
+  - description: Unknown float feature
+    dtype: float
+    name: C1
+  - description: Unknown float feature
+    dtype: float
+    name: C2
+  - description: Unknown float feature
+    dtype: float
+    name: C3
+  - description: Unknown float feature
+    dtype: float
+    name: C4
+  - description: Unknown float feature
+    dtype: float
+    name: C5
+  - description: Unknown float feature
+    dtype: float
+    name: C6
+  - description: Unknown float feature
+    dtype: float
+    name: C7
+  - description: Unknown float feature
+    dtype: float
+    name: C8
+  - description: Unknown float feature
+    dtype: float
+    name: C9
+  - description: Unknown float feature
+    dtype: float
+    name: C10
+  - description: Unknown float feature
+    dtype: float
+    name: C11
+  - description: Unknown float feature
+    dtype: float
+    name: C12
+  - description: Unknown float feature
+    dtype: float
+    name: C13
+  - description: Unknown float feature
+    dtype: float
+    name: C14
+  - description: Unknown float feature
+    dtype: float
+    name: D1
+  - description: Unknown float feature
+    dtype: float
+    name: D2
+  - description: Unknown float feature
+    dtype: float
+    name: D3
+  - description: Unknown float feature
+    dtype: float
+    name: D4
+  - description: Unknown float feature
+    dtype: float
+    name: D5
+  - description: Unknown float feature
+    dtype: float
+    name: D6
+  - description: Unknown float feature
+    dtype: float
+    name: D7
+  - description: Unknown float feature
+    dtype: float
+    name: D8
+  - description: Unknown float feature
+    dtype: float
+    name: D9
+  - description: Unknown float feature
+    dtype: float
+    name: D10
+  - description: Unknown float feature
+    dtype: float
+    name: D11
+  - description: Unknown float feature
+    dtype: float
+    name: D12
+  - description: Unknown float feature
+    dtype: float
+    name: D13
+  - description: Unknown float feature
+    dtype: float
+    name: D14
+  - description: Unknown float feature
+    dtype: float
+    name: D15
+  - description: Categorical feature
+    dtype: category
+    name: M1
+  - description: Categorical feature
+    dtype: category
+    name: M2
+  - description: Categorical feature
+    dtype: category
+    name: M3
+  - description: Categorical feature
+    dtype: category
+    name: M4
+  - description: Categorical feature
+    dtype: category
+    name: M5
+  - description: Categorical feature
+    dtype: category
+    name: M6
+  - description: Categorical feature
+    dtype: category
+    name: M7
+  - description: Categorical feature
+    dtype: category
+    name: M8
+  - description: Categorical feature
+    dtype: category
+    name: M9
+  - description: Unknown float feature
+    dtype: float
+    name: V1
+  - description: Unknown float feature
+    dtype: float
+    name: V2
+  - description: Unknown float feature
+    dtype: float
+    name: V3
+  - description: Unknown float feature
+    dtype: float
+    name: V4
+  - description: Unknown float feature
+    dtype: float
+    name: V5
+  - description: Unknown float feature
+    dtype: float
+    name: V6
+  - description: Unknown float feature
+    dtype: float
+    name: V7
+  - description: Unknown float feature
+    dtype: float
+    name: V8
+  - description: Unknown float feature
+    dtype: float
+    name: V9
+  - description: Unknown float feature
+    dtype: float
+    name: V10
+  - description: Unknown float feature
+    dtype: float
+    name: V11
+  - description: Unknown float feature
+    dtype: float
+    name: V12
+  - description: Unknown float feature
+    dtype: float
+    name: V13
+  - description: Unknown float feature
+    dtype: float
+    name: V14
+  - description: Unknown float feature
+    dtype: float
+    name: V15
+  - description: Unknown float feature
+    dtype: float
+    name: V16
+  - description: Unknown float feature
+    dtype: float
+    name: V17
+  - description: Unknown float feature
+    dtype: float
+    name: V18
+  - description: Unknown float feature
+    dtype: float
+    name: V19
+  - description: Unknown float feature
+    dtype: float
+    name: V20
+  - description: Unknown float feature
+    dtype: float
+    name: V21
+  - description: Unknown float feature
+    dtype: float
+    name: V22
+  - description: Unknown float feature
+    dtype: float
+    name: V23
+  - description: Unknown float feature
+    dtype: float
+    name: V24
+  - description: Unknown float feature
+    dtype: float
+    name: V25
+  - description: Unknown float feature
+    dtype: float
+    name: V26
+  - description: Unknown float feature
+    dtype: float
+    name: V27
+  - description: Unknown float feature
+    dtype: float
+    name: V28
+  - description: Unknown float feature
+    dtype: float
+    name: V29
+  - description: Unknown float feature
+    dtype: float
+    name: V30
+  - description: Unknown float feature
+    dtype: float
+    name: V31
+  - description: Unknown float feature
+    dtype: float
+    name: V32
+  - description: Unknown float feature
+    dtype: float
+    name: V33
+  - description: Unknown float feature
+    dtype: float
+    name: V34
+  - description: Unknown float feature
+    dtype: float
+    name: V35
+  - description: Unknown float feature
+    dtype: float
+    name: V36
+  - description: Unknown float feature
+    dtype: float
+    name: V37
+  - description: Unknown float feature
+    dtype: float
+    name: V38
+  - description: Unknown float feature
+    dtype: float
+    name: V39
+  - description: Unknown float feature
+    dtype: float
+    name: V40
+  - description: Unknown float feature
+    dtype: float
+    name: V41
+  - description: Unknown float feature
+    dtype: float
+    name: V42
+  - description: Unknown float feature
+    dtype: float
+    name: V43
+  - description: Unknown float feature
+    dtype: float
+    name: V44
+  - description: Unknown float feature
+    dtype: float
+    name: V45
+  - description: Unknown float feature
+    dtype: float
+    name: V46
+  - description: Unknown float feature
+    dtype: float
+    name: V47
+  - description: Unknown float feature
+    dtype: float
+    name: V48
+  - description: Unknown float feature
+    dtype: float
+    name: V49
+  - description: Unknown float feature
+    dtype: float
+    name: V50
+  - description: Unknown float feature
+    dtype: float
+    name: V51
+  - description: Unknown float feature
+    dtype: float
+    name: V52
+  - description: Unknown float feature
+    dtype: float
+    name: V53
+  - description: Unknown float feature
+    dtype: float
+    name: V54
+  - description: Unknown float feature
+    dtype: float
+    name: V55
+  - description: Unknown float feature
+    dtype: float
+    name: V56
+  - description: Unknown float feature
+    dtype: float
+    name: V57
+  - description: Unknown float feature
+    dtype: float
+    name: V58
+  - description: Unknown float feature
+    dtype: float
+    name: V59
+  - description: Unknown float feature
+    dtype: float
+    name: V60
+  - description: Unknown float feature
+    dtype: float
+    name: V61
+  - description: Unknown float feature
+    dtype: float
+    name: V62
+  - description: Unknown float feature
+    dtype: float
+    name: V63
+  - description: Unknown float feature
+    dtype: float
+    name: V64
+  - description: Unknown float feature
+    dtype: float
+    name: V65
+  - description: Unknown float feature
+    dtype: float
+    name: V66
+  - description: Unknown float feature
+    dtype: float
+    name: V67
+  - description: Unknown float feature
+    dtype: float
+    name: V68
+  - description: Unknown float feature
+    dtype: float
+    name: V69
+  - description: Unknown float feature
+    dtype: float
+    name: V70
+  - description: Unknown float feature
+    dtype: float
+    name: V71
+  - description: Unknown float feature
+    dtype: float
+    name: V72
+  - description: Unknown float feature
+    dtype: float
+    name: V73
+  - description: Unknown float feature
+    dtype: float
+    name: V74
+  - description: Unknown float feature
+    dtype: float
+    name: V75
+  - description: Unknown float feature
+    dtype: float
+    name: V76
+  - description: Unknown float feature
+    dtype: float
+    name: V77
+  - description: Unknown float feature
+    dtype: float
+    name: V78
+  - description: Unknown float feature
+    dtype: float
+    name: V79
+  - description: Unknown float feature
+    dtype: float
+    name: V80
+  - description: Unknown float feature
+    dtype: float
+    name: V81
+  - description: Unknown float feature
+    dtype: float
+    name: V82
+  - description: Unknown float feature
+    dtype: float
+    name: V83
+  - description: Unknown float feature
+    dtype: float
+    name: V84
+  - description: Unknown float feature
+    dtype: float
+    name: V85
+  - description: Unknown float feature
+    dtype: float
+    name: V86
+  - description: Unknown float feature
+    dtype: float
+    name: V87
+  - description: Unknown float feature
+    dtype: float
+    name: V88
+  - description: Unknown float feature
+    dtype: float
+    name: V89
+  - description: Unknown float feature
+    dtype: float
+    name: V90
+  - description: Unknown float feature
+    dtype: float
+    name: V91
+  - description: Unknown float feature
+    dtype: float
+    name: V92
+  - description: Unknown float feature
+    dtype: float
+    name: V93
+  - description: Unknown float feature
+    dtype: float
+    name: V94
+  - description: Unknown float feature
+    dtype: float
+    name: V95
+  - description: Unknown float feature
+    dtype: float
+    name: V96
+  - description: Unknown float feature
+    dtype: float
+    name: V97
+  - description: Unknown float feature
+    dtype: float
+    name: V98
+  - description: Unknown float feature
+    dtype: float
+    name: V99
+  - description: Unknown float feature
+    dtype: float
+    name: V100
+  - description: Unknown float feature
+    dtype: float
+    name: V101
+  - description: Unknown float feature
+    dtype: float
+    name: V102
+  - description: Unknown float feature
+    dtype: float
+    name: V103
+  - description: Unknown float feature
+    dtype: float
+    name: V104
+  - description: Unknown float feature
+    dtype: float
+    name: V105
+  - description: Unknown float feature
+    dtype: float
+    name: V106
+  - description: Unknown float feature
+    dtype: float
+    name: V107
+  - description: Unknown float feature
+    dtype: float
+    name: V108
+  - description: Unknown float feature
+    dtype: float
+    name: V109
+  - description: Unknown float feature
+    dtype: float
+    name: V110
+  - description: Unknown float feature
+    dtype: float
+    name: V111
+  - description: Unknown float feature
+    dtype: float
+    name: V112
+  - description: Unknown float feature
+    dtype: float
+    name: V113
+  - description: Unknown float feature
+    dtype: float
+    name: V114
+  - description: Unknown float feature
+    dtype: float
+    name: V115
+  - description: Unknown float feature
+    dtype: float
+    name: V116
+  - description: Unknown float feature
+    dtype: float
+    name: V117
+  - description: Unknown float feature
+    dtype: float
+    name: V118
+  - description: Unknown float feature
+    dtype: float
+    name: V119
+  - description: Unknown float feature
+    dtype: float
+    name: V120
+  - description: Unknown float feature
+    dtype: float
+    name: V121
+  - description: Unknown float feature
+    dtype: float
+    name: V122
+  - description: Unknown float feature
+    dtype: float
+    name: V123
+  - description: Unknown float feature
+    dtype: float
+    name: V124
+  - description: Unknown float feature
+    dtype: float
+    name: V125
+  - description: Unknown float feature
+    dtype: float
+    name: V126
+  - description: Unknown float feature
+    dtype: float
+    name: V127
+  - description: Unknown float feature
+    dtype: float
+    name: V128
+  - description: Unknown float feature
+    dtype: float
+    name: V129
+  - description: Unknown float feature
+    dtype: float
+    name: V130
+  - description: Unknown float feature
+    dtype: float
+    name: V131
+  - description: Unknown float feature
+    dtype: float
+    name: V132
+  - description: Unknown float feature
+    dtype: float
+    name: V133
+  - description: Unknown float feature
+    dtype: float
+    name: V134
+  - description: Unknown float feature
+    dtype: float
+    name: V135
+  - description: Unknown float feature
+    dtype: float
+    name: V136
+  - description: Unknown float feature
+    dtype: float
+    name: V137
+  - description: Unknown float feature
+    dtype: float
+    name: V138
+  - description: Unknown float feature
+    dtype: float
+    name: V139
+  - description: Unknown float feature
+    dtype: float
+    name: V140
+  - description: Unknown float feature
+    dtype: float
+    name: V141
+  - description: Unknown float feature
+    dtype: float
+    name: V142
+  - description: Unknown float feature
+    dtype: float
+    name: V143
+  - description: Unknown float feature
+    dtype: float
+    name: V144
+  - description: Unknown float feature
+    dtype: float
+    name: V145
+  - description: Unknown float feature
+    dtype: float
+    name: V146
+  - description: Unknown float feature
+    dtype: float
+    name: V147
+  - description: Unknown float feature
+    dtype: float
+    name: V148
+  - description: Unknown float feature
+    dtype: float
+    name: V149
+  - description: Unknown float feature
+    dtype: float
+    name: V150
+  - description: Unknown float feature
+    dtype: float
+    name: V151
+  - description: Unknown float feature
+    dtype: float
+    name: V152
+  - description: Unknown float feature
+    dtype: float
+    name: V153
+  - description: Unknown float feature
+    dtype: float
+    name: V154
+  - description: Unknown float feature
+    dtype: float
+    name: V155
+  - description: Unknown float feature
+    dtype: float
+    name: V156
+  - description: Unknown float feature
+    dtype: float
+    name: V157
+  - description: Unknown float feature
+    dtype: float
+    name: V158
+  - description: Unknown float feature
+    dtype: float
+    name: V159
+  - description: Unknown float feature
+    dtype: float
+    name: V160
+  - description: Unknown float feature
+    dtype: float
+    name: V161
+  - description: Unknown float feature
+    dtype: float
+    name: V162
+  - description: Unknown float feature
+    dtype: float
+    name: V163
+  - description: Unknown float feature
+    dtype: float
+    name: V164
+  - description: Unknown float feature
+    dtype: float
+    name: V165
+  - description: Unknown float feature
+    dtype: float
+    name: V166
+  - description: Unknown float feature
+    dtype: float
+    name: V167
+  - description: Unknown float feature
+    dtype: float
+    name: V168
+  - description: Unknown float feature
+    dtype: float
+    name: V169
+  - description: Unknown float feature
+    dtype: float
+    name: V170
+  - description: Unknown float feature
+    dtype: float
+    name: V171
+  - description: Unknown float feature
+    dtype: float
+    name: V172
+  - description: Unknown float feature
+    dtype: float
+    name: V173
+  - description: Unknown float feature
+    dtype: float
+    name: V174
+  - description: Unknown float feature
+    dtype: float
+    name: V175
+  - description: Unknown float feature
+    dtype: float
+    name: V176
+  - description: Unknown float feature
+    dtype: float
+    name: V177
+  - description: Unknown float feature
+    dtype: float
+    name: V178
+  - description: Unknown float feature
+    dtype: float
+    name: V179
+  - description: Unknown float feature
+    dtype: float
+    name: V180
+  - description: Unknown float feature
+    dtype: float
+    name: V181
+  - description: Unknown float feature
+    dtype: float
+    name: V182
+  - description: Unknown float feature
+    dtype: float
+    name: V183
+  - description: Unknown float feature
+    dtype: float
+    name: V184
+  - description: Unknown float feature
+    dtype: float
+    name: V185
+  - description: Unknown float feature
+    dtype: float
+    name: V186
+  - description: Unknown float feature
+    dtype: float
+    name: V187
+  - description: Unknown float feature
+    dtype: float
+    name: V188
+  - description: Unknown float feature
+    dtype: float
+    name: V189
+  - description: Unknown float feature
+    dtype: float
+    name: V190
+  - description: Unknown float feature
+    dtype: float
+    name: V191
+  - description: Unknown float feature
+    dtype: float
+    name: V192
+  - description: Unknown float feature
+    dtype: float
+    name: V193
+  - description: Unknown float feature
+    dtype: float
+    name: V194
+  - description: Unknown float feature
+    dtype: float
+    name: V195
+  - description: Unknown float feature
+    dtype: float
+    name: V196
+  - description: Unknown float feature
+    dtype: float
+    name: V197
+  - description: Unknown float feature
+    dtype: float
+    name: V198
+  - description: Unknown float feature
+    dtype: float
+    name: V199
+  - description: Unknown float feature
+    dtype: float
+    name: V200
+  - description: Unknown float feature
+    dtype: float
+    name: V201
+  - description: Unknown float feature
+    dtype: float
+    name: V202
+  - description: Unknown float feature
+    dtype: float
+    name: V203
+  - description: Unknown float feature
+    dtype: float
+    name: V204
+  - description: Unknown float feature
+    dtype: float
+    name: V205
+  - description: Unknown float feature
+    dtype: float
+    name: V206
+  - description: Unknown float feature
+    dtype: float
+    name: V207
+  - description: Unknown float feature
+    dtype: float
+    name: V208
+  - description: Unknown float feature
+    dtype: float
+    name: V209
+  - description: Unknown float feature
+    dtype: float
+    name: V210
+  - description: Unknown float feature
+    dtype: float
+    name: V211
+  - description: Unknown float feature
+    dtype: float
+    name: V212
+  - description: Unknown float feature
+    dtype: float
+    name: V213
+  - description: Unknown float feature
+    dtype: float
+    name: V214
+  - description: Unknown float feature
+    dtype: float
+    name: V215
+  - description: Unknown float feature
+    dtype: float
+    name: V216
+  - description: Unknown float feature
+    dtype: float
+    name: V217
+  - description: Unknown float feature
+    dtype: float
+    name: V218
+  - description: Unknown float feature
+    dtype: float
+    name: V219
+  - description: Unknown float feature
+    dtype: float
+    name: V220
+  - description: Unknown float feature
+    dtype: float
+    name: V221
+  - description: Unknown float feature
+    dtype: float
+    name: V222
+  - description: Unknown float feature
+    dtype: float
+    name: V223
+  - description: Unknown float feature
+    dtype: float
+    name: V224
+  - description: Unknown float feature
+    dtype: float
+    name: V225
+  - description: Unknown float feature
+    dtype: float
+    name: V226
+  - description: Unknown float feature
+    dtype: float
+    name: V227
+  - description: Unknown float feature
+    dtype: float
+    name: V228
+  - description: Unknown float feature
+    dtype: float
+    name: V229
+  - description: Unknown float feature
+    dtype: float
+    name: V230
+  - description: Unknown float feature
+    dtype: float
+    name: V231
+  - description: Unknown float feature
+    dtype: float
+    name: V232
+  - description: Unknown float feature
+    dtype: float
+    name: V233
+  - description: Unknown float feature
+    dtype: float
+    name: V234
+  - description: Unknown float feature
+    dtype: float
+    name: V235
+  - description: Unknown float feature
+    dtype: float
+    name: V236
+  - description: Unknown float feature
+    dtype: float
+    name: V237
+  - description: Unknown float feature
+    dtype: float
+    name: V238
+  - description: Unknown float feature
+    dtype: float
+    name: V239
+  - description: Unknown float feature
+    dtype: float
+    name: V240
+  - description: Unknown float feature
+    dtype: float
+    name: V241
+  - description: Unknown float feature
+    dtype: float
+    name: V242
+  - description: Unknown float feature
+    dtype: float
+    name: V243
+  - description: Unknown float feature
+    dtype: float
+    name: V244
+  - description: Unknown float feature
+    dtype: float
+    name: V245
+  - description: Unknown float feature
+    dtype: float
+    name: V246
+  - description: Unknown float feature
+    dtype: float
+    name: V247
+  - description: Unknown float feature
+    dtype: float
+    name: V248
+  - description: Unknown float feature
+    dtype: float
+    name: V249
+  - description: Unknown float feature
+    dtype: float
+    name: V250
+  - description: Unknown float feature
+    dtype: float
+    name: V251
+  - description: Unknown float feature
+    dtype: float
+    name: V252
+  - description: Unknown float feature
+    dtype: float
+    name: V253
+  - description: Unknown float feature
+    dtype: float
+    name: V254
+  - description: Unknown float feature
+    dtype: float
+    name: V255
+  - description: Unknown float feature
+    dtype: float
+    name: V256
+  - description: Unknown float feature
+    dtype: float
+    name: V257
+  - description: Unknown float feature
+    dtype: float
+    name: V258
+  - description: Unknown float feature
+    dtype: float
+    name: V259
+  - description: Unknown float feature
+    dtype: float
+    name: V260
+  - description: Unknown float feature
+    dtype: float
+    name: V261
+  - description: Unknown float feature
+    dtype: float
+    name: V262
+  - description: Unknown float feature
+    dtype: float
+    name: V263
+  - description: Unknown float feature
+    dtype: float
+    name: V264
+  - description: Unknown float feature
+    dtype: float
+    name: V265
+  - description: Unknown float feature
+    dtype: float
+    name: V266
+  - description: Unknown float feature
+    dtype: float
+    name: V267
+  - description: Unknown float feature
+    dtype: float
+    name: V268
+  - description: Unknown float feature
+    dtype: float
+    name: V269
+  - description: Unknown float feature
+    dtype: float
+    name: V270
+  - description: Unknown float feature
+    dtype: float
+    name: V271
+  - description: Unknown float feature
+    dtype: float
+    name: V272
+  - description: Unknown float feature
+    dtype: float
+    name: V273
+  - description: Unknown float feature
+    dtype: float
+    name: V274
+  - description: Unknown float feature
+    dtype: float
+    name: V275
+  - description: Unknown float feature
+    dtype: float
+    name: V276
+  - description: Unknown float feature
+    dtype: float
+    name: V277
+  - description: Unknown float feature
+    dtype: float
+    name: V278
+  - description: Unknown float feature
+    dtype: float
+    name: V279
+  - description: Unknown float feature
+    dtype: float
+    name: V280
+  - description: Unknown float feature
+    dtype: float
+    name: V281
+  - description: Unknown float feature
+    dtype: float
+    name: V282
+  - description: Unknown float feature
+    dtype: float
+    name: V283
+  - description: Unknown float feature
+    dtype: float
+    name: V284
+  - description: Unknown float feature
+    dtype: float
+    name: V285
+  - description: Unknown float feature
+    dtype: float
+    name: V286
+  - description: Unknown float feature
+    dtype: float
+    name: V287
+  - description: Unknown float feature
+    dtype: float
+    name: V288
+  - description: Unknown float feature
+    dtype: float
+    name: V289
+  - description: Unknown float feature
+    dtype: float
+    name: V290
+  - description: Unknown float feature
+    dtype: float
+    name: V291
+  - description: Unknown float feature
+    dtype: float
+    name: V292
+  - description: Unknown float feature
+    dtype: float
+    name: V293
+  - description: Unknown float feature
+    dtype: float
+    name: V294
+  - description: Unknown float feature
+    dtype: float
+    name: V295
+  - description: Unknown float feature
+    dtype: float
+    name: V296
+  - description: Unknown float feature
+    dtype: float
+    name: V297
+  - description: Unknown float feature
+    dtype: float
+    name: V298
+  - description: Unknown float feature
+    dtype: float
+    name: V299
+  - description: Unknown float feature
+    dtype: float
+    name: V300
+  - description: Unknown float feature
+    dtype: float
+    name: V301
+  - description: Unknown float feature
+    dtype: float
+    name: V302
+  - description: Unknown float feature
+    dtype: float
+    name: V303
+  - description: Unknown float feature
+    dtype: float
+    name: V304
+  - description: Unknown float feature
+    dtype: float
+    name: V305
+  - description: Unknown float feature
+    dtype: float
+    name: V306
+  - description: Unknown float feature
+    dtype: float
+    name: V307
+  - description: Unknown float feature
+    dtype: float
+    name: V308
+  - description: Unknown float feature
+    dtype: float
+    name: V309
+  - description: Unknown float feature
+    dtype: float
+    name: V310
+  - description: Unknown float feature
+    dtype: float
+    name: V311
+  - description: Unknown float feature
+    dtype: float
+    name: V312
+  - description: Unknown float feature
+    dtype: float
+    name: V313
+  - description: Unknown float feature
+    dtype: float
+    name: V314
+  - description: Unknown float feature
+    dtype: float
+    name: V315
+  - description: Unknown float feature
+    dtype: float
+    name: V316
+  - description: Unknown float feature
+    dtype: float
+    name: V317
+  - description: Unknown float feature
+    dtype: float
+    name: V318
+  - description: Unknown float feature
+    dtype: float
+    name: V319
+  - description: Unknown float feature
+    dtype: float
+    name: V320
+  - description: Unknown float feature
+    dtype: float
+    name: V321
+  - description: Unknown float feature
+    dtype: float
+    name: V322
+  - description: Unknown float feature
+    dtype: float
+    name: V323
+  - description: Unknown float feature
+    dtype: float
+    name: V324
+  - description: Unknown float feature
+    dtype: float
+    name: V325
+  - description: Unknown float feature
+    dtype: float
+    name: V326
+  - description: Unknown float feature
+    dtype: float
+    name: V327
+  - description: Unknown float feature
+    dtype: float
+    name: V328
+  - description: Unknown float feature
+    dtype: float
+    name: V329
+  - description: Unknown float feature
+    dtype: float
+    name: V330
+  - description: Unknown float feature
+    dtype: float
+    name: V331
+  - description: Unknown float feature
+    dtype: float
+    name: V332
+  - description: Unknown float feature
+    dtype: float
+    name: V333
+  - description: Unknown float feature
+    dtype: float
+    name: V334
+  - description: Unknown float feature
+    dtype: float
+    name: V335
+  - description: Unknown float feature
+    dtype: float
+    name: V336
+  - description: Unknown float feature
+    dtype: float
+    name: V337
+  - description: Unknown float feature
+    dtype: float
+    name: V338
+  - description: Unknown float feature
+    dtype: float
+    name: V339
+  name: Transaction
+  time_column: TransactionDT
+target_column: isFraud
+target_table: Transaction
+task_split: [0.8, 0.1]

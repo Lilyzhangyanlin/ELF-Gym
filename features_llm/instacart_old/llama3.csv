@@ -1,0 +1,90 @@
+,feature_description,code
+0,TotalProductsOrdered - Total number of products ordered in the order,"
+Orders['TotalProductsOrdered'] = Orders['order_id'].map(Order_products__train.groupby('order_id')['product_id'].count())
+"
+1,TotalUniqueProductsOrdered - Total number of unique products ordered in the order,"
+Orders['TotalUniqueProductsOrdered'] = Orders['order_id'].map(Order_products__train.groupby('order_id')['product_id'].nunique())
+"
+2,AverageAddToCartOrder - Average add to cart order of products in the order,"
+Orders['AverageAddToCartOrder'] = Orders['order_id'].map(Order_products__train.groupby('order_id')['add_to_cart_order'].mean())
+"
+3,ReorderedProductCount - Count of products reordered in the order,"
+Orders['ReorderedProductCount'] = Orders['order_id'].map(Order_products__train.groupby('order_id')['reordered'].sum())
+"
+4,ReorderedProductRatio - Ratio of reordered products to total products in the order,"
+Orders['ReorderedProductRatio'] = Orders['order_id'].apply(lambda x: Order_products__train[Order_products__train['order_id'] == x]['reordered'].mean())
+"
+5,ProductAisleDiversity - Number of unique aisles represented in the order,"
+Orders['ProductAisleDiversity'] = Orders['order_id'].apply(lambda x: len(Order_products__train[Order_products__train['order_id'] == x].merge(Products, on='product_id')['aisle_id'].unique()))
+"
+6,ProductDepartmentDiversity - Number of unique departments represented in the order,"
+Orders['ProductDepartmentDiversity'] = Orders['order_id'].apply(lambda x: len(Products.merge(Order_products__train[Order_products__train['order_id'] == x], on='product_id')['department_id'].unique()))
+"
+7,AverageDaysSincePriorOrder - Average days since prior order for the user,"
+Orders['AverageDaysSincePriorOrder'] = Orders.groupby('user_id')['days_since_prior_order'].transform('mean')
+"
+8,"OrderHourOfDayBucket - Bucketed hour of day the order was placed (e.g. morning, afternoon, evening)","
+def bucket_hour(hour):
+    try:
+        hour = int(hour)
+        if hour < 6:
+            return 'night'
+        elif hour < 12:
+            return 'morning'
+        elif hour < 18:
+            return 'afternoon'
+        else:
+            return 'evening'
+    except ValueError:
+        return 'unknown'
+
+Orders['OrderHourOfDayBucket'] = Orders['order_hour_of_day'].apply(bucket_hour)
+"
+9,"OrderDOWBucket - Bucketed day of the week the order was placed (e.g. weekday, weekend)","
+Orders['OrderDOWBucket'] = Orders['order_dow'].apply(lambda x: 'weekday' if x in [1, 2, 3, 4, 5] else 'weekend')
+"
+10,UserOrderCount - Total number of orders placed by the user,"
+Orders['UserOrderCount'] = Orders.groupby('user_id')['order_id'].transform('count')
+"
+11,UserAverageOrderValue - Average value of orders placed by the user (calculated using total products ordered and reordered),"
+order_products = pd.concat([Order_products__train, Order_products__prior])
+order_products_count = order_products.groupby('order_id')['product_id'].count().reset_index()
+order_products_count.columns = ['order_id', 'product_count']
+
+orders_with_product_count = Orders.merge(order_products_count, on='order_id')
+user_average_order_value = orders_with_product_count.groupby('user_id')['product_count'].mean().reset_index()
+user_average_order_value.columns = ['user_id', 'UserAverageOrderValue']
+
+Orders = Orders.merge(user_average_order_value, on='user_id')
+"
+12,UserReorderRatio - Ratio of reordered products to total products ordered by the user,"
+Orders['UserReorderRatio'] = Orders['user_id'].apply(lambda x: 
+    (Order_products__train[Order_products__train['order_id'].isin(Orders[Orders['user_id'] == x]['order_id'])]['reordered'].sum() + 
+     Order_products__prior[Order_products__prior['order_id'].isin(Orders[Orders['user_id'] == x]['order_id'])]['reordered'].sum()) / 
+    (Order_products__train[Order_products__train['order_id'].isin(Orders[Orders['user_id'] == x]['order_id'])].shape[0] + 
+     Order_products__prior[Order_products__prior['order_id'].isin(Orders[Orders['user_id'] == x]['order_id'])].shape[0]))
+"
+13,ProductPopularity - Popularity of each product (calculated using total orders and reordered counts),"
+# Merge Order_products__train and Order_products__prior into one table
+Order_products = pd.concat([Order_products__train, Order_products__prior])
+
+# Calculate total orders for each product
+product_orders = Order_products.groupby('product_id')['order_id'].count().reset_index()
+product_orders.columns = ['product_id', 'total_orders']
+
+# Calculate reordered counts for each product
+product_reordered = Order_products[Order_products['reordered'] == 1].groupby('product_id')['order_id'].count().reset_index()
+product_reordered.columns = ['product_id', 'reordered_count']
+
+# Calculate product popularity
+product_popularity = product_orders.merge(product_reordered, on='product_id', how='left').fillna(0)
+product_popularity['product_popularity'] = product_popularity['total_orders'] + product_popularity['reordered_count']
+
+# Merge Orders table with Order_products table to get product_id
+Orders = Orders.merge(Order_products[['order_id', 'product_id']], on='order_id', how='left')
+
+# Add product popularity to Orders table
+Orders = Orders.merge(product_popularity[['product_id', 'product_popularity']], on='product_id', how='left').fillna(0)
+"
+14,AislePopularity - Popularity of each aisle (calculated using total orders and reordered counts),
+15,DepartmentPopularity - Popularity of each department (calculated using total orders and reordered counts),

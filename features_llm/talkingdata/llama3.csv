@@ -1,0 +1,121 @@
+,feature_description,code
+0,DeviceEventCount - Count of events per device (from Events table),"
+Gender_age = Gender_age.merge(Events.groupby('device_id').size().reset_index(name='DeviceEventCount'), on='device_id')
+"
+1,DeviceAppCount - Count of unique apps per device (from App_events table),"
+App_events_with_device_id = pd.merge(App_events, Events[['event_id', 'device_id']], on='event_id', how='left')
+App_events_per_device = App_events_with_device_id.groupby('device_id')['app_id'].nunique().reset_index()
+App_events_per_device.columns = ['device_id', 'DeviceAppCount']
+
+Gender_age = pd.merge(Gender_age, App_events_per_device, on='device_id', how='left')
+"
+2,DeviceActiveAppCount - Count of active apps per device (from App_events table),"
+App_events_active = App_events[App_events['is_active'] == 1]
+App_events_active = pd.merge(App_events_active, Events, on='event_id', how='left')
+DeviceActiveAppCount = App_events_active.groupby('device_id')['event_id'].count().reset_index()
+DeviceActiveAppCount = DeviceActiveAppCount.rename(columns={'event_id': 'DeviceActiveAppCount'})
+
+Gender_age = pd.merge(Gender_age, DeviceActiveAppCount, on='device_id', how='left')
+Gender_age['DeviceActiveAppCount'].fillna(0, inplace=True)
+"
+3,DeviceAppCategoryCount - Count of unique app categories per device (from App_events and App_labels tables),"
+# Merge App_events and App_labels to get app categories
+App_events_labels = pd.merge(App_events, App_labels, on='app_id')
+
+# Merge App_events_labels and Label_categories to get category names
+App_events_labels_categories = pd.merge(App_events_labels, Label_categories, on='label_id')
+
+# Merge App_events_labels_categories with Events to get device_id
+App_events_labels_categories_events = pd.merge(App_events_labels_categories, Events, on='event_id')
+
+# Count unique app categories per device
+DeviceAppCategoryCount = App_events_labels_categories_events.groupby('device_id')['category'].nunique().reset_index()
+DeviceAppCategoryCount.columns = ['device_id', 'DeviceAppCategoryCount']
+
+# Merge with Gender_age
+Gender_age = pd.merge(Gender_age, DeviceAppCategoryCount, on='device_id', how='left')
+Gender_age['DeviceAppCategoryCount'].fillna(0, inplace=True)
+"
+4,DeviceLongitudeMean - Mean longitude of events per device (from Events table),"
+Gender_age['DeviceLongitudeMean'] = Gender_age['device_id'].map(Events.groupby('device_id')['longitude'].mean())
+"
+5,DeviceLatitudeMean - Mean latitude of events per device (from Events table),"
+Gender_age['DeviceLatitudeMean'] = Gender_age['device_id'].map(Events.groupby('device_id')['latitude'].mean())
+"
+6,DeviceLongitudeStd - Standard deviation of longitude of events per device (from Events table),"
+Gender_age['DeviceLongitudeStd'] = Gender_age['device_id'].map(Events.groupby('device_id')['longitude'].std())
+"
+7,DeviceLatitudeStd - Standard deviation of latitude of events per device (from Events table),"
+Gender_age['DeviceLatitudeStd'] = Gender_age['device_id'].map(Events.groupby('device_id')['latitude'].std())
+"
+8,DeviceBrand - Phone brand of the device (from Brand table),"
+Gender_age = pd.merge(Gender_age, Brand, on='device_id', how='left')
+Gender_age.rename(columns={'phone_brand': 'DeviceBrand'}, inplace=True)
+"
+9,DeviceModel - Phone model of the device (from Brand table),"
+Gender_age = pd.merge(Gender_age, Brand, on='device_id', how='left')
+Gender_age.rename(columns={'device_model': 'DeviceModel'}, inplace=True)
+"
+10,AppCategoryEntropy - Entropy of app categories per device (from App_events and App_labels tables),"
+import pandas as pd
+from scipy.stats import entropy
+
+# Merge App_events and App_labels tables
+App_events_labels = pd.merge(App_events, App_labels, on='app_id')
+
+# Merge App_events_labels and Label_categories tables
+App_events_labels_categories = pd.merge(App_events_labels, Label_categories, on='label_id')
+
+# Merge App_events_labels_categories and Events tables
+App_events_labels_categories_events = pd.merge(App_events_labels_categories, Events, on='event_id')
+
+# Group by device_id and category, and count the number of each category
+category_counts = App_events_labels_categories_events.groupby(['device_id', 'category']).size().reset_index(name='count')
+
+# Calculate the entropy for each device_id
+entropy_values = category_counts.groupby('device_id')['count'].apply(lambda x: entropy(x/x.sum()))
+
+# Merge the entropy values with the Gender_age table
+Gender_age = pd.merge(Gender_age, entropy_values.reset_index(name='AppCategoryEntropy'), on='device_id', how='left')
+"
+11,EventHourOfDay - Hour of day of events per device (from Events table),"
+Events['timestamp'] = pd.to_datetime(Events['timestamp'])
+Events['EventHourOfDay'] = Events['timestamp'].dt.hour
+
+device_event_hour = Events.groupby('device_id')['EventHourOfDay'].value_counts().unstack().fillna(0)
+
+Gender_age = Gender_age.merge(device_event_hour, how='left', left_on='device_id', right_index=True)
+"
+12,EventDayOfWeek - Day of week of events per device (from Events table),"
+Events['timestamp'] = pd.to_datetime(Events['timestamp'])
+Events['EventDayOfWeek'] = Events['timestamp'].dt.dayofweek
+
+device_event_day_of_week = Events.groupby('device_id')['EventDayOfWeek'].apply(lambda x: x.value_counts().index.tolist()).reset_index()
+device_event_day_of_week.columns = ['device_id', 'EventDayOfWeek']
+
+Gender_age = pd.merge(Gender_age, device_event_day_of_week, on='device_id', how='left')
+"
+13,"AgeBucket - Age bucket (e.g. 18-24, 25-34, etc.) of the user","
+def age_bucket(age):
+    try:
+        age = int(age)
+        if age < 18:
+            return 'Under 18'
+        elif age < 25:
+            return '18-24'
+        elif age < 35:
+            return '25-34'
+        elif age < 45:
+            return '35-44'
+        elif age < 55:
+            return '45-54'
+        else:
+            return '55+'
+    except ValueError:
+        return 'Unknown'
+
+Gender_age['AgeBucket'] = Gender_age['age'].apply(age_bucket)
+"
+14,GenderDeviceRatio - Ratio of devices per gender (from Gender_age table),"
+Gender_age['GenderDeviceRatio'] = Gender_age.groupby('gender')['device_id'].transform('count') / Gender_age.groupby('gender')['device_id'].transform('nunique')
+"

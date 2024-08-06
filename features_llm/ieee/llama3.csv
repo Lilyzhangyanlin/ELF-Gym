@@ -1,0 +1,183 @@
+,feature_description,code
+0,ProductCD_count - Count of each ProductCD category,"
+Transaction['ProductCD_count'] = Transaction.groupby('ProductCD')['ProductCD'].transform('count')
+"
+1,"card1_count, card2_count, ..., card6_count - Count of each card category","
+for i in range(1, 7):
+    Transaction[f'card{i}_count'] = Transaction.groupby(f'card{i}')[f'card{i}'].transform('count')
+"
+2,"addr1_count, addr2_count - Count of each address category","
+Transaction['addr1_count'] = Transaction.groupby('addr1')['addr1'].transform('count')
+Transaction['addr2_count'] = Transaction.groupby('addr2')['addr2'].transform('count')
+"
+3,"P_emaildomain_count, R_emaildomain_count - Count of each email domain category","
+Transaction['P_emaildomain_count'] = Transaction.groupby('P_emaildomain')['P_emaildomain'].transform('count')
+Transaction['R_emaildomain_count'] = Transaction.groupby('R_emaildomain')['R_emaildomain'].transform('count')
+"
+4,"M1_count, M2_count, ..., M9_count - Count of each M category","
+for i in range(1, 10):
+    Transaction[f'M{i}_count'] = Transaction.groupby('TransactionID')[f'M{i}'].transform('count')
+"
+5,DeviceType_count - Count of each DeviceType category (from Train_identity table),"
+DeviceType_count = Train_identity.groupby('TransactionID')['DeviceType'].value_counts().unstack().fillna(0)
+Transaction = Transaction.merge(DeviceType_count, on='TransactionID', how='left')
+"
+6,DeviceInfo_count - Count of each DeviceInfo category (from Train_identity table),"
+Transaction['DeviceInfo_count'] = Transaction['TransactionID'].map(Train_identity.groupby('TransactionID')['DeviceInfo'].count())
+"
+7,"id_12_count, id_13_count, ..., id38_count - Count of each id category (from Train_identity table)","
+for col in Train_identity.columns[Train_identity.columns.str.startswith('id_')]:
+    Transaction = Transaction.merge(Train_identity.groupby('TransactionID')[col].count().reset_index(name=f'{col}_count'), on='TransactionID', how='left')
+"
+8,TransactionAmt_log - Logarithm of TransactionAmt,"
+import numpy as np
+
+Transaction[""TransactionAmt_log""] = Transaction[""TransactionAmt""].apply(lambda x: np.log(x) if x > 0 else 0)
+"
+9,"dist1_log, dist2_log - Logarithm of dist1 and dist2","
+import numpy as np
+
+Transaction['dist1_log'] = Transaction['dist1'].apply(lambda x: np.log(x) if x > 0 else 0)
+Transaction['dist2_log'] = Transaction['dist2'].apply(lambda x: np.log(x) if x > 0 else 0)
+"
+10,"C1_avg, C2_avg, ..., C14_avg - Average of each C feature","
+Transaction[['C1_avg', 'C2_avg', 'C3_avg', 'C4_avg', 'C5_avg', 'C6_avg', 'C7_avg', 'C8_avg', 'C9_avg', 'C10_avg', 'C11_avg', 'C12_avg', 'C13_avg', 'C14_avg']] = Transaction.groupby('TransactionID')[['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10', 'C11', 'C12', 'C13', 'C14']].transform('mean')
+"
+11,"D1_avg, D2_avg, ..., D15_avg - Average of each D feature","
+D_cols = [f'D{i+1}' for i in range(15)]
+Transaction[[f'{col}_avg' for col in D_cols]] = Transaction.groupby('TransactionID')[D_cols].transform('mean')
+"
+12,"V1_avg, V2_avg, ..., V339_avg - Average of each V feature","
+for i in range(1, 340):
+    Transaction[f'V{i}_avg'] = Transaction.groupby('TransactionID')[f'V{i}'].transform('mean')
+"
+13,"id1_avg, id2_avg, ..., id11_avg - Average of each id feature (from Train_identity table)",
+14,"TransactionDT_hour, TransactionDT_day, TransactionDT_weekday - Extracted hour, day, and weekday from TransactionDT","
+reference_datetime = pd.to_datetime('1970-01-01')  # assuming the reference datetime is 1970-01-01
+Transaction['TransactionDT'] = reference_datetime + pd.to_timedelta(Transaction['TransactionDT'])
+Transaction['TransactionDT_hour'] = Transaction['TransactionDT'].dt.hour
+Transaction['TransactionDT_day'] = Transaction['TransactionDT'].dt.day
+Transaction['TransactionDT_weekday'] = Transaction['TransactionDT'].dt.dayofweek
+"
+15,"card1_card2_corr, card1_card3_corr, ..., card5_card6_corr - Correlation between each pair of card features","
+import pandas as pd
+from itertools import combinations
+
+# Select card features
+card_features = [f""card{i}"" for i in range(1, 7)]
+
+# One-hot encode the card features
+Transaction = pd.get_dummies(Transaction, columns=card_features)
+
+# Compute correlation between each pair of dummy variables
+corr_features = []
+for f1, f2 in combinations(Transaction.columns, 2):
+    if f1.startswith(""card"") and f2.startswith(""card""):
+        corr = Transaction[f1].corr(Transaction[f2])
+        Transaction[f""{f1}_{f2}_corr""] = corr
+        corr_features.append(f""{f1}_{f2}_corr"")
+
+print(""Added features:"", corr_features)
+"
+16,addr1_addr2_corr - Correlation between addr1 and addr2,"
+from sklearn.preprocessing import LabelEncoder
+
+le = LabelEncoder()
+Transaction['addr1_encoded'] = le.fit_transform(Transaction['addr1'])
+Transaction['addr2_encoded'] = le.fit_transform(Transaction['addr2'])
+
+Transaction['addr1_addr2_corr'] = Transaction.groupby('TransactionID').apply(lambda x: x['addr1_encoded'].corr(x['addr2_encoded'])).reset_index(name='addr1_addr2_corr')['addr1_addr2_corr']
+"
+17,P_emaildomain_R_emaildomain_corr - Correlation between P_emaildomain and R_emaildomain,
+18,"ProductCD_card1_corr, ProductCD_card2_corr, ..., ProductCD_card6_corr - Correlation between ProductCD and each card feature",
+19,"ProductCD_addr1_corr, ProductCD_addr2_corr - Correlation between ProductCD and each address feature","
+import pandas as pd
+
+# Calculate the frequency of each combination of ProductCD and addr1
+freq_addr1 = Transaction.groupby(['ProductCD', 'addr1']).size().reset_index(name='freq_addr1')
+
+# Calculate the frequency of each combination of ProductCD and addr2
+freq_addr2 = Transaction.groupby(['ProductCD', 'addr2']).size().reset_index(name='freq_addr2')
+
+# Merge the frequency tables with the original table
+Transaction = Transaction.merge(freq_addr1, on=['ProductCD', 'addr1'], how='left')
+Transaction = Transaction.merge(freq_addr2, on=['ProductCD', 'addr2'], how='left')
+
+# Calculate the correlation between ProductCD and each address feature
+corr_addr1 = freq_addr1.groupby('ProductCD')['freq_addr1'].corr(freq_addr1.groupby('ProductCD')['freq_addr1'].mean())
+corr_addr2 = freq_addr2.groupby('ProductCD')['freq_addr2'].corr(freq_addr2.groupby('ProductCD')['freq_addr2'].mean())
+
+# Add the correlation as new columns to the Transaction table
+Transaction['ProductCD_addr1_corr'] = Transaction['ProductCD'].map(corr_addr1)
+Transaction['ProductCD_addr2_corr'] = Transaction['ProductCD'].map(corr_addr2)
+"
+20,DeviceType_DeviceInfo_corr - Correlation between DeviceType and DeviceInfo (from Train_identity table),
+21,"id_12_id_13_corr, id_12_id_14_corr, ..., id_37_id_38_corr - Correlation between each pair of id features (from Train_identity table)","
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import LabelEncoder
+
+# Merge the two tables on TransactionID
+merged_table = pd.merge(Transaction, Train_identity, on='TransactionID')
+
+# Encode the id features
+id_cols = [col for col in merged_table.columns if col.startswith('id_')]
+le = LabelEncoder()
+for col in id_cols:
+    merged_table[col] = le.fit_transform(merged_table[col])
+
+# Compute the correlation between each pair of id features
+corr_matrix = merged_table[id_cols].corr()
+
+# Create new feature names
+new_feature_names = [f'{col1}_{col2}_corr' for i, col1 in enumerate(id_cols) for j, col2 in enumerate(id_cols) if i < j]
+
+# Compute the correlations
+new_features = []
+for i, col1 in enumerate(id_cols):
+    for j, col2 in enumerate(id_cols):
+        if i < j:
+            new_features.append(merged_table[col1] * merged_table[col2])
+
+# Add the new features to the Transaction table
+for i, new_feature in enumerate(new_features):
+    Transaction[new_feature_names[i]] = new_feature
+"
+22,"TransactionAmt_quantile - Quantile of TransactionAmt (e.g., 25th, 50th, 75th percentile)","
+Transaction['TransactionAmt_quantile'] = Transaction.groupby('TransactionID')['TransactionAmt'].transform(lambda x: x.rank(pct=True))
+"
+23,"dist1_quantile, dist2_quantile - Quantile of dist1 and dist2","
+from sklearn.preprocessing import QuantileTransformer
+
+qt = QuantileTransformer(n_quantiles=100, output_distribution='uniform')
+Transaction['dist1_quantile'] = qt.fit_transform(Transaction[['dist1']]).ravel()
+Transaction['dist2_quantile'] = qt.fit_transform(Transaction[['dist2']]).ravel()
+"
+24,"C1_quantile, C2_quantile, ..., C14_quantile - Quantile of each C feature","
+from pandas import qcut
+
+for i in range(1, 15):
+    col_name = f'C{i}_quantile'
+    Transaction[col_name] = qcut(Transaction[f'C{i}'], q=4, labels=False, duplicates='drop')
+"
+25,"D1_quantile, D2_quantile, ..., D15_quantile - Quantile of each D feature","
+for i in range(1, 16):
+    col_name = f""D{i}_quantile""
+    Transaction[col_name] = pd.qcut(Transaction[f""D{i}""], 4, labels=False, duplicates='drop')
+"
+26,"V1_quantile, V2_quantile, ..., V339_quantile - Quantile of each V feature","
+from scipy.stats import percentileofscore
+
+for i in range(1, 340):
+    col_name = f'V{i}'
+    Transaction[f'{col_name}_quantile'] = Transaction[col_name].apply(lambda x: percentileofscore(Transaction[col_name], x) / 100)
+"
+27,"id1_quantile, id2_quantile, ..., id11_quantile - Quantile of each id feature (from Train_identity table)","
+for i in range(1, 12):
+    col_name = f""id{i}""
+    quantile_name = f""id{i}_quantile""
+    if col_name in Train_identity.columns:
+        quantile_values = Train_identity.groupby(""TransactionID"")[col_name].quantile().reset_index()
+        quantile_values = quantile_values.pivot(index=""TransactionID"", columns=col_name, values=col_name).add_suffix(""_quantile"")
+        Transaction = Transaction.merge(quantile_values, on=""TransactionID"", how=""left"")
+"

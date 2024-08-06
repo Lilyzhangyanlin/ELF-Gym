@@ -1,0 +1,306 @@
+,feature_description,code
+0,AgeGroup - Binned age groups to capture age patterns,"
+# Convert 'age' column to numeric type and fill NA values
+Gender_age['age'] = pd.to_numeric(Gender_age['age'], errors='coerce')
+Gender_age['age'].fillna(Gender_age['age'].mean(), inplace=True)
+
+# Define age groups
+age_bins = [0, 18, 35, 60, 100]
+age_group_labels = ['Young', 'MiddleAged', 'Senior', 'VerySenior']
+
+# Create a new column in Gender_age DataFrame
+Gender_age['AgeGroup'] = pd.cut(Gender_age['age'], bins=age_bins, labels=age_group_labels)
+"
+1,GenderAgeMean - Average age for each gender,"
+# Replace non-numeric values in the 'age' column with NaN
+Gender_age['age'] = pd.to_numeric(Gender_age['age'], errors='coerce')
+
+# Group the Gender_age DataFrame by gender and calculate the mean age
+Gender_age_grouped = Gender_age.groupby('gender')['age'].mean()
+
+# Reset the index to convert the MultiIndex into a column
+Gender_age_grouped = Gender_age_grouped.reset_index()
+
+# Rename the columns to 'gender' and 'GenderAgeMean'
+Gender_age_grouped = Gender_age_grouped.rename(columns={'index': 'gender', 'age': 'GenderAgeMean'})
+
+# Merge the GenderAgeMean column with the original Gender_age DataFrame
+Gender_age = pd.merge(Gender_age, Gender_age_grouped, on='gender')
+"
+2,GenderDeviceCount - Count of devices for each gender,"
+# Merge Brand and Gender_age tables on device_id
+Gender_age = Gender_age.merge(Brand, on='device_id', how='left')
+
+# Group the devices by gender and count them
+gender_device_count = Gender_age['gender'].value_counts().groupby(Gender_age['phone_brand']).sum().reset_index()
+gender_device_count.columns = ['phone_brand', 'GenderDeviceCount']
+
+# Merge the GenderDeviceCount with the Gender_age table
+Gender_age = Gender_age.merge(gender_device_count, on='phone_brand', how='left')
+
+# Fill the NA values with 0
+Gender_age['GenderDeviceCount'].fillna(0, inplace=True)
+"
+3,GenderEventCount - Count of events for each gender,"
+# First, merge the Gender_age and Events tables on device_id
+Gender_age_Events = pd.merge(Gender_age, Events, on='device_id')
+
+# Then, group by gender and device_id, and count the number of events
+GenderEventCount = Gender_age_Events.groupby(['gender', 'device_id'])['event_id'].count().reset_index(name='GenderEventCount')
+
+# Finally, merge the result back to the original Gender_age table
+Gender_age = Gender_age.merge(GenderEventCount, on=['gender', 'device_id'])
+"
+4,DeviceBrandCount - Count of each device brand,"
+# First, we need to merge the Brand and Gender_age tables on device_id
+Brand_gender_age = pd.merge(Gender_age, Brand, on='device_id', how='left')
+
+# Then, we can count the number of each device brand
+Brand_gender_age['DeviceBrandCount'] = Brand_gender_age['device_id'].map(Brand_gender_age.groupby('device_id')['device_id'].count())
+
+# Finally, we can merge the result back to the Gender_age table
+Gender_age = pd.merge(Gender_age, Brand_gender_age[['device_id', 'DeviceBrandCount']], on='device_id', how='left')
+"
+5,DeviceModelCount - Count of each device model,"
+# Convert 'device_model' column in Brand DataFrame to categorical data type
+Brand['device_model'] = Brand['device_model'].astype('category')
+
+# Merge Brand and Gender_age tables on device_id
+Gender_age = Gender_age.merge(Brand[['device_id', 'device_model']], on='device_id', how='left')
+
+# Then, count the number of each device model
+device_model_count = Gender_age['device_model'].value_counts()
+
+# Create a new DataFrame with the counted device models
+DeviceModelCount = pd.DataFrame({'DeviceModelCount': device_model_count.values})
+
+# Convert the index of DeviceModelCount DataFrame to a column
+DeviceModelCount = DeviceModelCount.reset_index()
+
+# Rename the column to match the device_model column in Gender_age DataFrame
+DeviceModelCount = DeviceModelCount.rename(columns={'index': 'device_model'})
+
+# Merge DeviceModelCount DataFrame with Gender_age DataFrame
+Gender_age = Gender_age.merge(DeviceModelCount, on='device_model', how='left')
+
+# Fill Na values with 0
+Gender_age['DeviceModelCount'] = Gender_age['DeviceModelCount'].fillna(0)
+"
+6,EventTimestampMean - Average timestamp for each event,"
+# First, merge the Events and App_events tables on 'event_id'
+Events_App_events = pd.merge(Events, App_events, on='event_id')
+
+# Then, compute the mean timestamp for each event_id
+Events_App_events['EventTimestampMean'] = Events_App_events.groupby('event_id')['timestamp'].transform('mean')
+
+# Finally, merge the result with the Gender_age table on 'device_id'
+Gender_age = pd.merge(Gender_age, Events_App_events[['device_id', 'EventTimestampMean']], on='device_id', how='left')
+"
+7,EventTimestampStd - Standard deviation of timestamp for each event,"
+# Merge Gender_age and Events tables on device_id
+merged_df = pd.merge(Gender_age, Events, on='device_id')
+
+# Group by device_id and compute std deviation of timestamp
+merged_df['EventTimestampStd'] = merged_df.groupby('device_id')['timestamp'].transform(lambda x: x.std())
+
+# Drop the timestamp column as it's not required
+merged_df = merged_df.drop('timestamp', axis=1)
+
+# Overwrite the Gender_age DataFrame
+Gender_age = merged_df
+"
+8,EventLocationMeanLongitude - Average longitude for each event,"
+# Join Events and App_events tables on event_id
+Events_App_events = pd.merge(Events, App_events, on='event_id')
+
+# Join Events_App_events and App_labels tables on app_id
+Events_App_labels = pd.merge(Events_App_events, App_labels, on='app_id')
+
+# Join Events_App_labels and Label_categories tables on label_id
+Events_App_labels_categories = pd.merge(Events_App_labels, Label_categories, on='label_id')
+
+# Calculate the average longitude for each event
+Events_App_labels_categories['EventLocationMeanLongitude'] = Events_App_labels_categories.groupby('event_id')['longitude'].transform('mean')
+
+# Join Events_App_labels_categories and Gender_age tables on device_id
+Gender_age_Events = pd.merge(Gender_age, Events_App_labels_categories, on='device_id')
+
+# Now, the 'EventLocationMeanLongitude' column is added to the Gender_age table
+"
+9,EventLocationMeanLatitude - Average latitude for each event,"
+# Join Events and App_events tables on event_id
+Events_App_events = pd.merge(Events, App_events, on='event_id')
+
+# Join Events_App_events and App_labels tables on app_id
+Events_App_labels = pd.merge(Events_App_events, App_labels, on='app_id')
+
+# Join Events_App_labels and Label_categories tables on label_id
+Events_App_labels_categories = pd.merge(Events_App_labels, Label_categories, on='label_id')
+
+# Calculate the average latitude for each event
+Events_App_labels_categories['EventLocationMeanLatitude'] = Events_App_labels_categories.groupby('event_id')['latitude'].transform('mean')
+
+# Join Events_App_labels_categories and Gender_age tables on device_id
+Gender_age_with_EventLocationMeanLatitude = pd.merge(Gender_age, Events_App_labels_categories[['device_id', 'EventLocationMeanLatitude']], on='device_id')
+"
+10,EventLocationStdLongitude - Standard deviation of longitude for each event,"
+# Merge Events and App_events tables on event_id
+events_app_events = pd.merge(Events, App_events, on='event_id')
+
+# Merge Gender_age and Brand tables on device_id
+gender_age_brand = pd.merge(Gender_age, Brand, on='device_id')
+
+# Calculate the standard deviation of longitude for each device_id
+device_longitude_std = events_app_events.groupby('device_id')['longitude'].std()
+
+# Merge the standard deviation values with the gender_age_brand table
+Gender_age['EventLocationStdLongitude'] = gender_age_brand['device_id'].map(device_longitude_std)
+"
+11,EventLocationStdLatitude - Standard deviation of latitude for each event,"
+# Merge Events and App_events tables on event_id
+events_app_events = pd.merge(Events, App_events, on='event_id')
+
+# Merge Gender_age and Brand tables on device_id
+gender_age_brand = pd.merge(Gender_age, Brand, on='device_id')
+
+# Calculate the standard deviation of latitude for each device_id
+std_latitude = events_app_events.groupby('device_id')['latitude'].std()
+
+# Merge the standard deviation of latitude with the gender_age_brand table
+Gender_age['EventLocationStdLatitude'] = gender_age_brand['device_id'].map(std_latitude)
+"
+12,AppActiveCount - Count of active apps for each event,"
+# Merge App_events and Events tables on event_id
+App_events = App_events.merge(Events[['event_id', 'device_id']], on='event_id', how='inner')
+
+# Merge App_labels and App_events tables on app_id
+App_labels = App_labels.merge(App_events[['app_id', 'event_id', 'device_id']], on='app_id', how='inner')
+
+# Merge Label_categories and App_labels tables on label_id
+App_labels = App_labels.merge(Label_categories[['label_id', 'category']], on='label_id', how='inner')
+
+# Count the number of active apps for each event
+App_events['AppActiveCount'] = App_events.groupby('event_id')['device_id'].transform('count')
+
+# Merge the computed feature with the Gender_age table on device_id
+Gender_age = Gender_age.merge(App_events[['device_id', 'AppActiveCount']], on='device_id', how='left')
+"
+13,AppLabelCount - Count of app labels for each event,"
+# First, we need to merge the necessary tables
+Gender_age = Gender_age.merge(Events, on='device_id')
+Gender_age = Gender_age.merge(App_events, on='event_id')
+Gender_age = Gender_age.merge(App_labels, on='app_id')
+
+# Then, we can compute the AppLabelCount
+Gender_age['AppLabelCount'] = Gender_age.groupby('device_id')['label_id'].transform('nunique')
+"
+14,LabelCategoryCount - Count of label categories for each event,"
+# First, merge the necessary tables
+Events = Events.merge(App_events, on='event_id')
+Events = Events.merge(App_labels, on='app_id')
+Events = Events.merge(Label_categories, on='label_id')
+
+# Then, compute the LabelCategoryCount
+Events['LabelCategoryCount'] = Events.groupby('device_id')['category'].transform('nunique')
+
+# Finally, merge the Events table with the Gender_age table
+Gender_age = Gender_age.merge(Events[['device_id', 'LabelCategoryCount']], on='device_id', how='left')
+"
+15,LabelCategoryUniqueCount - Unique count of label categories for each event,"
+# First, merge the necessary tables
+Events = Events.merge(App_events, on='event_id')
+Events = Events.merge(App_labels, on='app_id')
+Events = Events.merge(Label_categories, on='label_id')
+
+# Then, compute the LabelCategoryUniqueCount
+Events['LabelCategoryUniqueCount'] = Events.groupby('device_id')['category'].transform('nunique')
+
+# Finally, merge the Events table with the Gender_age table
+Gender_age = Gender_age.merge(Events[['device_id', 'LabelCategoryUniqueCount']], on='device_id', how='left')
+"
+16,BrandDeviceCount - Count of devices for each brand,
+17,BrandDeviceUniqueCount - Unique count of devices for each brand,"
+# First, merge the Brand and Events tables on device_id
+BrandEvents = pd.merge(Brand, Events[['device_id']], on='device_id', how='inner')
+
+# Then, count the unique devices for each brand
+BrandDeviceUniqueCount = BrandEvents.groupby('phone_brand')['device_id'].nunique()
+
+# Now, merge the result with the Gender_age table
+Gender_age = Gender_age.merge(BrandDeviceUniqueCount.to_frame('BrandDeviceUniqueCount'), left_index=True, right_index=True, how='left')
+"
+18,BrandAppCount - Count of apps for each brand,
+19,BrandAppUniqueCount - Unique count of apps for each brand,
+20,ModelDeviceCount - Count of devices for each model,"
+# First, merge Brand and Events tables on device_id
+Brand_Events = pd.merge(Brand, Events[['device_id']], on='device_id', how='inner')
+
+# Then, count the number of devices for each model
+ModelDeviceCount = Brand_Events['phone_brand'].value_counts()
+
+# Now, merge the ModelDeviceCount series with the Gender_age table
+Gender_age = Gender_age.merge(ModelDeviceCount.to_frame('ModelDeviceCount'), left_index=True, right_index=True, how='left')
+"
+21,ModelDeviceUniqueCount - Unique count of devices for each model,
+22,ModelAppCount - Count of apps for each model,
+23,ModelAppUniqueCount - Unique count of apps for each model,
+24,AgeGenderDeviceCount - Count of devices for each age and gender,"
+# First, merge the Gender_age, Events, and Brand tables based on device_id
+merged_df = pd.merge(Gender_age, Events, on='device_id')
+merged_df = pd.merge(merged_df, Brand, on='device_id')
+
+# Then, group by age, gender, and phone_brand, and count the number of devices
+grouped_df = merged_df.groupby(['age', 'gender', 'phone_brand']).size().reset_index(name='AgeGenderDeviceCount')
+
+# Finally, merge the result back to the original Gender_age table
+Gender_age = Gender_age.merge(grouped_df, on=['age', 'gender'], how='left')
+
+# Fill the NaN values with 0
+Gender_age['AgeGenderDeviceCount'].fillna(0, inplace=True)
+"
+25,AgeGenderEventCount - Count of events for each age and gender,"
+# First, merge the Gender_age, Events, and Brand tables based on device_id
+merged_df = pd.merge(Gender_age, Events, on='device_id')
+merged_df = pd.merge(merged_df, Brand, on='device_id')
+
+# Then, compute the AgeGenderEventCount
+merged_df['AgeGenderEventCount'] = merged_df.groupby(['age', 'gender'])['event_id'].transform('count')
+
+# Finally, add the new column to the Gender_age table
+Gender_age['AgeGenderEventCount'] = merged_df['AgeGenderEventCount']
+"
+26,AgeGenderAppActiveCount - Count of active apps for each age and gender,
+27,AgeGenderAppLabelCount - Count of app labels for each age and gender,"
+# Compute the AgeGenderAppLabelCount
+App_labels_grouped = App_labels.groupby(['app_id'])['label_id'].nunique()
+Gender_age['AgeGenderAppLabelCount'] = Gender_age['device_id'].map(App_labels_grouped).fillna(0)
+"
+28,AgeGenderLabelCategoryCount - Count of label categories for each age and gender,
+29,"AgeGenderBrandCount - Count of devices for each age, gender, and brand","
+# Merge all tables on device_id
+merged_df = pd.merge(Gender_age, Events, on='device_id')
+merged_df = pd.merge(merged_df, App_events, on='event_id')
+merged_df = pd.merge(merged_df, App_labels, on='app_id')
+merged_df = pd.merge(merged_df, Label_categories, on='label_id')
+merged_df = pd.merge(merged_df, Brand, on='device_id')
+
+# Group by age, gender, brand and count the number of devices
+grouped_df = merged_df.groupby(['age', 'gender', 'phone_brand']).size().reset_index(name='AgeGenderBrandCount')
+
+# Merge the result back to the Gender_age table
+Gender_age = Gender_age.merge(grouped_df, on=['age', 'gender'], how='left')
+"
+30,"AgeGenderModelCount - Count of devices for each age, gender, and model","
+# Merge all tables
+merged_df = Gender_age.merge(Events, on='device_id', how='left')
+merged_df = merged_df.merge(App_events, on='event_id', how='left')
+merged_df = merged_df.merge(App_labels, on='app_id', how='left')
+merged_df = merged_df.merge(Label_categories, on='label_id', how='left')
+merged_df = merged_df.merge(Brand, on='device_id', how='left')
+
+# Compute AgeGenderModelCount
+grouped_df = merged_df.groupby(['age', 'gender', 'device_model']).size().reset_index(name='AgeGenderModelCount')
+
+# Merge the computed feature with the original Gender_age table
+Gender_age = Gender_age.merge(grouped_df, on=['age', 'gender'], how='left')
+"
