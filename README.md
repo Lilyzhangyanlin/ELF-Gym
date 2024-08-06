@@ -1,4 +1,4 @@
-# LLM_datascience
+# ELF-Gym
 
 This repository contains projects and experiments related to the paper: **"ELF-Gym: Evaluating Large Language Models Generated Features for Tabular Prediction."**
 
